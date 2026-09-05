@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getSalesRates, type SalesRateRow } from "../lib/sales-data";
+import { getSalesRates, saveSalesQuote, type SalesRateRow } from "../lib/sales-data";
 
 type Ticket = { id: string; name: string; price: number; note?: string };
 type Experience = { id: string; name: string; line: "tour" | "rental"; tickets: Ticket[] };
@@ -79,8 +79,11 @@ export default function QuoteBuilder() {
   const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     getSalesRates()
@@ -143,6 +146,40 @@ export default function QuoteBuilder() {
     total: sum.total + item.total,
   }), { subtotal: 0, tax: 0, tripSafe: 0, premier: 0, twFee: 0, total: 0 });
 
+  const hasAnyTicket = activities.some((activity) => Object.values(activity.qty).some((quantity) => quantity > 0));
+
+  async function handleSave() {
+    if (!hasAnyTicket) {
+      setSaveMessage("Add at least one ticket before saving the estimate.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage("");
+    try {
+      const result = await saveSalesQuote({
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
+        activities: activities.map((activity) => ({
+          experienceId: activity.experienceId,
+          tripSafe: activity.tripSafe,
+          premier: activity.premier,
+          tickets: Object.entries(activity.qty)
+            .filter(([, quantity]) => quantity > 0)
+            .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })),
+        })),
+      });
+      setSaveMessage(result.lead_created_or_attached
+        ? `Estimate saved and attached to the lead. Quote ${result.quote_id.slice(0, 8)}.`
+        : `Estimate saved. Add an email or phone number to create/attach a lead. Quote ${result.quote_id.slice(0, 8)}.`);
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Unable to save estimate.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -157,7 +194,7 @@ export default function QuoteBuilder() {
         {active === "leads" ? (
           <div className="card">
             <h2>Sales Leads</h2>
-            <p className="muted">Standalone Epic Sales workspace. Lead persistence and call linking are next.</p>
+            <p className="muted">Standalone Epic Sales workspace. Saved estimates now attach to an existing open lead by phone/email or create a new lead.</p>
             <div className="leadRow"><strong>New Lead</strong><span className="muted">No quote yet</span><span className="badge">Open</span><button onClick={() => setActive("quotes")}>Build Estimate</button></div>
           </div>
         ) : (
@@ -231,9 +268,11 @@ export default function QuoteBuilder() {
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
               <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
-              <div className="field" style={{ marginTop: 20 }}><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional for now" /></div>
-              <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional for now" /></div>
-              <button className="primary" type="button">Save Estimate (next)</button>
+              <div className="field" style={{ marginTop: 20 }}><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" /></div>
+              <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional unless emailing quote" /></div>
+              <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" /></div>
+              <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving Estimate..." : "Save Estimate"}</button>
+              {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
               <p className="ticketMeta" style={{ marginBottom: 0 }}>Rates are live from the Sales rate table and currently use $1 placeholders.</p>
             </section>
           </div>
