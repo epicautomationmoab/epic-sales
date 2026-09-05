@@ -38,6 +38,26 @@ export type RecentSalesQuote = {
   created_at: string;
 };
 
+export type SalesQuoteDetail = {
+  quote: RecentSalesQuote & Record<string, unknown>;
+  activities: Array<{
+    id: string;
+    experience_id: string;
+    experience_name: string;
+    business_line: string;
+    activity_order: number;
+    tripsafe_selected: boolean;
+    premier_selected: boolean;
+    items: Array<{
+      ticket_type_id: string;
+      ticket_type_name: string;
+      quantity: number;
+      unit_price_cents: number;
+      line_total_cents: number;
+    }>;
+  }>;
+};
+
 const SUPABASE_URL = "https://kbuxcvqzicnydqllyong.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 
@@ -69,6 +89,7 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
 }
 
 export async function saveSalesQuote(input: {
+  quoteId?: string | null;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -76,10 +97,11 @@ export async function saveSalesQuote(input: {
   visitEnd?: string;
   activities: SaveQuoteActivity[];
 }): Promise<SaveQuoteResult> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v2`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v3`, {
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
+      p_quote_id: input.quoteId || null,
       p_customer_name: input.customerName || null,
       p_customer_email: input.customerEmail || null,
       p_customer_phone: input.customerPhone || null,
@@ -111,4 +133,22 @@ export async function getRecentSalesQuotes(limit = 25): Promise<RecentSalesQuote
   }
 
   return response.json() as Promise<RecentSalesQuote[]>;
+}
+
+export async function getSalesQuoteDetail(quoteId: string): Promise<SalesQuoteDetail> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_epic_sales_quote_detail`, {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({ p_quote_id: quoteId }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Unable to open quote (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  const result = await response.json();
+  if (!result) throw new Error("Quote not found.");
+  return result as SalesQuoteDetail;
 }
