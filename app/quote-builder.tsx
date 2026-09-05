@@ -5,8 +5,30 @@ import { getSalesRates, type SalesRateRow } from "../lib/sales-data";
 
 type Ticket = { id: string; name: string; price: number; note?: string };
 type Experience = { id: string; name: string; line: "tour" | "rental"; tickets: Ticket[] };
+type QuoteActivity = {
+  key: string;
+  experienceId: string;
+  qty: Record<string, number>;
+  tripSafe: boolean;
+  premier: boolean;
+};
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+function ticketSortRank(name: string) {
+  const value = name.toLowerCase();
+  if (value.includes("3 hour")) return 10;
+  if (value.includes("5 hour") || value.includes("half-day") || value.includes("half day")) return 20;
+  if (value.includes("9 hour") || value.includes("full-day") || value.includes("full day")) return 30;
+  if (value.includes("24 hour")) return 40;
+  const dayMatch = value.match(/(\d+)\s*[- ]?day/);
+  if (dayMatch) return 40 + Number(dayMatch[1]) * 10;
+  if (value.includes("vehicle") || value.includes("rzr") || value.includes("pro r") || value.includes("pro s") || value.includes("xpedition")) return 100;
+  if (value.includes("guest") || value.includes("adult rider")) return 200;
+  if (value.includes("guide car")) return 210;
+  if (value.includes("terms")) return 999;
+  return 500;
+}
 
 function buildExperiences(rows: SalesRateRow[]): Experience[] {
   const grouped = new Map<string, Experience>();
@@ -27,16 +49,34 @@ function buildExperiences(rows: SalesRateRow[]): Experience[] {
       note: row.sales_help_text || row.quantity_label || "Placeholder rate",
     });
   }
-  return Array.from(grouped.values()).sort((a, b) => a.line === b.line ? a.name.localeCompare(b.name) : a.line.localeCompare(b.line));
+
+  for (const experience of grouped.values()) {
+    experience.tickets.sort((a, b) => {
+      const rank = ticketSortRank(a.name) - ticketSortRank(b.name);
+      return rank || a.name.localeCompare(b.name);
+    });
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    if (a.line !== b.line) return a.line === "tour" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function blankActivity(experienceId = ""): QuoteActivity {
+  return {
+    key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    experienceId,
+    qty: {},
+    tripSafe: false,
+    premier: false,
+  };
 }
 
 export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
-  const [experienceId, setExperienceId] = useState("");
-  const [qty, setQty] = useState<Record<string, number>>({});
-  const [tripSafe, setTripSafe] = useState(false);
-  const [premier, setPremier] = useState(false);
+  const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
@@ -47,29 +87,61 @@ export default function QuoteBuilder() {
       .then((rows) => {
         const built = buildExperiences(rows);
         setExperiences(built);
-        setExperienceId(built[0]?.id || "");
+        if (built.length) setActivities([blankActivity(built[0].id)]);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales rates"))
       .finally(() => setLoading(false));
   }, []);
 
-  const experience = experiences.find((item) => item.id === experienceId) ?? experiences[0];
-  const subtotal = useMemo(() => experience ? experience.tickets.reduce((sum, ticket) => sum + ticket.price * (qty[ticket.id] ?? 0), 0) : 0, [experience, qty]);
-  const taxRate = experience?.line === "rental" ? 0.0635 + 0.025 : 0.0735;
-  const tax = subtotal * taxRate;
-  const tripSafeAmount = tripSafe ? subtotal * 0.09 : 0;
-  const premierAmount = experience?.line === "rental" && premier ? 69 : 0;
-  const twBase = subtotal + tax + tripSafeAmount + premierAmount;
-  const twFee = twBase * 0.04;
-  const total = twBase + twFee;
+  function updateActivity(key: string, changes: Partial<QuoteActivity>) {
+    setActivities((current) => current.map((item) => item.key === key ? { ...item, ...changes } : item));
+  }
 
-  const changeQty = (id: string, delta: number) => setQty((current) => ({ ...current, [id]: Math.max(0, (current[id] ?? 0) + delta) }));
-  const changeExperience = (id: string) => {
-    setExperienceId(id);
-    setQty({});
-    setTripSafe(false);
-    setPremier(false);
-  };
+  function changeExperience(key: string, experienceId: string) {
+    updateActivity(key, { experienceId, qty: {}, tripSafe: false, premier: false });
+  }
+
+  function changeQty(activityKey: string, ticketId: string, delta: number) {
+    setActivities((current) => current.map((item) => {
+      if (item.key !== activityKey) return item;
+      return {
+        ...item,
+        qty: { ...item.qty, [ticketId]: Math.max(0, (item.qty[ticketId] ?? 0) + delta) },
+      };
+    }));
+  }
+
+  function addActivity() {
+    setActivities((current) => [...current, blankActivity(experiences[0]?.id || "")]);
+  }
+
+  function removeActivity(key: string) {
+    setActivities((current) => current.length === 1 ? current : current.filter((item) => item.key !== key));
+  }
+
+  const calculatedActivities = useMemo(() => activities.map((activity) => {
+    const experience = experiences.find((item) => item.id === activity.experienceId);
+    const subtotal = experience ? experience.tickets.reduce((sum, ticket) => sum + ticket.price * (activity.qty[ticket.id] ?? 0), 0) : 0;
+    const primaryTaxRate = experience?.line === "rental" ? 0.0635 : 0.0735;
+    const secondaryTaxRate = experience?.line === "rental" ? 0.025 : 0;
+    const primaryTax = subtotal * primaryTaxRate;
+    const secondaryTax = subtotal * secondaryTaxRate;
+    const tripSafeAmount = activity.tripSafe ? subtotal * 0.09 : 0;
+    const premierAmount = experience?.line === "rental" && activity.premier ? 69 : 0;
+    const twBase = subtotal + primaryTax + secondaryTax + tripSafeAmount + premierAmount;
+    const twFee = twBase * 0.04;
+    const total = twBase + twFee;
+    return { activity, experience, subtotal, primaryTax, secondaryTax, tripSafeAmount, premierAmount, twFee, total };
+  }), [activities, experiences]);
+
+  const totals = calculatedActivities.reduce((sum, item) => ({
+    subtotal: sum.subtotal + item.subtotal,
+    tax: sum.tax + item.primaryTax + item.secondaryTax,
+    tripSafe: sum.tripSafe + item.tripSafeAmount,
+    premier: sum.premier + item.premierAmount,
+    twFee: sum.twFee + item.twFee,
+    total: sum.total + item.total,
+  }), { subtotal: 0, tax: 0, tripSafe: 0, premier: 0, twFee: 0, total: 0 });
 
   return (
     <main className="shell">
@@ -89,19 +161,32 @@ export default function QuoteBuilder() {
             <div className="leadRow"><strong>New Lead</strong><span className="muted">No quote yet</span><span className="badge">Open</span><button onClick={() => setActive("quotes")}>Build Estimate</button></div>
           </div>
         ) : (
-          <div className="grid">
-            <section className="card">
-              <h2>Build Estimate</h2>
-              {loading && <p className="muted">Loading Epic experiences and ticket types...</p>}
-              {error && <p className="muted">{error}</p>}
-              {experience && (
-                <>
+          <div className="grid quoteGrid">
+            <section>
+              <div className="sectionHeading">
+                <div>
+                  <h2>Build Estimate</h2>
+                  <p className="muted compact">One quote can include multiple tours and rentals.</p>
+                </div>
+                <button className="secondary" type="button" onClick={addActivity} disabled={!experiences.length}>+ Add Activity</button>
+              </div>
+
+              {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
+              {error && <div className="card"><p className="muted">{error}</p></div>}
+
+              {!loading && !error && calculatedActivities.map(({ activity, experience }, index) => experience && (
+                <div className="card activityCard" key={activity.key}>
+                  <div className="activityHeader">
+                    <div className="activityNumber">Activity {index + 1}</div>
+                    {activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}
+                  </div>
                   <div className="field">
                     <label>Experience</label>
-                    <select value={experienceId} onChange={(e) => changeExperience(e.target.value)}>
+                    <select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}>
                       {experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                   </div>
+
                   {experience.tickets.map((ticket) => (
                     <div className="ticketRow" key={ticket.id}>
                       <div>
@@ -109,34 +194,43 @@ export default function QuoteBuilder() {
                         <div className="ticketMeta">{ticket.note}</div>
                       </div>
                       <div className="qty">
-                        <button onClick={() => changeQty(ticket.id, -1)}>-</button>
-                        <span>{qty[ticket.id] ?? 0}</span>
-                        <button onClick={() => changeQty(ticket.id, 1)}>+</button>
+                        <button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button>
+                        <span>{activity.qty[ticket.id] ?? 0}</span>
+                        <button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button>
                       </div>
                     </div>
                   ))}
+
                   <div className="toggleRow">
-                    <div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9%</div></div>
-                    <input type="checkbox" checked={tripSafe} onChange={(e) => setTripSafe(e.target.checked)} />
+                    <div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div>
+                    <input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} />
                   </div>
                   {experience.line === "rental" && (
                     <div className="toggleRow">
-                      <div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69 protection option</div></div>
-                      <input type="checkbox" checked={premier} onChange={(e) => setPremier(e.target.checked)} />
+                      <div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69 for this rental period</div></div>
+                      <input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} />
                     </div>
                   )}
-                </>
-              )}
+                </div>
+              ))}
+
+              {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>+ Add Another Activity</button>}
             </section>
 
-            <section className="card">
+            <section className="card summaryCard">
               <h2>Quote Summary</h2>
-              <div className="summaryRow"><span>Ticket subtotal</span><strong>{money.format(subtotal)}</strong></div>
-              <div className="summaryRow"><span>Tax ({(taxRate * 100).toFixed(2)}%)</span><strong>{money.format(tax)}</strong></div>
-              <div className="summaryRow"><span>TripSafe</span><strong>{money.format(tripSafeAmount)}</strong></div>
-              {experience?.line === "rental" && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(premierAmount)}</strong></div>}
-              <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(twFee)}</strong></div>
-              <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(total)}</span></div>
+              {calculatedActivities.map(({ activity, experience, total }, index) => experience && (
+                <div className="quoteActivitySummary" key={activity.key}>
+                  <div><strong>{index + 1}. {experience.name}</strong></div>
+                  <strong>{money.format(total)}</strong>
+                </div>
+              ))}
+              <div className="summaryRow"><span>Ticket subtotal</span><strong>{money.format(totals.subtotal)}</strong></div>
+              <div className="summaryRow"><span>Taxes</span><strong>{money.format(totals.tax)}</strong></div>
+              <div className="summaryRow"><span>TripSafe</span><strong>{money.format(totals.tripSafe)}</strong></div>
+              {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
+              <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
+              <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
               <div className="field" style={{ marginTop: 20 }}><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional for now" /></div>
               <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional for now" /></div>
               <button className="primary" type="button">Save Estimate (next)</button>
