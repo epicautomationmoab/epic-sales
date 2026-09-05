@@ -25,6 +25,19 @@ export type SaveQuoteResult = {
   visit_end_date?: string | null;
 };
 
+export type RecentSalesQuote = {
+  quote_id: string;
+  opportunity_id: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone_e164: string | null;
+  visit_start_date: string | null;
+  visit_end_date: string | null;
+  status: string;
+  total_cents: number;
+  created_at: string;
+};
+
 const SUPABASE_URL = "https://kbuxcvqzicnydqllyong.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 
@@ -80,4 +93,20 @@ export async function saveSalesQuote(input: {
   }
 
   return response.json() as Promise<SaveQuoteResult>;
+}
+
+export async function getRecentSalesQuotes(limit = 25): Promise<RecentSalesQuote[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_recent_epic_sales_quotes`, {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({ p_limit: limit }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Unable to load saved quotes (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  return response.json() as Promise<RecentSalesQuote[]>;
 }
