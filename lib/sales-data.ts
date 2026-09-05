@@ -50,6 +50,8 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   const params = new URLSearchParams({
     select: "experience_id,experience_name,business_line,ticket_type_id,ticket_type_name,unit_price_cents,quantity_label,sales_help_text",
     is_active: "eq.true",
+    experience_id: "neq.17328",
+    ticket_type_name: "neq.Terms and Conditions",
     order: "business_line.asc,experience_name.asc,ticket_type_name.asc",
   });
 
