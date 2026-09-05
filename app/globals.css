@@ -38,8 +38,8 @@ button { cursor: pointer; }
   padding: 10px 14px;
 }
 .nav button.active { background: var(--accent-soft); border-color: #aac7f5; color: var(--accent); }
-.content { padding: 28px; max-width: 1440px; margin: 0 auto; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.content { padding: 28px; max-width: 1500px; margin: 0 auto; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(360px, .7fr); gap: 20px; align-items: start; }
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -49,6 +49,22 @@ button { cursor: pointer; }
 }
 .card h2 { margin: 0 0 14px; font-size: 20px; }
 .muted { color: var(--muted); }
+.compact { margin: 2px 0 0; }
+.sectionHeading { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 14px; }
+.sectionHeading h2 { margin: 0; }
+.secondary, .addActivityFull {
+  border: 1px solid #b8cdf0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+.addActivityFull { width: 100%; margin-top: 12px; }
+.activityCard { margin-bottom: 16px; }
+.activityHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.activityNumber { font-weight: 800; color: var(--accent); }
+.removeLink { border: 0; background: transparent; color: #b42318; font-weight: 700; }
 .field { display: grid; gap: 6px; margin-bottom: 14px; }
 .field label { font-weight: 600; font-size: 14px; }
 .field input, .field select {
@@ -75,6 +91,8 @@ button { cursor: pointer; }
 }
 .qty span { min-width: 24px; text-align: center; font-weight: 700; }
 .toggleRow { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.summaryCard { position: sticky; top: 20px; }
+.quoteActivitySummary { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .summaryRow { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; }
 .summaryRow.total { font-size: 22px; font-weight: 800; border-top: 2px solid var(--line); padding-top: 14px; margin-top: 14px; }
 .primary {
@@ -88,4 +106,5 @@ button { cursor: pointer; }
 }
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 9px; background: #eef2f7; color: #4b5563; font-size: 12px; font-weight: 700; }
 .leadRow { display: grid; grid-template-columns: 1.2fr .8fr .8fr auto; gap: 14px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }
-@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .leadRow { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } .summaryCard { position: static; } }
+@media (max-width: 700px) { .sectionHeading { align-items: stretch; flex-direction: column; } .leadRow { grid-template-columns: 1fr; } }
