@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getSalesRates, saveSalesQuote, type SalesRateRow } from "../lib/sales-data";
+import {
+  getRecentSalesQuotes,
+  getSalesRates,
+  saveSalesQuote,
+  type RecentSalesQuote,
+  type SalesRateRow,
+} from "../lib/sales-data";
 
 type Ticket = { id: string; name: string; price: number; note?: string };
 type Experience = { id: string; name: string; line: "tour" | "rental"; tickets: Ticket[] };
@@ -73,6 +79,16 @@ function blankActivity(experienceId = ""): QuoteActivity {
   };
 }
 
+function quoteName(quote: RecentSalesQuote) {
+  return quote.customer_name || quote.customer_email || quote.customer_phone_e164 || `Quote ${quote.quote_id.slice(0, 8)}`;
+}
+
+function dateRange(quote: RecentSalesQuote) {
+  if (!quote.visit_start_date) return "Dates not set";
+  if (!quote.visit_end_date || quote.visit_end_date === quote.visit_start_date) return quote.visit_start_date;
+  return `${quote.visit_start_date} to ${quote.visit_end_date}`;
+}
+
 export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
@@ -80,6 +96,9 @@ export default function QuoteBuilder() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [visitStart, setVisitStart] = useState("");
+  const [visitEnd, setVisitEnd] = useState("");
+  const [recentQuotes, setRecentQuotes] = useState<RecentSalesQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -94,6 +113,8 @@ export default function QuoteBuilder() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales rates"))
       .finally(() => setLoading(false));
+
+    getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
   }, []);
 
   function updateActivity(key: string, changes: Partial<QuoteActivity>) {
@@ -161,6 +182,8 @@ export default function QuoteBuilder() {
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
+        visitStart,
+        visitEnd,
         activities: activities.map((activity) => ({
           experienceId: activity.experienceId,
           tripSafe: activity.tripSafe,
@@ -173,6 +196,7 @@ export default function QuoteBuilder() {
       setSaveMessage(result.lead_created_or_attached
         ? `Estimate saved and attached to the lead. Quote ${result.quote_id.slice(0, 8)}.`
         : `Estimate saved. Add an email or phone number to create/attach a lead. Quote ${result.quote_id.slice(0, 8)}.`);
+      getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to save estimate.");
     } finally {
@@ -193,9 +217,23 @@ export default function QuoteBuilder() {
       <section className="content">
         {active === "leads" ? (
           <div className="card">
-            <h2>Sales Leads</h2>
-            <p className="muted">Standalone Epic Sales workspace. Saved estimates now attach to an existing open lead by phone/email or create a new lead.</p>
-            <div className="leadRow"><strong>New Lead</strong><span className="muted">No quote yet</span><span className="badge">Open</span><button onClick={() => setActive("quotes")}>Build Estimate</button></div>
+            <div className="sectionHeading">
+              <div>
+                <h2>Saved Quotes & Leads</h2>
+                <p className="muted compact">Saved estimates live here. Quotes with an email or phone are attached to a lead.</p>
+              </div>
+              <button className="secondary" onClick={() => setActive("quotes")}>+ Build Estimate</button>
+            </div>
+            {recentQuotes.length === 0 ? (
+              <p className="muted">No saved quotes yet.</p>
+            ) : recentQuotes.map((quote) => (
+              <div className="leadRow" key={quote.quote_id}>
+                <div><strong>{quoteName(quote)}</strong><div className="ticketMeta">Quote {quote.quote_id.slice(0, 8)} · {dateRange(quote)}</div></div>
+                <span className="muted">{quote.opportunity_id ? "Lead attached" : "Quote only"}</span>
+                <span className="badge">{quote.status}</span>
+                <strong>{money.format(quote.total_cents / 100)}</strong>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="grid quoteGrid">
@@ -271,6 +309,8 @@ export default function QuoteBuilder() {
               <div className="field" style={{ marginTop: 20 }}><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" /></div>
               <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional unless emailing quote" /></div>
               <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" /></div>
+              <div className="field"><label>Moab arrival / first activity date</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
+              <div className="field"><label>Moab departure / last activity date</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} min={visitStart || undefined} /></div>
               <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving Estimate..." : "Save Estimate"}</button>
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
               <p className="ticketMeta" style={{ marginBottom: 0 }}>Rates are live from the Sales rate table and currently use $1 placeholders.</p>
