@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getRecentSalesQuotes,
+  getSalesQuoteDetail,
   getSalesRates,
   saveSalesQuote,
   type RecentSalesQuote,
@@ -99,7 +100,10 @@ export default function QuoteBuilder() {
   const [visitStart, setVisitStart] = useState("");
   const [visitEnd, setVisitEnd] = useState("");
   const [recentQuotes, setRecentQuotes] = useState<RecentSalesQuote[]>([]);
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -128,10 +132,7 @@ export default function QuoteBuilder() {
   function changeQty(activityKey: string, ticketId: string, delta: number) {
     setActivities((current) => current.map((item) => {
       if (item.key !== activityKey) return item;
-      return {
-        ...item,
-        qty: { ...item.qty, [ticketId]: Math.max(0, (item.qty[ticketId] ?? 0) + delta) },
-      };
+      return { ...item, qty: { ...item.qty, [ticketId]: Math.max(0, (item.qty[ticketId] ?? 0) + delta) } };
     }));
   }
 
@@ -141,6 +142,41 @@ export default function QuoteBuilder() {
 
   function removeActivity(key: string) {
     setActivities((current) => current.length === 1 ? current : current.filter((item) => item.key !== key));
+  }
+
+  function newQuote() {
+    setEditingQuoteId(null);
+    setActivities([blankActivity(experiences[0]?.id || "")]);
+    setName(""); setEmail(""); setPhone(""); setVisitStart(""); setVisitEnd("");
+    setSaveMessage("");
+    setActive("quotes");
+  }
+
+  async function openQuote(quoteId: string) {
+    setOpening(true);
+    setSaveMessage("");
+    try {
+      const detail = await getSalesQuoteDetail(quoteId);
+      const q = detail.quote;
+      setEditingQuoteId(quoteId);
+      setName(String(q.customer_name || ""));
+      setEmail(String(q.customer_email || ""));
+      setPhone(String(q.customer_phone_e164 || ""));
+      setVisitStart(String(q.visit_start_date || ""));
+      setVisitEnd(String(q.visit_end_date || ""));
+      setActivities(detail.activities.map((activity) => ({
+        key: activity.id,
+        experienceId: activity.experience_id,
+        tripSafe: activity.tripsafe_selected,
+        premier: activity.premier_selected,
+        qty: Object.fromEntries(activity.items.map((item) => [item.ticket_type_id, item.quantity])),
+      })));
+      setActive("quotes");
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Unable to open quote.");
+    } finally {
+      setOpening(false);
+    }
   }
 
   const calculatedActivities = useMemo(() => activities.map((activity) => {
@@ -174,11 +210,11 @@ export default function QuoteBuilder() {
       setSaveMessage("Add at least one ticket before saving the estimate.");
       return;
     }
-
     setSaving(true);
     setSaveMessage("");
     try {
       const result = await saveSalesQuote({
+        quoteId: editingQuoteId,
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
@@ -193,9 +229,11 @@ export default function QuoteBuilder() {
             .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })),
         })),
       });
+      setEditingQuoteId(result.quote_id);
+      setDetailsOpen(false);
       setSaveMessage(result.lead_created_or_attached
         ? `Estimate saved and attached to the lead. Quote ${result.quote_id.slice(0, 8)}.`
-        : `Estimate saved. Add an email or phone number to create/attach a lead. Quote ${result.quote_id.slice(0, 8)}.`);
+        : `Estimate saved as quote ${result.quote_id.slice(0, 8)}. Add email or phone later to attach it to a lead.`);
       getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to save estimate.");
@@ -218,20 +256,15 @@ export default function QuoteBuilder() {
         {active === "leads" ? (
           <div className="card">
             <div className="sectionHeading">
-              <div>
-                <h2>Saved Quotes & Leads</h2>
-                <p className="muted compact">Saved estimates live here. Quotes with an email or phone are attached to a lead.</p>
-              </div>
-              <button className="secondary" onClick={() => setActive("quotes")}>+ Build Estimate</button>
+              <div><h2>Saved Quotes & Leads</h2><p className="muted compact">Open any quote to add contact info, dates, or change the estimate.</p></div>
+              <button className="secondary" onClick={newQuote}>+ Build Estimate</button>
             </div>
-            {recentQuotes.length === 0 ? (
-              <p className="muted">No saved quotes yet.</p>
-            ) : recentQuotes.map((quote) => (
+            {recentQuotes.length === 0 ? <p className="muted">No saved quotes yet.</p> : recentQuotes.map((quote) => (
               <div className="leadRow" key={quote.quote_id}>
                 <div><strong>{quoteName(quote)}</strong><div className="ticketMeta">Quote {quote.quote_id.slice(0, 8)} · {dateRange(quote)}</div></div>
                 <span className="muted">{quote.opportunity_id ? "Lead attached" : "Quote only"}</span>
                 <span className="badge">{quote.status}</span>
-                <strong>{money.format(quote.total_cents / 100)}</strong>
+                <div style={{display:"flex",alignItems:"center",gap:10}}><strong>{money.format(quote.total_cents / 100)}</strong><button className="secondary" onClick={() => openQuote(quote.quote_id)} disabled={opening}>{opening ? "Opening..." : "Open / Edit"}</button></div>
               </div>
             ))}
           </div>
@@ -239,85 +272,55 @@ export default function QuoteBuilder() {
           <div className="grid quoteGrid">
             <section>
               <div className="sectionHeading">
-                <div>
-                  <h2>Build Estimate</h2>
-                  <p className="muted compact">One quote can include multiple tours and rentals.</p>
-                </div>
+                <div><h2>{editingQuoteId ? `Edit Quote ${editingQuoteId.slice(0, 8)}` : "Build Estimate"}</h2><p className="muted compact">One quote can include multiple tours and rentals.</p></div>
                 <button className="secondary" type="button" onClick={addActivity} disabled={!experiences.length}>+ Add Activity</button>
               </div>
-
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
-
               {!loading && !error && calculatedActivities.map(({ activity, experience }, index) => experience && (
                 <div className="card activityCard" key={activity.key}>
-                  <div className="activityHeader">
-                    <div className="activityNumber">Activity {index + 1}</div>
-                    {activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}
-                  </div>
-                  <div className="field">
-                    <label>Experience</label>
-                    <select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}>
-                      {experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                  </div>
-
+                  <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
+                  <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
                   {experience.tickets.map((ticket) => (
-                    <div className="ticketRow" key={ticket.id}>
-                      <div>
-                        <div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div>
-                        <div className="ticketMeta">{ticket.note}</div>
-                      </div>
-                      <div className="qty">
-                        <button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button>
-                        <span>{activity.qty[ticket.id] ?? 0}</span>
-                        <button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button>
-                      </div>
-                    </div>
+                    <div className="ticketRow" key={ticket.id}><div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div><div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div></div>
                   ))}
-
-                  <div className="toggleRow">
-                    <div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div>
-                    <input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} />
-                  </div>
-                  {experience.line === "rental" && (
-                    <div className="toggleRow">
-                      <div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69 for this rental period</div></div>
-                      <input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} />
-                    </div>
-                  )}
+                  <div className="toggleRow"><div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div><input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} /></div>
+                  {experience.line === "rental" && <div className="toggleRow"><div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69 for this rental period</div></div><input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} /></div>}
                 </div>
               ))}
-
               {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>+ Add Another Activity</button>}
             </section>
 
             <section className="card summaryCard">
               <h2>Quote Summary</h2>
-              {calculatedActivities.map(({ activity, experience, total }, index) => experience && (
-                <div className="quoteActivitySummary" key={activity.key}>
-                  <div><strong>{index + 1}. {experience.name}</strong></div>
-                  <strong>{money.format(total)}</strong>
-                </div>
-              ))}
+              {calculatedActivities.map(({ activity, experience, total }, index) => experience && <div className="quoteActivitySummary" key={activity.key}><div><strong>{index + 1}. {experience.name}</strong></div><strong>{money.format(total)}</strong></div>)}
               <div className="summaryRow"><span>Ticket subtotal</span><strong>{money.format(totals.subtotal)}</strong></div>
               <div className="summaryRow"><span>Taxes</span><strong>{money.format(totals.tax)}</strong></div>
               <div className="summaryRow"><span>TripSafe</span><strong>{money.format(totals.tripSafe)}</strong></div>
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
               <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
-              <div className="field" style={{ marginTop: 20 }}><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" /></div>
-              <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional unless emailing quote" /></div>
-              <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" /></div>
-              <div className="field"><label>Moab arrival / first activity date</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
-              <div className="field"><label>Moab departure / last activity date</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} min={visitStart || undefined} /></div>
-              <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving Estimate..." : "Save Estimate"}</button>
+              <button className="primary" type="button" onClick={() => setDetailsOpen(true)}>{editingQuoteId ? "Update Estimate" : "Save Estimate"}</button>
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
               <p className="ticketMeta" style={{ marginBottom: 0 }}>Rates are live from the Sales rate table and currently use $1 placeholders.</p>
             </section>
           </div>
         )}
       </section>
+
+      {detailsOpen && (
+        <div className="modalBackdrop" onMouseDown={() => setDetailsOpen(false)}>
+          <div className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="sectionHeading"><div><h2>{editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">Contact info is optional unless you want this attached to a lead.</p></div><button className="removeLink" onClick={() => setDetailsOpen(false)}>Close</button></div>
+            <div className="field"><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" /></div>
+            <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
+            <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" /></div>
+            <div className="modalDates"><div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div><div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div></div>
+            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update Quote" : "Save Quote"}</button>
+            <button className="secondary modalSecondary" type="button" disabled={!email}>Save & Email Quote (email wiring next)</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
