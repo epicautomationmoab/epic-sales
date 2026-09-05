@@ -9,8 +9,27 @@ export type SalesRateRow = {
   sales_help_text: string | null;
 };
 
+export type SaveQuoteActivity = {
+  experienceId: string;
+  tripSafe: boolean;
+  premier: boolean;
+  tickets: Array<{ ticketTypeId: string; quantity: number }>;
+};
+
+export type SaveQuoteResult = {
+  quote_id: string;
+  opportunity_id: string | null;
+  total_cents: number;
+  lead_created_or_attached: boolean;
+};
+
 const SUPABASE_URL = "https://kbuxcvqzicnydqllyong.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
+
+const apiHeaders = {
+  apikey: SUPABASE_PUBLISHABLE_KEY,
+  "Content-Type": "application/json",
+};
 
 export async function getSalesRates(): Promise<SalesRateRow[]> {
   const params = new URLSearchParams({
@@ -20,9 +39,7 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   });
 
   const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_quote_rates?${params.toString()}`, {
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-    },
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
     cache: "no-store",
   });
 
@@ -32,4 +49,29 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   }
 
   return response.json() as Promise<SalesRateRow[]>;
+}
+
+export async function saveSalesQuote(input: {
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  activities: SaveQuoteActivity[];
+}): Promise<SaveQuoteResult> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote`, {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({
+      p_customer_name: input.customerName || null,
+      p_customer_email: input.customerEmail || null,
+      p_customer_phone: input.customerPhone || null,
+      p_activities: input.activities,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Unable to save estimate (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  return response.json() as Promise<SaveQuoteResult>;
 }
