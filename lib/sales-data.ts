@@ -22,13 +22,13 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_quote_rates?${params.toString()}`, {
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     },
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to load sales rates (${response.status})`);
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Unable to load sales rates (${response.status})${detail ? `: ${detail}` : ""}`);
   }
 
   return response.json() as Promise<SalesRateRow[]>;
