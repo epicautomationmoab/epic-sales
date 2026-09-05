@@ -21,6 +21,8 @@ export type SaveQuoteResult = {
   opportunity_id: string | null;
   total_cents: number;
   lead_created_or_attached: boolean;
+  visit_start_date?: string | null;
+  visit_end_date?: string | null;
 };
 
 const SUPABASE_URL = "https://kbuxcvqzicnydqllyong.supabase.co";
@@ -55,15 +57,19 @@ export async function saveSalesQuote(input: {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  visitStart?: string;
+  visitEnd?: string;
   activities: SaveQuoteActivity[];
 }): Promise<SaveQuoteResult> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v2`, {
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
       p_customer_name: input.customerName || null,
       p_customer_email: input.customerEmail || null,
       p_customer_phone: input.customerPhone || null,
+      p_visit_start: input.visitStart || null,
+      p_visit_end: input.visitEnd || null,
       p_activities: input.activities,
     }),
   });
