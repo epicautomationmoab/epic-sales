@@ -18,6 +18,7 @@ body {
 }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
 .shell { min-height: 100vh; }
 .topbar {
   height: 72px;
@@ -106,5 +107,26 @@ button { cursor: pointer; }
 }
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 9px; background: #eef2f7; color: #4b5563; font-size: 12px; font-weight: 700; }
 .leadRow { display: grid; grid-template-columns: 1.2fr .8fr .8fr auto; gap: 14px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .42);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 50;
+}
+.modalCard {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+}
+.modalDates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modalSecondary { width: 100%; margin-top: 10px; }
 @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } .summaryCard { position: static; } }
-@media (max-width: 700px) { .sectionHeading { align-items: stretch; flex-direction: column; } .leadRow { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .sectionHeading { align-items: stretch; flex-direction: column; } .leadRow { grid-template-columns: 1fr; } .modalDates { grid-template-columns: 1fr; } }
