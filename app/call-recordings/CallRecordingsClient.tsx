@@ -23,6 +23,7 @@ export type Recording = {
   matched_opportunity_id: string | null;
   matched_lead_name: string | null;
   matched_lead_status: string | null;
+  matched_booking_confirmation_code: string | null;
 };
 
 function fmtTime(value: string | null) {
@@ -43,6 +44,15 @@ function fmtDuration(seconds: number | null) {
   return `${mins}:${String(rem).padStart(2, "0")}`;
 }
 
+function relationship(recording: Recording) {
+  const status = (recording.matched_lead_status || "").toLowerCase();
+  if (!recording.matched_opportunity_id) return <span className={styles.unmatched}>Unmatched</span>;
+  if (status === "open") return <a href={`/leads?open=${encodeURIComponent(recording.matched_opportunity_id)}`}>{recording.matched_lead_name || "Open lead"}</a>;
+  if (status === "booked") return <span className={styles.booked}>{recording.matched_lead_name || "Booked"}{recording.matched_booking_confirmation_code ? <small>{recording.matched_booking_confirmation_code}</small> : null}</span>;
+  if (status === "lost" || status === "retired") return <span className={styles.closed}>{recording.matched_lead_name || "Closed"}<small>{status === "lost" ? "Lost" : "Retired"}</small></span>;
+  return <span>{recording.matched_lead_name || "Matched"}</span>;
+}
+
 export default function CallRecordingsClient({ recordings }: { recordings: Recording[] }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Recording | null>(null);
@@ -50,7 +60,7 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return recordings;
-    return recordings.filter((r) => [r.customer_name, r.customer_phone_number, r.source_name, r.campaign, r.matched_lead_name, r.call_summary]
+    return recordings.filter((r) => [r.customer_name, r.customer_phone_number, r.source_name, r.campaign, r.matched_lead_name, r.matched_booking_confirmation_code, r.call_summary]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(q)));
   }, [recordings, query]);
@@ -59,12 +69,12 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
     <>
       <div className={styles.toolbar}>
         <div><strong>{filtered.length} recording{filtered.length === 1 ? "" : "s"}</strong><span> · newest first</span></div>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search caller, phone, source, campaign, lead…" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search caller, phone, source, campaign, customer…" />
       </div>
 
       <div className={styles.tableCard}>
         <table>
-          <thead><tr><th>Caller</th><th>Time</th><th>Duration</th><th>Source</th><th>Matched Lead</th><th></th></tr></thead>
+          <thead><tr><th>Caller</th><th>Time</th><th>Duration</th><th>Source</th><th>Customer Status</th><th></th></tr></thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.callrail_call_id}>
@@ -72,7 +82,7 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
                 <td>{fmtTime(r.start_time)}</td>
                 <td>{fmtDuration(r.duration_seconds)}</td>
                 <td><strong>{r.source_name || "—"}</strong><div>{r.campaign || ""}</div></td>
-                <td>{r.matched_opportunity_id ? <a href={`/leads?open=${encodeURIComponent(r.matched_opportunity_id)}`}>{r.matched_lead_name || "Open lead"}</a> : <span className={styles.unmatched}>Unmatched</span>}</td>
+                <td>{relationship(r)}</td>
                 <td><button onClick={() => setSelected(r)}>Open</button></td>
               </tr>
             ))}
@@ -98,9 +108,11 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
 
             <div className={styles.actions}>
               <a className={styles.primary} href={selected.recording_player_url || selected.recording_url || "#"} target="_blank" rel="noreferrer">Play Recording ↗</a>
-              {selected.matched_opportunity_id ? <a href={`/leads?open=${encodeURIComponent(selected.matched_opportunity_id)}`}>Open Lead</a> : null}
+              {selected.matched_opportunity_id && selected.matched_lead_status === "open" ? <a href={`/leads?open=${encodeURIComponent(selected.matched_opportunity_id)}`}>Open Lead</a> : null}
             </div>
 
+            {selected.matched_lead_status === "booked" ? <section><h3>Booked Customer</h3><p>{selected.matched_lead_name}{selected.matched_booking_confirmation_code ? ` · ${selected.matched_booking_confirmation_code}` : ""}. This call remains in Call Recordings and the booking timeline, but no longer appears as an open Sales lead.</p></section> : null}
+            {selected.matched_lead_status === "lost" || selected.matched_lead_status === "retired" ? <section><h3>Closed Sales Opportunity</h3><p>{selected.matched_lead_name} · {selected.matched_lead_status}. The recording is retained for history without reopening the lead.</p></section> : null}
             {selected.campaign ? <section><h3>Campaign</h3><p>{selected.campaign}</p></section> : null}
             {selected.call_summary ? <section><h3>Call Summary</h3><p>{selected.call_summary}</p></section> : null}
             {selected.transcription_text ? <section><h3>Transcription</h3><p className={styles.transcript}>{selected.transcription_text}</p></section> : null}
