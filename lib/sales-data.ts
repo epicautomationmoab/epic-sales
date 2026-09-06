@@ -9,6 +9,13 @@ export type SalesRateRow = {
   sales_help_text: string | null;
 };
 
+export type SalesExperienceFee = {
+  experience_id: string;
+  experience_name: string;
+  fee_label: string;
+  fee_cents: number;
+};
+
 export type SaveQuoteActivity = {
   experienceId: string;
   tripSafe: boolean;
@@ -48,6 +55,8 @@ export type SalesQuoteDetail = {
     activity_order: number;
     tripsafe_selected: boolean;
     premier_selected: boolean;
+    private_fee_cents?: number;
+    rental_period_days?: number;
     items: Array<{
       ticket_type_id: string;
       ticket_type_name: string;
@@ -88,6 +97,26 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   return response.json() as Promise<SalesRateRow[]>;
 }
 
+export async function getSalesExperienceFees(): Promise<SalesExperienceFee[]> {
+  const params = new URLSearchParams({
+    select: "experience_id,experience_name,fee_label,fee_cents",
+    is_active: "eq.true",
+    order: "experience_name.asc",
+  });
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_quote_experience_fees?${params.toString()}`, {
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Unable to load private tour fees (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  return response.json() as Promise<SalesExperienceFee[]>;
+}
+
 export async function saveSalesQuote(input: {
   quoteId?: string | null;
   customerName?: string;
@@ -97,7 +126,7 @@ export async function saveSalesQuote(input: {
   visitEnd?: string;
   activities: SaveQuoteActivity[];
 }): Promise<SaveQuoteResult> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v4`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v5`, {
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
