@@ -26,8 +26,9 @@ export async function POST(request: NextRequest) {
   if (!profile || !accessToken || profile.role === "workstation") return NextResponse.json({ error: "Employee login required." }, { status: 401 });
 
   const body = await request.json().catch(() => null) as {
-    action?: "claim" | "release" | "note" | "mark_lost" | "retire";
+    action?: "claim" | "release" | "note" | "edit_note" | "mark_lost" | "retire";
     opportunity_id?: string;
+    note_id?: string;
     note_text?: string;
     reason?: string;
   } | null;
@@ -37,6 +38,12 @@ export async function POST(request: NextRequest) {
   try {
     if (body?.action === "note") {
       const note = await rpc(accessToken, "epic_sales_add_note", { p_opportunity_id: opportunityId, p_note_text: body.note_text || "" });
+      return NextResponse.json({ ok: true, note });
+    }
+    if (body?.action === "edit_note") {
+      const noteId = body.note_id?.trim();
+      if (!noteId) return NextResponse.json({ error: "Note is required." }, { status: 400 });
+      const note = await rpc(accessToken, "epic_sales_edit_note", { p_note_id: noteId, p_note_text: body.note_text || "" });
       return NextResponse.json({ ok: true, note });
     }
     if (body?.action === "claim" || body?.action === "release") {
