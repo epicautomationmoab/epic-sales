@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getRecentSalesQuotes,
+  getSalesExperienceFees,
   getSalesQuoteDetail,
   getSalesRates,
   saveSalesQuote,
   type RecentSalesQuote,
+  type SalesExperienceFee,
   type SalesRateRow,
 } from "../lib/sales-data";
 
@@ -31,10 +33,14 @@ function ticketSortRank(name: string) {
   const dayMatch = value.match(/(\d+)\s*[- ]?day/);
   if (dayMatch) return 40 + Number(dayMatch[1]) * 10;
   if (value.includes("vehicle") || value.includes("rzr") || value.includes("pro r") || value.includes("pro s") || value.includes("xpedition")) return 100;
-  if (value.includes("guest") || value.includes("adult rider")) return 200;
   if (value.includes("guide car")) return 210;
-  if (value.includes("terms")) return 999;
   return 500;
+}
+
+function rentalDaysFromTicket(name: string) {
+  const value = name.toLowerCase();
+  const dayMatch = value.match(/(\d+)\s*[- ]?day/);
+  return dayMatch ? Number(dayMatch[1]) : 1;
 }
 
 function buildExperiences(rows: SalesRateRow[]): Experience[] {
@@ -53,7 +59,7 @@ function buildExperiences(rows: SalesRateRow[]): Experience[] {
       id: row.ticket_type_id,
       name: row.ticket_type_name,
       price: row.unit_price_cents / 100,
-      note: row.sales_help_text || row.quantity_label || "Placeholder rate",
+      note: row.sales_help_text || row.quantity_label || "Sales rate",
     });
   }
 
@@ -93,6 +99,7 @@ function dateRange(quote: RecentSalesQuote) {
 export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
   const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -109,13 +116,14 @@ export default function QuoteBuilder() {
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
-    getSalesRates()
-      .then((rows) => {
+    Promise.all([getSalesRates(), getSalesExperienceFees()])
+      .then(([rows, fees]) => {
         const built = buildExperiences(rows);
         setExperiences(built);
+        setExperienceFees(fees);
         if (built.length) setActivities([blankActivity(built[0].id)]);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales rates"))
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales pricing"))
       .finally(() => setLoading(false));
 
     getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
@@ -147,7 +155,11 @@ export default function QuoteBuilder() {
   function newQuote() {
     setEditingQuoteId(null);
     setActivities([blankActivity(experiences[0]?.id || "")]);
-    setName(""); setEmail(""); setPhone(""); setVisitStart(""); setVisitEnd("");
+    setName("");
+    setEmail("");
+    setPhone("");
+    setVisitStart("");
+    setVisitEnd("");
     setSaveMessage("");
     setActive("quotes");
   }
@@ -181,27 +193,50 @@ export default function QuoteBuilder() {
 
   const calculatedActivities = useMemo(() => activities.map((activity) => {
     const experience = experiences.find((item) => item.id === activity.experienceId);
+    const privateFeeRule = experienceFees.find((fee) => fee.experience_id === activity.experienceId);
+    const privateFee = privateFeeRule ? privateFeeRule.fee_cents / 100 : 0;
     const subtotal = experience ? experience.tickets.reduce((sum, ticket) => sum + ticket.price * (activity.qty[ticket.id] ?? 0), 0) : 0;
+    const pricingBase = subtotal + privateFee;
     const primaryTaxRate = experience?.line === "rental" ? 0.0635 : 0.0735;
     const secondaryTaxRate = experience?.line === "rental" ? 0.025 : 0;
-    const primaryTax = subtotal * primaryTaxRate;
-    const secondaryTax = subtotal * secondaryTaxRate;
-    const tripSafeAmount = activity.tripSafe ? subtotal * 0.09 : 0;
-    const premierAmount = experience?.line === "rental" && activity.premier ? 69 : 0;
-    const twBase = subtotal + primaryTax + secondaryTax + tripSafeAmount + premierAmount;
+    const primaryTax = pricingBase * primaryTaxRate;
+    const secondaryTax = pricingBase * secondaryTaxRate;
+    const tripSafeAmount = activity.tripSafe ? pricingBase * 0.09 : 0;
+    let rentalDays = 1;
+    if (experience?.line === "rental") {
+      rentalDays = experience.tickets.reduce((maxDays, ticket) => {
+        return (activity.qty[ticket.id] ?? 0) > 0 ? Math.max(maxDays, rentalDaysFromTicket(ticket.name)) : maxDays;
+      }, 1);
+    }
+    const premierAmount = experience?.line === "rental" && activity.premier ? 69 * rentalDays : 0;
+    const twBase = pricingBase + primaryTax + secondaryTax + tripSafeAmount + premierAmount;
     const twFee = twBase * 0.04;
     const total = twBase + twFee;
-    return { activity, experience, subtotal, primaryTax, secondaryTax, tripSafeAmount, premierAmount, twFee, total };
-  }), [activities, experiences]);
+    return {
+      activity,
+      experience,
+      privateFeeRule,
+      privateFee,
+      subtotal,
+      primaryTax,
+      secondaryTax,
+      tripSafeAmount,
+      premierAmount,
+      rentalDays,
+      twFee,
+      total,
+    };
+  }), [activities, experiences, experienceFees]);
 
   const totals = calculatedActivities.reduce((sum, item) => ({
     subtotal: sum.subtotal + item.subtotal,
+    privateFees: sum.privateFees + item.privateFee,
     tax: sum.tax + item.primaryTax + item.secondaryTax,
     tripSafe: sum.tripSafe + item.tripSafeAmount,
     premier: sum.premier + item.premierAmount,
     twFee: sum.twFee + item.twFee,
     total: sum.total + item.total,
-  }), { subtotal: 0, tax: 0, tripSafe: 0, premier: 0, twFee: 0, total: 0 });
+  }), { subtotal: 0, privateFees: 0, tax: 0, tripSafe: 0, premier: 0, twFee: 0, total: 0 });
 
   const hasAnyTicket = activities.some((activity) => Object.values(activity.qty).some((quantity) => quantity > 0));
 
@@ -264,7 +299,10 @@ export default function QuoteBuilder() {
                 <div><strong>{quoteName(quote)}</strong><div className="ticketMeta">Quote {quote.quote_id.slice(0, 8)} · {dateRange(quote)}</div></div>
                 <span className="muted">{quote.opportunity_id ? "Lead attached" : "Quote only"}</span>
                 <span className="badge">{quote.status}</span>
-                <div style={{display:"flex",alignItems:"center",gap:10}}><strong>{money.format(quote.total_cents / 100)}</strong><button className="secondary" onClick={() => openQuote(quote.quote_id)} disabled={opening}>{opening ? "Opening..." : "Open / Edit"}</button></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <strong>{money.format(quote.total_cents / 100)}</strong>
+                  <button className="secondary" onClick={() => openQuote(quote.quote_id)} disabled={opening}>{opening ? "Opening..." : "Open / Edit"}</button>
+                </div>
               </div>
             ))}
           </div>
@@ -277,15 +315,29 @@ export default function QuoteBuilder() {
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
-              {!loading && !error && calculatedActivities.map(({ activity, experience }, index) => experience && (
+              {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays }, index) => experience && (
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
                   <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
                   {experience.tickets.map((ticket) => (
-                    <div className="ticketRow" key={ticket.id}><div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div><div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div></div>
+                    <div className="ticketRow" key={ticket.id}>
+                      <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
+                      <div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div>
+                    </div>
                   ))}
+                  {privateFeeRule && (
+                    <div className="toggleRow">
+                      <div><strong>{privateFeeRule.fee_label}</strong><div className="ticketMeta">Automatically added once to this private tour, regardless of vehicle quantity.</div></div>
+                      <strong>{money.format(privateFee)}</strong>
+                    </div>
+                  )}
                   <div className="toggleRow"><div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div><input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} /></div>
-                  {experience.line === "rental" && <div className="toggleRow"><div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69 for this rental period</div></div><input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} /></div>}
+                  {experience.line === "rental" && (
+                    <div className="toggleRow">
+                      <div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69/day · currently {rentalDays} day{rentalDays === 1 ? "" : "s"}</div></div>
+                      <input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} />
+                    </div>
+                  )}
                 </div>
               ))}
               {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>+ Add Another Activity</button>}
@@ -293,8 +345,11 @@ export default function QuoteBuilder() {
 
             <section className="card summaryCard">
               <h2>Quote Summary</h2>
-              {calculatedActivities.map(({ activity, experience, total }, index) => experience && <div className="quoteActivitySummary" key={activity.key}><div><strong>{index + 1}. {experience.name}</strong></div><strong>{money.format(total)}</strong></div>)}
+              {calculatedActivities.map(({ activity, experience, total }, index) => experience && (
+                <div className="quoteActivitySummary" key={activity.key}><div><strong>{index + 1}. {experience.name}</strong></div><strong>{money.format(total)}</strong></div>
+              ))}
               <div className="summaryRow"><span>Ticket subtotal</span><strong>{money.format(totals.subtotal)}</strong></div>
+              {totals.privateFees > 0 && <div className="summaryRow"><span>Private Tour Fee{calculatedActivities.filter((item) => item.privateFee > 0).length > 1 ? "s" : ""}</span><strong>{money.format(totals.privateFees)}</strong></div>}
               <div className="summaryRow"><span>Taxes</span><strong>{money.format(totals.tax)}</strong></div>
               <div className="summaryRow"><span>TripSafe</span><strong>{money.format(totals.tripSafe)}</strong></div>
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
@@ -302,7 +357,6 @@ export default function QuoteBuilder() {
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
               <button className="primary" type="button" onClick={() => setDetailsOpen(true)}>{editingQuoteId ? "Update Estimate" : "Save Estimate"}</button>
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
-              <p className="ticketMeta" style={{ marginBottom: 0 }}>Rates are live from the Sales rate table and currently use $1 placeholders.</p>
             </section>
           </div>
         )}
@@ -315,7 +369,10 @@ export default function QuoteBuilder() {
             <div className="field"><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" /></div>
             <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
             <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" /></div>
-            <div className="modalDates"><div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div><div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div></div>
+            <div className="modalDates">
+              <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
+              <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
+            </div>
             <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update Quote" : "Save Quote"}</button>
             <button className="secondary modalSecondary" type="button" disabled={!email}>Save & Email Quote (email wiring next)</button>
           </div>
