@@ -1,0 +1,112 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import styles from "./CallRecordings.module.css";
+
+export type Recording = {
+  callrail_call_id: string;
+  customer_name: string | null;
+  customer_phone_number: string | null;
+  tracking_phone_number: string | null;
+  direction: string | null;
+  call_type: string | null;
+  answered: boolean | null;
+  voicemail: boolean | null;
+  start_time: string | null;
+  duration_seconds: number | null;
+  source_name: string | null;
+  campaign: string | null;
+  recording_url: string | null;
+  recording_player_url: string | null;
+  call_summary: string | null;
+  transcription_text: string | null;
+  matched_opportunity_id: string | null;
+  matched_lead_name: string | null;
+  matched_lead_status: string | null;
+};
+
+function fmtTime(value: string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Denver",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function fmtDuration(seconds: number | null) {
+  if (!seconds) return "—";
+  const mins = Math.floor(seconds / 60);
+  const rem = seconds % 60;
+  return `${mins}:${String(rem).padStart(2, "0")}`;
+}
+
+export default function CallRecordingsClient({ recordings }: { recordings: Recording[] }) {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Recording | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recordings;
+    return recordings.filter((r) => [r.customer_name, r.customer_phone_number, r.source_name, r.campaign, r.matched_lead_name, r.call_summary]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q)));
+  }, [recordings, query]);
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <div><strong>{filtered.length} recording{filtered.length === 1 ? "" : "s"}</strong><span> · newest first</span></div>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search caller, phone, source, campaign, lead…" />
+      </div>
+
+      <div className={styles.tableCard}>
+        <table>
+          <thead><tr><th>Caller</th><th>Time</th><th>Duration</th><th>Source</th><th>Matched Lead</th><th></th></tr></thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.callrail_call_id}>
+                <td><strong>{r.customer_name || "Unknown caller"}</strong><div>{r.customer_phone_number || "No phone"}</div></td>
+                <td>{fmtTime(r.start_time)}</td>
+                <td>{fmtDuration(r.duration_seconds)}</td>
+                <td><strong>{r.source_name || "—"}</strong><div>{r.campaign || ""}</div></td>
+                <td>{r.matched_opportunity_id ? <a href={`/leads?open=${encodeURIComponent(r.matched_opportunity_id)}`}>{r.matched_lead_name || "Open lead"}</a> : <span className={styles.unmatched}>Unmatched</span>}</td>
+                <td><button onClick={() => setSelected(r)}>Open</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!filtered.length ? <div className={styles.empty}>No recordings match that search.</div> : null}
+      </div>
+
+      {selected ? (
+        <div className={styles.backdrop} onMouseDown={() => setSelected(null)}>
+          <aside className={styles.drawer} onMouseDown={(e) => e.stopPropagation()}>
+            <div className={styles.drawerHeader}>
+              <div><div className={styles.eyebrow}>Call Recording</div><h2>{selected.customer_name || "Unknown caller"}</h2><p>{selected.customer_phone_number || "No phone"} · {fmtTime(selected.start_time)}</p></div>
+              <button className={styles.close} onClick={() => setSelected(null)}>×</button>
+            </div>
+
+            <div className={styles.factGrid}>
+              <div><span>Duration</span><strong>{fmtDuration(selected.duration_seconds)}</strong></div>
+              <div><span>Call Type</span><strong>{selected.voicemail ? "Voicemail" : selected.call_type || (selected.answered ? "Answered" : "Missed")}</strong></div>
+              <div><span>Tracking Number</span><strong>{selected.tracking_phone_number || "—"}</strong></div>
+              <div><span>Source</span><strong>{selected.source_name || "—"}</strong></div>
+            </div>
+
+            <div className={styles.actions}>
+              <a className={styles.primary} href={selected.recording_player_url || selected.recording_url || "#"} target="_blank" rel="noreferrer">Play Recording ↗</a>
+              {selected.matched_opportunity_id ? <a href={`/leads?open=${encodeURIComponent(selected.matched_opportunity_id)}`}>Open Lead</a> : null}
+            </div>
+
+            {selected.campaign ? <section><h3>Campaign</h3><p>{selected.campaign}</p></section> : null}
+            {selected.call_summary ? <section><h3>Call Summary</h3><p>{selected.call_summary}</p></section> : null}
+            {selected.transcription_text ? <section><h3>Transcription</h3><p className={styles.transcript}>{selected.transcription_text}</p></section> : null}
+          </aside>
+        </div>
+      ) : null}
+    </>
+  );
+}
