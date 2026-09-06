@@ -71,7 +71,7 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
     select: "experience_id,experience_name,business_line,ticket_type_id,ticket_type_name,unit_price_cents,quantity_label,sales_help_text",
     is_active: "eq.true",
     experience_id: "neq.17328",
-    ticket_type_name: "neq.Terms and Conditions",
+    ticket_type_name: "not.in.(Guest,Adult Rider,Terms and Conditions)",
     order: "business_line.asc,experience_name.asc,ticket_type_name.asc",
   });
 
@@ -97,7 +97,7 @@ export async function saveSalesQuote(input: {
   visitEnd?: string;
   activities: SaveQuoteActivity[];
 }): Promise<SaveQuoteResult> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v3`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v4`, {
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
