@@ -56,9 +56,9 @@ export default async function LeadsPage() {
         <nav className={styles.nav}>
           <a className={styles.active} href="/leads">Leads</a>
           <a href="/">Quote Builder</a>
-          <span className={styles.navPending}>Missed Calls <small>coming over next</small></span>
-          <span className={styles.navPending}>Call Recordings <small>coming over next</small></span>
-          <span className={styles.navPending}>Inbox / Needs Review <small>coming over next</small></span>
+          <a href="/missed-calls">Missed Calls</a>
+          <span className={styles.navPending}>Call Recordings <small>coming next</small></span>
+          <span className={styles.navPending}>Inbox / Needs Review <small>coming next</small></span>
         </nav>
         <div className={styles.sidebarFooter}>
           <div>Signed in as</div>
