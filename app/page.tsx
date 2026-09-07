@@ -30,11 +30,11 @@ export default async function HomePage() {
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 900, letterSpacing: ".14em", color: "#ff6a24" }}>SALES</div>
         </div>
         <nav style={{ padding: "16px 12px 8px", display: "grid", gap: 6 }}>
+          <a href="/inbox" style={navLink}>◇ Inbox</a>
           <a href="/leads" style={navLink}>◇ Leads</a>
           <a href="/" style={{ ...navLink, background: "rgba(255,255,255,.08)", color: "#fff", boxShadow: "inset 3px 0 0 #ff6a24" }}>◇ Quote Builder</a>
           <a href="/missed-calls" style={navLink}>◇ Missed Calls</a>
           <a href="/call-recordings" style={navLink}>◇ Call Recordings</a>
-          <span style={{ ...navLink, opacity: .52 }}>◇ Inbox / Needs Review</span>
         </nav>
         <div style={{ marginTop: "auto", padding: 16, borderTop: "1px solid rgba(255,255,255,.08)", fontSize: 11, color: "#8f9aaa" }}>
           <div>Signed in as</div>
