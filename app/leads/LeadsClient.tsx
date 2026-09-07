@@ -15,11 +15,12 @@ export type SalesLead = {
   assignments: Array<{ id:string; assigned_rep_name:string|null; assigned_at:string|null; unassigned_at:string|null; assignment_source:string|null; }>;
   calls?: Array<{ id:string; direction:string|null; call_type:string|null; answered:boolean|null; voicemail:boolean|null; occurred_at:string|null; duration_seconds:number|null; recording_player_url:string|null; recording_url:string|null; call_summary:string|null; transcription_text:string|null; tracking_phone_number:string|null; }>;
   texts?: Array<{ id:string; direction:string|null; message_body:string|null; status:string|null; agent_name:string|null; occurred_at:string|null; source_number:string|null; destination_number:string|null; }>;
+  emails?: Array<{ id:string; direction:string|null; subject:string|null; body_text:string|null; from_email:string|null; to_emails:string[]|null; occurred_at:string|null; thread_id:string|null; match_confidence:string|null; }>;
   quotes?: Array<{ id:string; status:string|null; experience_name:string|null; total_cents:number|null; created_by_name:string|null; created_at:string|null; updated_at:string|null; emailed_at:string|null; visit_start_date:string|null; visit_end_date:string|null; }>;
 };
 
-type TimelineItem={id:string;kind:"note"|"call"|"text"|"assignment"|"draft"|"quote";at:string|null;title:string;body?:string|null;meta?:string|null;href?:string|null;hrefLabel?:string|null};
-type LeadActivity={opportunity_id:string;kind:"text"|"missed_call"|"call"|"voicemail"|"shopped_again";at:string;preview:string|null;unread:boolean};
+type TimelineItem={id:string;kind:"note"|"call"|"text"|"email"|"assignment"|"draft"|"quote";at:string|null;title:string;body?:string|null;meta?:string|null;href?:string|null;hrefLabel?:string|null};
+type LeadActivity={opportunity_id:string;kind:"text"|"email"|"missed_call"|"call"|"voicemail"|"shopped_again";at:string;preview:string|null;unread:boolean};
 type CloseMode="lost"|"retired"|null;
 
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
@@ -32,7 +33,7 @@ function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet
 function durationLabel(s:number|null){if(s==null)return"";const m=Math.floor(s/60),r=s%60;return m?`${m}m ${r}s`:`${r}s`;}
 function twDraftUrl(code:string|null){return code?`https://epic4x4.tripworks.com/trip/${encodeURIComponent(code)}/bookings`:null;}
 function twCustomerUrl(code:string|null|undefined){return code?`https://epic4x4.tripworks.com/customer/${encodeURIComponent(code)}/trips`:null;}
-function activityLabel(a:LeadActivity|undefined){if(!a?.unread)return"";if(a.kind==="text")return"New text";if(a.kind==="missed_call")return"Missed call";if(a.kind==="voicemail")return"Voicemail";if(a.kind==="shopped_again")return"Shopped again";return"New call";}
+function activityLabel(a:LeadActivity|undefined){if(!a?.unread)return"";if(a.kind==="text")return"New text";if(a.kind==="email")return"New email";if(a.kind==="missed_call")return"Missed call";if(a.kind==="voicemail")return"Voicemail";if(a.kind==="shopped_again")return"Shopped again";return"New call";}
 function isNewShopper(l:SalesLead){return Boolean(l.new_unclaimed_at&&!l.claimed_by_name&&!l.assigned_rep_name);}
 function consentLabel(v:boolean|null|undefined){return v===true?"Opted in":v===false?"Opted out":"Unknown";}
 
@@ -41,6 +42,7 @@ function timelineFor(lead:SalesLead):TimelineItem[]{
   for(const n of lead.notes||[])items.push({id:`n-${n.id}`,kind:"note",at:n.created_at,title:"Note added",body:n.note_text,meta:n.author_name||"Unknown author"});
   for(const c of lead.calls||[]){const label=c.voicemail?"Voicemail":c.answered===false?"Missed call":c.direction==="outbound"?"Outbound call":"Inbound call";items.push({id:`c-${c.id}`,kind:"call",at:c.occurred_at,title:label,body:c.call_summary||c.transcription_text||null,meta:[durationLabel(c.duration_seconds),c.tracking_phone_number?`via ${c.tracking_phone_number}`:null].filter(Boolean).join(" · "),href:c.recording_player_url||c.recording_url||null,hrefLabel:"Play recording"});}
   for(const t of lead.texts||[])items.push({id:`t-${t.id}`,kind:"text",at:t.occurred_at,title:t.direction==="outbound"?"Text sent":"Text received",body:t.message_body,meta:[t.agent_name,t.status].filter(Boolean).join(" · ")});
+  for(const e of lead.emails||[])items.push({id:`e-${e.id}`,kind:"email",at:e.occurred_at,title:e.direction==="outbound"?`Email sent: ${e.subject||"(No subject)"}`:`Email received: ${e.subject||"(No subject)"}`,body:e.body_text,meta:e.direction==="inbound"?(e.from_email?`From ${e.from_email}`:"From customer"):(e.to_emails?.length?`To ${e.to_emails.join(", ")}`:"From Hello")});
   for(const a of lead.assignments||[]){items.push({id:`a-${a.id}`,kind:"assignment",at:a.assigned_at,title:`Lead assigned to ${a.assigned_rep_name||"Unknown"}`,meta:a.assignment_source||null});if(a.unassigned_at)items.push({id:`u-${a.id}`,kind:"assignment",at:a.unassigned_at,title:`Assignment ended for ${a.assigned_rep_name||"Unknown"}`});}
   for(const d of lead.drafts||[])items.push({id:`d-${d.id}`,kind:"draft",at:d.first_seen_at||d.last_seen_at||null,title:`TripWorks draft: ${d.experience_name||"Draft"}`,body:d.option_name||null,meta:[d.confirmation_code,d.created_by_name,d.last_trip_status].filter(Boolean).join(" · "),href:twDraftUrl(d.confirmation_code),hrefLabel:"Open draft in TripWorks"});
   for(const q of lead.quotes||[])items.push({id:`q-${q.id}`,kind:"quote",at:q.created_at,title:`Epic quote ${q.status||"saved"}`,body:q.experience_name||null,meta:[money.format((q.total_cents||0)/100),q.created_by_name,q.emailed_at?"Emailed":null].filter(Boolean).join(" · ")});
