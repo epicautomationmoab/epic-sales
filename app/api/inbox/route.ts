@@ -22,6 +22,16 @@ async function rpc(accessToken: string, fn: string, body: Record<string, unknown
   return text ? JSON.parse(text) : null;
 }
 
+function emailDomain(value: unknown) {
+  const email = String(value || "").trim().toLowerCase();
+  const at = email.lastIndexOf("@");
+  return at >= 0 ? email.slice(at + 1) : "";
+}
+
+function domainBlocked(domain: string, blocked: string[]) {
+  return blocked.some((item) => domain === item || domain.endsWith(`.${item}`));
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
@@ -32,8 +42,17 @@ export async function GET(request: NextRequest) {
       const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
-    const threads = await rpc(session.accessToken, "get_epic_unified_inbox", { p_include_cleaned: includeClosed });
-    return NextResponse.json({ ok: true, threads: threads || [] });
+    const [threads, blockedRows] = await Promise.all([
+      rpc(session.accessToken, "get_epic_unified_inbox", { p_include_cleaned: includeClosed }),
+      rpc(session.accessToken, "get_epic_sales_blocked_domains", {}),
+    ]);
+    const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
+    const filteredThreads = (Array.isArray(threads) ? threads : []).filter((thread: { kind?: string; email?: string | null }) => {
+      if (thread.kind !== "email") return true;
+      const domain = emailDomain(thread.email);
+      return !domain || !domainBlocked(domain, blocked);
+    });
+    return NextResponse.json({ ok: true, threads: filteredThreads });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load inbox." }, { status: 500 });
   }
