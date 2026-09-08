@@ -25,9 +25,14 @@ async function rpc(accessToken: string, fn: string, body: Record<string, unknown
 export async function GET(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
-  const includeCleaned = request.nextUrl.searchParams.get("cleaned") === "1";
+  const includeClosed = request.nextUrl.searchParams.get("cleaned") === "1" || request.nextUrl.searchParams.get("closed") === "1";
+  const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
-    const threads = await rpc(session.accessToken, "get_epic_unified_inbox", { p_include_cleaned: includeCleaned });
+    if (threadKey) {
+      const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
+      return NextResponse.json({ ok: true, notes: notes || [] });
+    }
+    const threads = await rpc(session.accessToken, "get_epic_unified_inbox", { p_include_cleaned: includeClosed });
     return NextResponse.json({ ok: true, threads: threads || [] });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load inbox." }, { status: 500 });
@@ -37,12 +42,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
-  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string } | null;
-  if (body?.action !== "clean" || !body.thread_key) return NextResponse.json({ error: "Invalid inbox action." }, { status: 400 });
+  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string } | null;
+  if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
-    const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
-    return NextResponse.json(result || { ok: true });
+    if (body.action === "close" || body.action === "clean") {
+      const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
+      return NextResponse.json(result || { ok: true });
+    }
+    if (body.action === "note") {
+      const result = await rpc(session.accessToken, "epic_sales_add_inbox_thread_note", { p_thread_key: body.thread_key, p_note_text: body.note_text || "" });
+      return NextResponse.json(result || { ok: true });
+    }
+    return NextResponse.json({ error: "Invalid inbox action." }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to clean inbox thread." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to update inbox thread." }, { status: 500 });
   }
 }
