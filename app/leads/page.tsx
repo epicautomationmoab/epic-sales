@@ -33,35 +33,20 @@ export default async function LeadsPage() {
   catch (err) { error = err instanceof Error ? err.message : "Unable to load Sales leads."; }
 
   const openValue = leads.reduce((sum, lead) => sum + Number(lead.lead_value_cents || 0), 0);
-  const claimed = leads.filter((lead) => Boolean(lead.claimed_by_name)).length;
+  const claimed = leads.filter((lead) => Boolean(lead.claimed_by_name || lead.assigned_rep_name)).length;
   const unclaimed = leads.length - claimed;
 
   return (
     <main className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}><div className={styles.logoText}>EPIC 4X4</div><div className={styles.salesText}>SALES</div></div>
-        <nav className={styles.nav}>
-          <a href="/inbox">Inbox</a>
-          <a className={styles.active} href="/leads">Leads</a>
-          <a href="/">Quote Builder</a>
-          <a href="/missed-calls">Missed Calls</a>
-          <a href="/call-recordings">Call Recordings</a>
-        </nav>
+        <nav className={styles.nav}><a href="/inbox">Inbox</a><a className={styles.active} href="/leads">Leads</a><a href="/">Quote Builder</a><a href="/missed-calls">Missed Calls</a><a href="/call-recordings">Call Recordings</a></nav>
         <div className={styles.sidebarFooter}><div>Signed in as</div><strong>{profile.display_name}</strong></div>
       </aside>
 
       <section className={styles.main}>
-        <header className={styles.header}>
-          <div><div className={styles.eyebrow}>Epic Sales</div><h1>Open Leads</h1><p>The same live sales opportunities your team has already been working.</p></div>
-          <a className={styles.quoteButton} href="/">+ Build Quote</a>
-        </header>
-
-        <section className={styles.kpis}>
-          <div className={`${styles.kpi} ${styles.kpiPrimary}`}><span>Open Lead Value</span><strong>${(openValue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{leads.length} active opportunities</small></div>
-          <div className={styles.kpi}><span>Open Leads</span><strong>{leads.length}</strong><small>Still with Sales</small></div>
-          <div className={styles.kpi}><span>Claimed</span><strong>{claimed}</strong><small>Currently owned by a rep</small></div>
-          <div className={styles.kpi}><span>Unclaimed</span><strong>{unclaimed}</strong><small>Needs ownership</small></div>
-        </section>
+        <header className={styles.header}><div><div className={styles.eyebrow}>Epic Sales</div><h1>Active Leads</h1><p>Ongoing sales opportunities your team has chosen to work. Customer 360 is the workspace.</p></div><a className={styles.quoteButton} href="/">+ Build Quote</a></header>
+        <section className={styles.kpis}><div className={`${styles.kpi} ${styles.kpiPrimary}`}><span>Active Lead Value</span><strong>${(openValue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{leads.length} active opportunities</small></div><div className={styles.kpi}><span>Active Leads</span><strong>{leads.length}</strong><small>Still being worked</small></div><div className={styles.kpi}><span>Claimed</span><strong>{claimed}</strong><small>Owned by a rep</small></div><div className={styles.kpi}><span>Unclaimed</span><strong>{unclaimed}</strong><small>Needs ownership</small></div></section>
         {error ? <div className={styles.error}>{error}</div> : <LeadsClient leads={leads} />}
       </section>
     </main>
