@@ -9,6 +9,7 @@ export default async function InboxPage(){
   const accessToken=cookieStore.get("epic_access_token")?.value;
   const profile=await getAuthenticatedTeamProfile(accessToken);
   if(!profile||!accessToken)redirect("/employee-login");
+  const canManage=profile.role==="admin"||profile.role==="manager";
   return <main className={styles.shell}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><div className={styles.logoText}>EPIC 4X4</div><div className={styles.salesText}>COMMUNICATIONS</div></div>
@@ -18,6 +19,7 @@ export default async function InboxPage(){
         <a href="/">Quote Builder</a>
         <a href="/missed-calls">Missed Calls</a>
         <a href="/call-recordings">Call Recordings</a>
+        {canManage?<a href="/inbox/blocked-domains">Blocked Email Domains</a>:null}
       </nav>
       <div className={styles.sidebarFooter}><div>Signed in as</div><strong>{profile.display_name}</strong></div>
     </aside>
