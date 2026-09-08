@@ -13,11 +13,7 @@ async function auth(request: NextRequest) {
 async function rpc(accessToken: string, body: Record<string, unknown>) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_epic_customer_360`, {
     method: "POST",
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
   });
@@ -26,22 +22,33 @@ async function rpc(accessToken: string, body: Record<string, unknown>) {
   return text ? JSON.parse(text) : null;
 }
 
+async function reservationIdForConfirmation(accessToken:string, confirmation:string) {
+  const response=await fetch(`${SUPABASE_URL}/rest/v1/operational_reservations?confirmation_code=eq.${encodeURIComponent(confirmation)}&select=id&order=updated_at.desc&limit=1`,{
+    headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${accessToken}`},cache:"no-store"
+  });
+  if(!response.ok)return null;
+  const rows=await response.json().catch(()=>[]) as Array<{id:string}>;
+  return rows[0]?.id||null;
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
 
   const params = request.nextUrl.searchParams;
+  let reservationId=params.get("reservation")||null;
+  const confirmation=params.get("confirmation")||null;
+  if(!reservationId&&confirmation) reservationId=await reservationIdForConfirmation(session.accessToken,confirmation);
+
   const body = {
     p_contact_id: params.get("contact") || null,
     p_opportunity_id: params.get("opportunity") || null,
-    p_reservation_id: params.get("reservation") || null,
+    p_reservation_id: reservationId,
     p_phone: params.get("phone") || null,
     p_email: params.get("email") || null,
   };
 
-  if (!Object.values(body).some(Boolean)) {
-    return NextResponse.json({ error: "Customer identity is required." }, { status: 400 });
-  }
+  if (!Object.values(body).some(Boolean)) return NextResponse.json({ error: "Customer identity is required." }, { status: 400 });
 
   try {
     const customer = await rpc(session.accessToken, body);
