@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import Customer360Modal from "../customer-360/Customer360Modal";
 import styles from "./Leads.module.css";
 
 export type SalesLead = {
@@ -10,107 +10,31 @@ export type SalesLead = {
   claimed_by_name:string|null; claimed_at:string|null; activity_window_start:string|null; activity_window_end:string|null;
   shopping_last_activity_at:string|null; interest_label:string|null; party_needs:string|null; lead_capture_note:string|null;
   is_past_guest:boolean|null; prior_booking_count:number|null; tripworks_customer_code?:string|null; tripworks_is_opt_in?:boolean|null;
-  new_unclaimed_at?:string|null;
-  drafts:Array<{id:string;confirmation_code:string|null;experience_name:string|null;option_name:string|null;activity_date:string|null;value_cents:number|null;trip_method:string|null;created_by_name:string|null;last_trip_status:string|null;first_seen_at?:string|null;last_seen_at?:string|null}>;
+  drafts:Array<{id:string;confirmation_code:string|null;experience_name:string|null;option_name:string|null;activity_date:string|null;value_cents:number|null}>;
   notes:Array<{id:string;author_name:string|null;note_text:string|null;created_at:string|null;updated_at:string|null}>;
   assignments:Array<{id:string;assigned_rep_name:string|null;assigned_at:string|null;unassigned_at:string|null;assignment_source:string|null}>;
-  calls?:Array<{id:string;direction:string|null;call_type:string|null;answered:boolean|null;voicemail:boolean|null;occurred_at:string|null;duration_seconds:number|null;recording_player_url:string|null;recording_url:string|null;call_summary:string|null;transcription_text:string|null;tracking_phone_number:string|null;lead_score:number|null;lead_explanation:string|null;sentiment:string|null;call_highlights:unknown[]|null;speaker_percent:Record<string,unknown>|null;keywords:string|null;source_name:string|null;campaign:string|null;medium:string|null;device_type:string|null;customer_city:string|null;customer_state:string|null;landing_page_url:string|null;referring_url:string|null;timeline_url:string|null;person_resource_id:string|null;lead_status:string|null;first_touch:Record<string,unknown>|null;last_touch:Record<string,unknown>|null}>;
-  texts?:Array<{id:string;direction:string|null;message_body:string|null;status:string|null;agent_name:string|null;occurred_at:string|null;source_number:string|null;destination_number:string|null}>;
-  emails?:Array<{id:string;direction:string|null;subject:string|null;body_text:string|null;from_email:string|null;to_emails:string[]|null;occurred_at:string|null;thread_id:string|null;match_confidence:string|null}>;
-  quotes?:Array<{id:string;status:string|null;experience_name:string|null;total_cents:number|null;created_by_name:string|null;created_at:string|null;updated_at:string|null;emailed_at:string|null;visit_start_date:string|null;visit_end_date:string|null}>;
 };
 
-type TimelineItem={id:string;kind:"note"|"call"|"text"|"email"|"assignment"|"draft"|"quote";at:string|null;title:string;body?:string|null;meta?:string|null;href?:string|null;hrefLabel?:string|null};
-type LeadActivity={opportunity_id:string;kind:"text"|"email"|"missed_call"|"call"|"voicemail"|"shopped_again";at:string;preview:string|null;unread:boolean};
-type CloseMode="lost"|"retired"|null;
-type JourneyFilter="all"|"call"|"text"|"email"|"other";
-
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
-const LOST_REASONS=[["","Choose why we lost it…"],["price","Price"],["availability","Availability"],["product_mismatch","Product mismatch"],["policy_or_qualification","Policy / qualification"],["went_elsewhere","Went elsewhere"],["plans_changed","Plans changed"],["unresponsive","Unresponsive"],["timing","Timing / not ready"],["other","Other"]] as const;
-const RETIRED_REASONS=[["","Choose why this is being retired…"],["fake_or_junk_contact","Fake / junk contact"],["duplicate","Duplicate"],["test_or_staff_activity","Test / staff activity"],["bad_data","Bad data"],["not_a_prospect","Not actually a prospect"],["other","Other"]] as const;
-
-function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
-function fmtDateTime(v:string|null){if(!v)return"Unknown time";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric"});}
 function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
-function durationLabel(s:number|null){if(s==null)return"";const m=Math.floor(s/60),r=s%60;return m?`${m}m ${r}s`:`${r}s`;}
-function twDraftUrl(code:string|null){return code?`https://epic4x4.tripworks.com/trip/${encodeURIComponent(code)}/bookings`:null;}
-function twCustomerUrl(code:string|null|undefined){return code?`https://epic4x4.tripworks.com/customer/${encodeURIComponent(code)}/trips`:null;}
-function activityLabel(a:LeadActivity|undefined){if(!a?.unread)return"";if(a.kind==="text")return"New text";if(a.kind==="email")return"New email";if(a.kind==="missed_call")return"Missed call";if(a.kind==="voicemail")return"Voicemail";if(a.kind==="shopped_again")return"Shopped again";return"New call";}
-function isNewShopper(l:SalesLead){return Boolean(l.new_unclaimed_at&&!l.claimed_by_name&&!l.assigned_rep_name);}
-function consentLabel(v:boolean|null|undefined){return v===true?"Opted in":v===false?"Opted out":"Unknown";}
 
-function timelineFor(lead:SalesLead):TimelineItem[]{
-  const items:TimelineItem[]=[];
-  for(const n of lead.notes||[])items.push({id:`n-${n.id}`,kind:"note",at:n.created_at,title:"Note added",body:n.note_text,meta:n.author_name||"Unknown author"});
-  for(const c of lead.calls||[]){
-    const label=c.voicemail?"Voicemail":c.answered===false?"Missed call":c.direction==="outbound"?"Outbound call":"Inbound call";
-    items.push({id:`c-${c.id}`,kind:"call",at:c.occurred_at,title:label,body:c.call_summary||c.lead_explanation||c.transcription_text||null,meta:[c.lead_score!=null?`CallRail lead score ${c.lead_score}`:null,durationLabel(c.duration_seconds),c.source_name,c.campaign,c.keywords?`keyword: ${c.keywords}`:null].filter(Boolean).join(" · "),href:c.recording_player_url||c.recording_url||null,hrefLabel:"Listen to call"});
-  }
-  for(const t of lead.texts||[])items.push({id:`t-${t.id}`,kind:"text",at:t.occurred_at,title:t.direction==="outbound"?"Text sent":"Text received",body:t.message_body,meta:[t.agent_name,t.status].filter(Boolean).join(" · ")});
-  for(const e of lead.emails||[])items.push({id:`e-${e.id}`,kind:"email",at:e.occurred_at,title:e.direction==="outbound"?`Email sent: ${e.subject||"(No subject)"}`:`Email received: ${e.subject||"(No subject)"}`,body:e.body_text,meta:e.direction==="inbound"?(e.from_email?`From ${e.from_email}`:"From customer"):(e.to_emails?.length?`To ${e.to_emails.join(", ")}`:"From Hello")});
-  for(const a of lead.assignments||[]){items.push({id:`a-${a.id}`,kind:"assignment",at:a.assigned_at,title:`Lead assigned to ${a.assigned_rep_name||"Unknown"}`,meta:a.assignment_source||null});if(a.unassigned_at)items.push({id:`u-${a.id}`,kind:"assignment",at:a.unassigned_at,title:`Assignment ended for ${a.assigned_rep_name||"Unknown"}`});}
-  for(const d of lead.drafts||[])items.push({id:`d-${d.id}`,kind:"draft",at:d.first_seen_at||d.last_seen_at||null,title:`TripWorks shopping: ${d.experience_name||"Draft"}`,body:d.option_name||null,meta:[d.value_cents!=null?money.format(d.value_cents/100):null,d.confirmation_code,d.created_by_name,d.last_trip_status].filter(Boolean).join(" · "),href:twDraftUrl(d.confirmation_code),hrefLabel:"Open in TripWorks"});
-  for(const q of lead.quotes||[])items.push({id:`q-${q.id}`,kind:"quote",at:q.created_at,title:`Epic quote ${q.status||"saved"}`,body:q.experience_name||null,meta:[money.format((q.total_cents||0)/100),q.created_by_name,q.emailed_at?"Emailed":null].filter(Boolean).join(" · ")});
-  return items.sort((a,b)=>(b.at?new Date(b.at).getTime():0)-(a.at?new Date(a.at).getTime():0));
-}
-
-export default function LeadsClient({leads:initialLeads}:{leads:SalesLead[]}){
-  const searchParams=useSearchParams();
-  const[leads,setLeads]=useState(initialLeads);const[query,setQuery]=useState("");const[selectedId,setSelectedId]=useState<string|null>(null);
-  const[noteText,setNoteText]=useState("");const[textMessage,setTextMessage]=useState("");const[busy,setBusy]=useState(false);const[actionError,setActionError]=useState("");
-  const[editingNoteId,setEditingNoteId]=useState<string|null>(null);const[editingNoteText,setEditingNoteText]=useState("");
-  const[activity,setActivity]=useState<Record<string,LeadActivity>>({});const[closeMode,setCloseMode]=useState<CloseMode>(null);const[closeReason,setCloseReason]=useState("");const[closeNote,setCloseNote]=useState("");
-  const[journeyFilter,setJourneyFilter]=useState<JourneyFilter>("all");
-  const selected=useMemo(()=>leads.find(l=>l.id===selectedId)||null,[leads,selectedId]);
-  const filtered=useMemo(()=>{const q=query.trim().toLowerCase();if(!q)return leads;return leads.filter(l=>[l.customer_name,l.email,l.phone_e164,l.interest_label,l.claimed_by_name,l.assigned_rep_name,l.tripworks_customer_code,...(l.drafts||[]).flatMap(d=>[d.confirmation_code,d.experience_name,d.option_name])].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));},[leads,query]);
-  const timeline=useMemo(()=>selected?timelineFor(selected):[],[selected]);
-  const visibleTimeline=useMemo(()=>timeline.filter(item=>journeyFilter==="all"?true:journeyFilter==="other"?!["call","text","email"].includes(item.kind):item.kind===journeyFilter),[timeline,journeyFilter]);
-
-  async function loadActivity(){try{const r=await fetch("/api/leads/activity",{cache:"no-store"});const p=await r.json();if(r.ok)setActivity(p.activity||{});}catch{}}
-  async function openLead(id:string){setSelectedId(id);setJourneyFilter("all");setActionError("");setCloseMode(null);setCloseReason("");setCloseNote("");setEditingNoteId(null);setEditingNoteText("");setTextMessage("");setActivity(c=>c[id]?{...c,[id]:{...c[id],unread:false}}:c);try{await fetch("/api/leads/activity",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opportunity_id:id})});}catch{}}
-  useEffect(()=>{void loadActivity();const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void loadActivity();},5000);return()=>window.clearInterval(timer);},[]);
-  useEffect(()=>{const requested=searchParams.get("open");if(requested&&leads.some(l=>l.id===requested))void openLead(requested);},[searchParams]);
-  useEffect(()=>{if(!selectedId)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setSelectedId(null);};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[selectedId]);
-
-  async function mutateLead(action:"claim"|"release"|"note"){
-    if(!selected)return;setBusy(true);setActionError("");try{const r=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,opportunity_id:selected.id,note_text:action==="note"?noteText:undefined})});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p?.error||"Unable to update lead.");setLeads(c=>c.map(l=>{if(l.id!==selected.id)return l;if(action==="claim")return{...l,claimed_by_name:p.claimed_by_name||l.claimed_by_name,assigned_rep_name:p.claimed_by_name||l.assigned_rep_name,claimed_at:p.claimed_at||new Date().toISOString(),new_unclaimed_at:null};if(action==="release")return{...l,claimed_by_name:null,assigned_rep_name:null,claimed_at:null};if(action==="note"&&p.note)return{...l,notes:[p.note,...(l.notes||[])]};return l;}));if(action==="note")setNoteText("");}catch(e){setActionError(e instanceof Error?e.message:"Unable to update lead.");}finally{setBusy(false);}}
-  async function saveEditedNote(){if(!selected||!editingNoteId||!editingNoteText.trim())return;setBusy(true);setActionError("");try{const r=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"edit_note",opportunity_id:selected.id,note_id:editingNoteId,note_text:editingNoteText})});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p?.error||"Unable to edit note.");setLeads(c=>c.map(l=>l.id===selected.id?{...l,notes:(l.notes||[]).map(n=>n.id===editingNoteId?{...n,...p.note}:n)}:l));setEditingNoteId(null);setEditingNoteText("");}catch(e){setActionError(e instanceof Error?e.message:"Unable to edit note.");}finally{setBusy(false);}}
-  async function sendText(){if(!selected||!textMessage.trim()||selected.tripworks_is_opt_in===false)return;setBusy(true);setActionError("");try{const message=textMessage.trim();const r=await fetch("/api/leads/text",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opportunity_id:selected.id,message_text:message})});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p?.error||"Unable to send text.");const optimistic={id:`sent-${Date.now()}`,direction:"outbound",message_body:message,status:"sent",agent_name:p.agent_name||"Epic Sales",occurred_at:p.sent_at||new Date().toISOString(),source_number:"435-260-4030",destination_number:selected.phone_e164};setLeads(c=>c.map(l=>l.id===selected.id?{...l,texts:[...(l.texts||[]),optimistic]}:l));setTextMessage("");}catch(e){setActionError(e instanceof Error?e.message:"Unable to send text.");}finally{setBusy(false);}}
-  async function closeLead(){if(!selected||!closeMode||!closeReason)return;setBusy(true);setActionError("");try{const r=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:closeMode==="lost"?"mark_lost":"retire",opportunity_id:selected.id,reason:closeReason,note_text:closeNote})});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p?.error||"Unable to close lead.");setLeads(c=>c.filter(l=>l.id!==selected.id));setSelectedId(null);}catch(e){setActionError(e instanceof Error?e.message:"Unable to close lead.");}finally{setBusy(false);}}
+export default function LeadsClient({leads}:{leads:SalesLead[]}){
+  const[query,setQuery]=useState("");
+  const[owner,setOwner]=useState("All");
+  const[selected,setSelected]=useState<SalesLead|null>(null);
+  const owners=useMemo(()=>["All","Unclaimed",...Array.from(new Set(leads.map(l=>l.claimed_by_name||l.assigned_rep_name).filter(Boolean) as string[])).sort()], [leads]);
+  const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return leads.filter(l=>{
+    const leadOwner=l.claimed_by_name||l.assigned_rep_name||"Unclaimed";
+    if(owner!=="All"&&leadOwner!==owner)return false;
+    if(!q)return true;
+    return[l.customer_name,l.email,l.phone_e164,l.interest_label,leadOwner,...(l.drafts||[]).flatMap(d=>[d.confirmation_code,d.experience_name,d.option_name])].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
+  });},[leads,owner,query]);
 
   return <>
-    <div className={styles.toolbar}><div><strong>Open Leads {filtered.length}</strong><div className={styles.toolbarSub}>Click any lead to open the full working record.</div></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity, rep…"/></div>
-    <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Activity Window</th><th>Interest</th><th>Method</th><th>Owner</th><th>Activity</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>
-      {filtered.map(l=>{const pill=activityLabel(activity[l.id]);return <tr key={l.id} className={isNewShopper(l)?styles.newShopperRow:undefined} onClick={()=>void openLead(l.id)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div><div className={styles.subLine}>Last activity {fmtDate(l.shopping_last_activity_at)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.source_method||"—"}</td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{pill?<span className={styles.activityPill}>{pill}</span>:"—"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>})}
-    </tbody></table></div>
-
-    {selected?<div className={styles.modalBackdrop} onMouseDown={e=>{if(e.currentTarget===e.target)setSelectedId(null);}}><section className={styles.leadModal} role="dialog" aria-modal="true" aria-label={`Lead workspace for ${selected.customer_name||"customer"}`}>
-      <header className={styles.modalHeader}><div><div className={styles.modalEyebrow}>Epic Sales · Lead Workspace</div><div className={styles.modalTitleRow}><h2>{selected.customer_name||"Unnamed lead"}</h2>{selected.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.modalSub}>{[selected.email,selected.phone_e164].filter(Boolean).join(" · ")||"No contact information yet"}</div></div><div className={styles.modalHeaderActions}><button className={styles.secondaryAction} onClick={()=>void mutateLead(selected.claimed_by_name?"release":"claim")} disabled={busy}>{selected.claimed_by_name?`Release ${selected.claimed_by_name}`:"Claim lead"}</button><button className={styles.modalClose} aria-label="Close lead workspace" onClick={()=>setSelectedId(null)}>×</button></div></header>
-
-      <div className={styles.modalBody}>
-        <section className={styles.journeyPane}>
-          <div className={styles.paneHeading}><div><div className={styles.modalEyebrow}>Customer Journey</div><h3>Everything we know about this relationship</h3></div><span>{timeline.length} events</span></div>
-          <div className={styles.journeyFilters}>{([['all','All'],['call','Calls'],['text','Texts'],['email','Emails'],['other','Other']] as Array<[JourneyFilter,string]>).map(([value,label])=><button key={value} className={journeyFilter===value?styles.journeyFilterActive:styles.journeyFilter} onClick={()=>setJourneyFilter(value)}>{label}</button>)}</div>
-          <div className={styles.quickReach}><div className={styles.quickReachTop}><strong>Reach Out</strong><span>Texting uses the lead's current phone number</span></div><textarea value={textMessage} onChange={e=>setTextMessage(e.target.value)} placeholder="Text this lead…" disabled={selected.tripworks_is_opt_in===false}/><div className={styles.quickReachFooter}><span>{selected.tripworks_is_opt_in===false?"SMS blocked: customer opted out.":`${textMessage.length}/1600`}</span><button className={styles.primaryAction} disabled={busy||!textMessage.trim()||selected.tripworks_is_opt_in===false} onClick={()=>void sendText()}>Send Text</button></div></div>
-          {actionError?<div className={styles.error}>{actionError}</div>:null}
-          <div className={styles.journeyTimeline}>{visibleTimeline.length?visibleTimeline.map(item=><article key={item.id} className={`${styles.journeyEvent} ${styles[`kind_${item.kind}`]||""}`}><div className={styles.timelineTop}><strong>{item.title}</strong><span>{fmtDateTime(item.at)}</span></div>{item.meta?<div className={styles.timelineMeta}>{item.meta}</div>:null}{item.body?<div className={styles.timelineBody}>{item.body}</div>:null}<div className={styles.eventActions}>{item.href?<a className={styles.recordingLink} href={item.href} target="_blank" rel="noreferrer">{item.hrefLabel||"Open"}</a>:null}{item.kind==="note"?<button className={styles.editLink} onClick={()=>{setEditingNoteId(item.id.replace(/^n-/,""));setEditingNoteText(item.body||"");}}>Edit note</button>:null}</div></article>):<div className={styles.emptyJourney}>No activity in this view yet.</div>}</div>
-        </section>
-
-        <aside className={styles.salesPane}>
-          <div className={styles.paneHeading}><div><div className={styles.modalEyebrow}>Lead Details</div><h3>Sales record</h3></div></div>
-          <div className={styles.factGrid}><div><span>Visit window</span><strong>{dateWindow(selected)}</strong></div><div><span>Interest</span><strong>{selected.interest_label||selected.drafts?.[0]?.experience_name||"—"}</strong></div><div><span>Lead value</span><strong>{selected.lead_value_cents!=null?money.format(selected.lead_value_cents/100):"—"}</strong></div><div><span>Owner</span><strong>{selected.claimed_by_name||selected.assigned_rep_name||"Unclaimed"}</strong></div><div><span>Party / needs</span><strong>{selected.party_needs||"—"}</strong></div><div><span>SMS</span><strong>{consentLabel(selected.tripworks_is_opt_in)}</strong></div><div><span>Source</span><strong>{selected.source_method||"—"}</strong></div><div><span>Prior bookings</span><strong>{selected.prior_booking_count??0}</strong></div></div>
-
-          <div className={styles.salesSection}><div className={styles.sectionHeading}><h3>Actions</h3></div><div className={styles.actionGrid}>{selected.tripworks_customer_code?<a className={styles.secondaryAction} href={twCustomerUrl(selected.tripworks_customer_code)||"#"} target="_blank" rel="noreferrer">Open TripWorks Customer</a>:null}<a className={styles.secondaryAction} href="/quote">Build Quote</a></div></div>
-
-          <div className={styles.salesSection}><div className={styles.sectionHeading}><h3>Notes</h3></div><textarea className={styles.noteBox} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Add a note about this lead…"/><button className={styles.primaryAction} disabled={busy||!noteText.trim()} onClick={()=>void mutateLead("note")}>Add Note</button></div>
-
-          {editingNoteId?<div className={styles.salesSection}><div className={styles.sectionHeading}><h3>Edit Note</h3></div><textarea className={styles.noteBox} value={editingNoteText} onChange={e=>setEditingNoteText(e.target.value)}/><div className={styles.inlineActions}><button className={styles.primaryAction} onClick={()=>void saveEditedNote()} disabled={busy||!editingNoteText.trim()}>Save</button><button className={styles.secondaryAction} onClick={()=>{setEditingNoteId(null);setEditingNoteText("");}}>Cancel</button></div></div>:null}
-
-          {(selected.drafts||[]).length?<div className={styles.salesSection}><div className={styles.sectionHeading}><h3>TripWorks Shopping</h3><span>{selected.drafts.length}</span></div>{selected.drafts.map(d=><div key={d.id} className={styles.recordCard}><div className={styles.recordTitle}>{d.experience_name||"TripWorks activity"}</div><div className={styles.recordMeta}>{[d.option_name,d.value_cents!=null?money.format(d.value_cents/100):null,d.activity_date?fmtDate(d.activity_date):null,d.confirmation_code].filter(Boolean).join(" · ")}</div>{twDraftUrl(d.confirmation_code)?<a className={styles.recordingLink} href={twDraftUrl(d.confirmation_code)||"#"} target="_blank" rel="noreferrer">Open in TripWorks</a>:null}</div>)}</div>:null}
-
-          <div className={styles.salesSection}><div className={styles.sectionHeading}><h3>Close Lead</h3></div><div className={styles.inlineActions}><button className={styles.lostButton} onClick={()=>setCloseMode("lost")}>Mark Lost</button><button className={styles.secondaryAction} onClick={()=>setCloseMode("retired")}>Retire</button></div>{closeMode?<div className={styles.closePanel}><select value={closeReason} onChange={e=>setCloseReason(e.target.value)}>{(closeMode==="lost"?LOST_REASONS:RETIRED_REASONS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><textarea value={closeNote} onChange={e=>setCloseNote(e.target.value)} placeholder="Optional note…"/><button className={styles.primaryAction} disabled={busy||!closeReason} onClick={()=>void closeLead()}>{closeMode==="lost"?"Confirm Lost":"Confirm Retire"}</button></div>:null}</div>
-        </aside>
-      </div>
-    </section></div>:null}
+    <div className={styles.toolbar}><div><strong>Active Leads {filtered.length}</strong><div className={styles.toolbarSub}>This is the work queue. Click a customer to work them in Customer 360.</div></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>{owners.map(name=><button key={name} onClick={()=>setOwner(name)} style={{border:"1px solid #d9e0e6",background:owner===name?"#111827":"#fff",color:owner===name?"#fff":"#26303b",borderRadius:999,padding:"8px 13px",fontWeight:800,cursor:"pointer"}}>{name}</button>)}</div>
+    <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Visit Window</th><th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>)}</tbody></table></div>
+    {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
