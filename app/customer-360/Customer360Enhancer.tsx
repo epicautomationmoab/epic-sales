@@ -5,6 +5,7 @@ import { useEffect } from "react";
 type Call = { id:string; recording_url:string|null; transcription?:string|null };
 type Email = { id:string; at:string|null; direction:string|null; subject:string|null; label?:string|null; status?:string|null; open_count?:number|null; first_opened_at?:string|null; last_opened_at?:string|null };
 type Customer360Payload = { customer?: { calls?:Call[]; emails?:Email[] } };
+type TranscriptTurn={speaker:"Agent"|"Caller"|"Unknown";text:string};
 
 function fmtDateTime(v:string|null){
   if(!v)return"Unknown time";
@@ -17,7 +18,34 @@ function buttonStyle(button:HTMLButtonElement){
 }
 
 function transcriptStyle(panel:HTMLDivElement){
-  Object.assign(panel.style,{marginTop:"10px",padding:"12px 14px",border:"1px solid #d8e2ee",borderRadius:"10px",background:"#f7faff",whiteSpace:"pre-wrap",lineHeight:"1.55",fontSize:"13px",color:"#253141"});
+  Object.assign(panel.style,{marginTop:"10px",padding:"14px",border:"1px solid #d8e2ee",borderRadius:"10px",background:"#f7faff",fontSize:"13px",color:"#253141",display:"grid",gap:"10px"});
+}
+function parseTranscript(transcript:string):TranscriptTurn[]{
+  const parts=transcript.split(/\b(Agent|Caller):\s*/g).filter(Boolean);
+  const turns:TranscriptTurn[]=[];
+  let speaker:TranscriptTurn["speaker"]="Unknown";
+  for(const part of parts){
+    if(part==="Agent"||part==="Caller"){speaker=part;continue;}
+    const text=part.trim();
+    if(!text)continue;
+    turns.push({speaker,text});
+  }
+  return turns.length?turns:[{speaker:"Unknown",text:transcript.trim()}];
+}
+function renderTranscript(panel:HTMLDivElement,transcript:string){
+  panel.replaceChildren();
+  for(const turn of parseTranscript(transcript)){
+    const row=document.createElement("div");
+    Object.assign(row.style,{display:"grid",gridTemplateColumns:"72px minmax(0,1fr)",gap:"10px",alignItems:"start"});
+    const label=document.createElement("div");
+    label.textContent=turn.speaker==="Unknown"?"Transcript":turn.speaker;
+    Object.assign(label.style,{fontWeight:"900",fontSize:"11px",textTransform:"uppercase",letterSpacing:".05em",paddingTop:"2px",color:turn.speaker==="Agent"?"#e4511d":turn.speaker==="Caller"?"#1557b0":"#667085"});
+    const text=document.createElement("div");
+    text.textContent=turn.text;
+    Object.assign(text.style,{lineHeight:"1.55",whiteSpace:"pre-wrap"});
+    row.append(label,text);
+    panel.appendChild(row);
+  }
 }
 
 function engagementStyle(el:HTMLDivElement){
@@ -51,9 +79,9 @@ async function enhance(modal:HTMLElement){
       button.textContent="View Transcript";
       buttonStyle(button);
       const panel=document.createElement("div");
-      panel.textContent=transcript;
       panel.hidden=true;
       transcriptStyle(panel);
+      renderTranscript(panel,transcript);
       button.addEventListener("click",()=>{panel.hidden=!panel.hidden;button.textContent=panel.hidden?"View Transcript":"Hide Transcript";});
       article.append(button,panel);
     }
