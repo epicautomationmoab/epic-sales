@@ -16,6 +16,7 @@ export default async function InboxPage(){
       <nav className={styles.nav}>
         <a className={styles.active} href="/inbox">Inbox</a>
         <a href="/leads">Leads</a>
+        <a href="/customers">Customers</a>
         <a href="/">Quote Builder</a>
         <a href="/missed-calls">Missed Calls</a>
         <a href="/call-recordings">Call Recordings</a>
