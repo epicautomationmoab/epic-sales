@@ -39,11 +39,12 @@ export default async function CallRecordingsPage() {
       <aside className={styles.sidebar}>
         <div className={styles.brand}><div className={styles.logoText}>EPIC 4X4</div><div className={styles.salesText}>SALES</div></div>
         <nav className={styles.nav}>
+          <a href="/inbox">Inbox</a>
           <a href="/leads">Leads</a>
+          <a href="/customers">Customers</a>
           <a href="/">Quote Builder</a>
           <a href="/missed-calls">Missed Calls</a>
           <a className={styles.active} href="/call-recordings">Call Recordings</a>
-          <span className={styles.navPending}>Inbox / Needs Review <small>coming next</small></span>
         </nav>
         <div className={styles.sidebarFooter}><div>Signed in as</div><strong>{profile.display_name}</strong></div>
       </aside>
