@@ -32,6 +32,7 @@ export default async function HomePage() {
         <nav style={{ padding: "16px 12px 8px", display: "grid", gap: 6 }}>
           <a href="/inbox" style={navLink}>◇ Inbox</a>
           <a href="/leads" style={navLink}>◇ Leads</a>
+          <a href="/customers" style={navLink}>◇ Customers</a>
           <a href="/" style={{ ...navLink, background: "rgba(255,255,255,.08)", color: "#fff", boxShadow: "inset 3px 0 0 #ff6a24" }}>◇ Quote Builder</a>
           <a href="/missed-calls" style={navLink}>◇ Missed Calls</a>
           <a href="/call-recordings" style={navLink}>◇ Call Recordings</a>
