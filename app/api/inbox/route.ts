@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows] = await Promise.all([
-      rpc(session.accessToken, "get_epic_unified_inbox", { p_include_cleaned: includeClosed }),
+      rpc(session.accessToken, "get_epic_routed_inbox", { p_include_cleaned: includeClosed }),
       rpc(session.accessToken, "get_epic_sales_blocked_domains", {}),
     ]);
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
-  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string } | null;
+  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
     if (body.action === "close" || body.action === "clean") {
@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "note") {
       const result = await rpc(session.accessToken, "epic_sales_add_inbox_thread_note", { p_thread_key: body.thread_key, p_note_text: body.note_text || "" });
+      return NextResponse.json(result || { ok: true });
+    }
+    if (body.action === "route") {
+      const destination = body.destination === "service" ? "service" : body.destination === "sales" ? "sales" : "";
+      if (!destination) return NextResponse.json({ error: "Destination is required." }, { status: 400 });
+      const result = await rpc(session.accessToken, "epic_route_inbox_thread", { p_thread_key: body.thread_key, p_destination: destination, p_note_text: body.note_text || null });
       return NextResponse.json(result || { ok: true });
     }
     return NextResponse.json({ error: "Invalid inbox action." }, { status: 400 });
