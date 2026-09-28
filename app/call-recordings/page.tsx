@@ -8,19 +8,55 @@ const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzi
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 
 async function loadRecordings(accessToken: string) {
+  const headers = {
+    apikey: SUPABASE_PUBLISHABLE_KEY,
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_epic_sales_call_recordings`, {
     method: "POST",
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: "{}",
     cache: "no-store",
   });
   if (!response.ok) throw new Error(await response.text());
   const payload = await response.json();
-  return Array.isArray(payload) ? payload as Recording[] : [];
+  const recordings = Array.isArray(payload) ? payload as Recording[] : [];
+
+  // Best-effort, read-only enrichment for Call Recordings only. This does not
+  // change shared routing or Readiness behavior.
+  try {
+    const matchResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/callrail_calls?matched_reservation_id=not.is.null&select=callrail_call_id,matched_reservation_id`,
+      { headers, cache: "no-store" },
+    );
+    if (!matchResponse.ok) return recordings;
+    const matches = await matchResponse.json() as Array<{ callrail_call_id:string; matched_reservation_id:string|null }>;
+    const reservationIds = [...new Set(matches.map(row=>row.matched_reservation_id).filter((id):id is string=>Boolean(id)))];
+    if (!reservationIds.length) return recordings;
+
+    const reservationResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/operational_reservations?id=in.(${reservationIds.map(encodeURIComponent).join(",")})&select=id,confirmation_code,business_line`,
+      { headers, cache: "no-store" },
+    );
+    if (!reservationResponse.ok) return recordings;
+    const reservations = await reservationResponse.json() as Array<{ id:string; confirmation_code:string|null; business_line:string|null }>;
+    const byReservation = new Map(reservations.map(row=>[row.id,row]));
+    const reservationIdByCall = new Map(matches.map(row=>[row.callrail_call_id,row.matched_reservation_id]));
+
+    return recordings.map(recording=>{
+      const reservationId = reservationIdByCall.get(recording.callrail_call_id) || null;
+      const reservation = reservationId ? byReservation.get(reservationId) : null;
+      return {
+        ...recording,
+        matched_reservation_id: reservationId,
+        reservation_confirmation: reservation?.confirmation_code || null,
+        reservation_business_line: reservation?.business_line || null,
+      };
+    });
+  } catch {
+    return recordings;
+  }
 }
 
 export default async function CallRecordingsPage() {
