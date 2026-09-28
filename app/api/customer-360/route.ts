@@ -11,8 +11,8 @@ async function auth(request: NextRequest) {
   return profile && accessToken && profile.role !== "workstation" ? { accessToken, profile } : null;
 }
 
-async function rpc(accessToken: string, body: Record<string, unknown>) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_epic_customer_360`, {
+async function rpcNamed(accessToken: string, fn:string, body: Record<string, unknown>) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -98,8 +98,43 @@ export async function GET(request: NextRequest) {
   if (!Object.values(body).some(Boolean)) return NextResponse.json({ error: "Customer identity is required." }, { status: 400 });
 
   try {
-    const customer = normalizeCustomerReservationTimes(await rpc(session.accessToken, body));
-    return NextResponse.json({ ok: true, customer });
+    const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    const confirmations = [...new Set((customer?.reservations || []).map((r:any)=>String(r.confirmation_code||"").trim()).filter(Boolean))] as string[];
+
+    let readinessByConfirmation = new Map<string, any>();
+    let cancellationEvents:any[] = [];
+    if (confirmations.length) {
+      const headers={apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`};
+      const readinessParams=new URLSearchParams({
+        confirmation_code:`in.(${confirmations.join(",")})`,
+        select:"confirmation_code,tripworks_booking_url,mpwr_confirmation_number,mpwr_reservation_url"
+      });
+      const [readinessResponse,cancellationRows]=await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/guest_readiness_operational?${readinessParams.toString()}`,{headers,cache:"no-store"}),
+        rpcNamed(session.accessToken,"get_epic_cancellation_timeline",{p_confirmations:confirmations}).catch(()=>[])
+      ]);
+      if(readinessResponse.ok){
+        const readinessRows=await readinessResponse.json().catch(()=>[]) as any[];
+        readinessByConfirmation=new Map(readinessRows.map((row:any)=>[String(row.confirmation_code||"").toUpperCase(),row]));
+      }
+      cancellationEvents=Array.isArray(cancellationRows)?cancellationRows:[];
+    }
+
+    const enriched = customer ? {
+      ...customer,
+      reservations:(customer.reservations||[]).map((reservation:any)=>{
+        const readiness=readinessByConfirmation.get(String(reservation.confirmation_code||"").toUpperCase());
+        return {
+          ...reservation,
+          tripworks_booking_url:readiness?.tripworks_booking_url||null,
+          mpwr_confirmation_number:readiness?.mpwr_confirmation_number||null,
+          mpwr_reservation_url:readiness?.mpwr_reservation_url||null,
+        };
+      }),
+      cancellation_agreements:cancellationEvents,
+    } : customer;
+
+    return NextResponse.json({ ok: true, customer: enriched });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load Customer 360." }, { status: 500 });
   }
