@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import CallTranscript from "../customer-360/CallTranscript";
 import styles from "./CallRecordings.module.css";
 
 export type Recording = {
@@ -24,6 +25,9 @@ export type Recording = {
   matched_lead_name: string | null;
   matched_lead_status: string | null;
   matched_booking_confirmation_code: string | null;
+  matched_reservation_id?: string | null;
+  reservation_confirmation?: string | null;
+  reservation_business_line?: string | null;
 };
 
 type ViewMode = "working" | "history" | "all";
@@ -35,6 +39,11 @@ function fmtTime(value: string | null) {
 function fmtDuration(seconds: number | null) { if (!seconds) return "—"; const mins=Math.floor(seconds/60); const rem=seconds%60; return `${mins}:${String(rem).padStart(2,"0")}`; }
 function relationship(recording: Recording) {
   const status=(recording.matched_lead_status||"").toLowerCase();
+  if(recording.matched_reservation_id){
+    const line=(recording.reservation_business_line||"").toLowerCase();
+    const label=line==="tour"?"Existing Tour Reservation":line==="rental"?"Existing Rental Reservation":"Existing Reservation";
+    return <span className={styles.booked}>{label}{recording.reservation_confirmation?<small>{recording.reservation_confirmation}</small>:null}</span>;
+  }
   if(!recording.matched_opportunity_id)return <span className={styles.unmatched}>Unmatched</span>;
   if(status==="open")return <a href={`/leads?open=${encodeURIComponent(recording.matched_opportunity_id)}`}>{recording.matched_lead_name||"Open lead"}</a>;
   if(status==="booked")return <span className={styles.booked}>{recording.matched_lead_name||"Booked"}{recording.matched_booking_confirmation_code?<small>{recording.matched_booking_confirmation_code}</small>:null}</span>;
@@ -62,7 +71,7 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search caller, phone, source, campaign, customer…"/>
       </div>
     </div>
-    <div className={styles.tableCard}><table><thead><tr><th>Caller</th><th>Time</th><th>Duration</th><th>Source</th><th>Customer Status</th><th></th></tr></thead><tbody>
+    <div className={styles.tableCard}><table><thead><tr><th>Caller</th><th>Time</th><th>Duration</th><th>Source</th><th>Relationship</th><th></th></tr></thead><tbody>
       {filtered.map(r=><tr key={r.callrail_call_id}><td><strong>{r.customer_name||"Unknown caller"}</strong><div>{r.customer_phone_number||"No phone"}</div></td><td>{fmtTime(r.start_time)}</td><td>{fmtDuration(r.duration_seconds)}</td><td><strong>{r.source_name||"—"}</strong><div>{r.campaign||""}</div></td><td>{relationship(r)}</td><td><button onClick={()=>setSelected(r)}>Open</button></td></tr>)}
     </tbody></table>{!filtered.length?<div className={styles.empty}>No recordings match this view.</div>:null}</div>
     {selected?<div className={styles.backdrop} onMouseDown={()=>setSelected(null)}><aside className={styles.drawer} onMouseDown={e=>e.stopPropagation()}>
@@ -71,7 +80,7 @@ export default function CallRecordingsClient({ recordings }: { recordings: Recor
       <div className={styles.actions}><a className={styles.primary} href={selected.recording_player_url||selected.recording_url||"#"} target="_blank" rel="noreferrer">Play Recording ↗</a>{selected.matched_opportunity_id&&selected.matched_lead_status==="open"?<a href={`/leads?open=${encodeURIComponent(selected.matched_opportunity_id)}`}>Open Lead</a>:null}</div>
       {selected.matched_lead_status==="booked"?<section><h3>Booked Customer</h3><p>{selected.matched_lead_name}{selected.matched_booking_confirmation_code?` · ${selected.matched_booking_confirmation_code}`:""}. This call remains in history and the booking timeline, but is no longer an open Sales lead.</p></section>:null}
       {selected.matched_lead_status==="lost"||selected.matched_lead_status==="retired"?<section><h3>Closed Sales Opportunity</h3><p>{selected.matched_lead_name} · {selected.matched_lead_status}.</p></section>:null}
-      {selected.campaign?<section><h3>Campaign</h3><p>{selected.campaign}</p></section>:null}{selected.call_summary?<section><h3>Call Summary</h3><p>{selected.call_summary}</p></section>:null}{selected.transcription_text?<section><h3>Transcription</h3><p className={styles.transcript}>{selected.transcription_text}</p></section>:null}
+      {selected.campaign?<section><h3>Campaign</h3><p>{selected.campaign}</p></section>:null}{selected.call_summary?<section><h3>Call Summary</h3><p>{selected.call_summary}</p></section>:null}{selected.transcription_text?<section><h3>Transcription</h3><CallTranscript transcript={selected.transcription_text}/></section>:null}
     </aside></div>:null}
   </>;
 }
