@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows] = await Promise.all([
-      rpc(session.accessToken, "get_epic_routed_inbox", { p_include_cleaned: includeClosed }),
+      rpc(session.accessToken, "get_epic_routed_inbox_v2", { p_include_cleaned: includeClosed }),
       rpc(session.accessToken, "get_epic_sales_blocked_domains", {}),
     ]);
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
