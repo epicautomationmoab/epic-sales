@@ -59,26 +59,16 @@ export async function GET(request: NextRequest) {
     const knownByEmail = new Map<string, { id:string; display_name:string|null }>();
     const knownByPhone = new Map<string, { id:string; display_name:string|null }>();
 
-    for (const email of emailCandidates) {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_contacts?canonical_email=eq.${encodeURIComponent(email)}&select=id,display_name,canonical_email&limit=2`, {
-        headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.accessToken}` },
-        cache: "no-store",
+    if (emailCandidates.length || phoneCandidates.length) {
+      const matches = await rpc(session.accessToken, "get_epic_known_customer_matches", {
+        p_emails: emailCandidates,
+        p_phones: phoneCandidates,
       });
-      if (!response.ok) continue;
-      const rows = await response.json().catch(() => []) as Array<{ id:string; display_name:string|null; canonical_email:string|null }>;
-      if (rows.length === 1) knownByEmail.set(email, rows[0]);
-    }
-
-    for (const digits of phoneCandidates) {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_contacts?canonical_phone=not.is.null&select=id,display_name,canonical_phone&limit=5000`, {
-        headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.accessToken}` },
-        cache: "no-store",
-      });
-      if (!response.ok) continue;
-      const rows = await response.json().catch(() => []) as Array<{ id:string; display_name:string|null; canonical_phone:string|null }>;
-      const matches = rows.filter(row => String(row.canonical_phone || "").replace(/\D/g, "") === digits);
-      if (matches.length === 1) knownByPhone.set(digits, matches[0]);
-      break;
+      for (const row of (Array.isArray(matches) ? matches : []) as Array<{ match_type:string; match_value:string; contact_id:string; display_name:string|null }>) {
+        const customer = { id: row.contact_id, display_name: row.display_name };
+        if (row.match_type === "email") knownByEmail.set(row.match_value, customer);
+        if (row.match_type === "phone") knownByPhone.set(row.match_value, customer);
+      }
     }
 
     const enrichedThreads = filteredThreads.map((thread: any) => {
