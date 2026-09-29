@@ -100,7 +100,7 @@ export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
-  const [activities, setActivities] = useState<QuoteActivity[]>([]);
+  const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -121,7 +121,7 @@ export default function QuoteBuilder() {
         const built = buildExperiences(rows);
         setExperiences(built);
         setExperienceFees(fees);
-        setActivities([]);
+        setActivities([blankActivity()]);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales pricing"))
       .finally(() => setLoading(false));
@@ -154,7 +154,7 @@ export default function QuoteBuilder() {
 
   function newQuote() {
     setEditingQuoteId(null);
-    setActivities([]);
+    setActivities([blankActivity()]);
     setName("");
     setEmail("");
     setPhone("");
