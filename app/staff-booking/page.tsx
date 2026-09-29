@@ -40,7 +40,7 @@ export default async function StaffBookingPage({searchParams}:{searchParams:Prom
     <div className={styles.grid}>
       <div><span>Activity / Vehicle</span><strong>{row.experience_name||"—"}</strong></div>
       <div><span>Date</span><strong>{dateLabel(row.activity_date)}</strong></div>
-      <div><span>Time</span><strong>{slot?.time_label||"—"}</strong></div>
+      <div><span>Time</span><strong>{row.time_label||"—"}</strong></div>
       <div><span>Duration / Option</span><strong>{row.option_name||"—"}</strong></div>
     </div>
     {addons.length?<section className={styles.section}><h2>Add-ons / Protection</h2>{addons.map((addon:any,index:number)=><div className={styles.line} key={index}><div><strong>{addon?.name||addon?.experience_addon?.title||"Add-on"}</strong>{addon?.experience_addon?.title&&addon.experience_addon.title!==addon.name?<span>{addon.experience_addon.title}</span>:null}</div><em>{typeof addon?.price==="number"?money.format(addon.price/100):""}</em></div>)}</section>:null}
