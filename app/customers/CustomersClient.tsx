@@ -40,17 +40,16 @@ export default function CustomersClient(){
   return <>
     <section className={styles.searchPanel}>
       <div className={styles.searchWrap}>
-        <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, email, phone, confirmation, TripWorks ID…" />
+        <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search guest name, email, phone, confirmation, TripWorks ID…" />
         {loading?<span>Searching…</span>:null}
       </div>
-      <div className={styles.help}>Search the customer database. Closed inbox items do not live here as messages — the customer and their history live in Customer 360.</div>
     </section>
 
     {error?<div className={styles.error}>{error}</div>:null}
-    {query.trim().length<2?<div className={styles.empty}><strong>Find any customer</strong><span>Start with at least two characters.</span></div>:
-      !loading&&!results.length?<div className={styles.empty}><strong>No customer found</strong><span>Try a different name, email, phone number, or reservation confirmation.</span></div>:
+    {query.trim().length<2?null:
+      !loading&&!results.length?<div className={styles.empty}><strong>No guest found</strong><span>Try a different name, email, phone number, or reservation confirmation.</span></div>:
       <section className={styles.results}>{results.map(c=><button key={c.identity_key} className={styles.customerCard} onClick={()=>setSelected(c)}>
-        <div className={styles.cardTop}><div><div className={styles.name}>{c.customer_name||c.email||c.phone||"Unknown customer"}</div><div className={styles.contact}>{[c.email,c.phone].filter(Boolean).join(" · ")||"No contact details"}</div></div><div className={styles.lastSeen}>{fmtDate(c.last_seen_at)}</div></div>
+        <div className={styles.cardTop}><div><div className={styles.name}>{c.customer_name||c.email||c.phone||"Unknown guest"}</div><div className={styles.contact}>{[c.email,c.phone].filter(Boolean).join(" · ")||"No contact details"}</div></div><div className={styles.lastSeen}>{fmtDate(c.last_seen_at)}</div></div>
         <div className={styles.meta}>
           {c.has_open_lead?<span className={styles.lead}>OPEN LEAD</span>:null}
           {c.reservation_count>0?<span>{c.reservation_count} reservation{c.reservation_count===1?"":"s"}</span>:null}
@@ -58,7 +57,7 @@ export default function CustomersClient(){
           {c.confirmation_code?<span>{c.confirmation_code}</span>:null}
           {c.tripworks_customer_id?<span>TW #{c.tripworks_customer_id}</span>:null}
         </div>
-        <div className={styles.open}>Open Customer 360 →</div>
+        <div className={styles.open}>Open EpicC360 →</div>
       </button>)}</section>}
 
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} contactId={selected.contact_id} reservationId={selected.reservation_id} reservationConfirmation={selected.confirmation_code} phone={selected.phone} email={selected.email}/>:null}
