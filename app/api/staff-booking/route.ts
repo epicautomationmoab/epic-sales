@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedTeamProfile } from "../../../../lib/team-auth";
+import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 
 const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"").replace(/\/+$/,"");
 const SUPABASE_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
