@@ -126,18 +126,10 @@ export async function saveSalesQuote(input: {
   visitEnd?: string;
   activities: SaveQuoteActivity[];
 }): Promise<SaveQuoteResult> {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_epic_sales_quote_v5`, {
+  const response = await fetch("/api/quotes", {
     method: "POST",
-    headers: apiHeaders,
-    body: JSON.stringify({
-      p_quote_id: input.quoteId || null,
-      p_customer_name: input.customerName || null,
-      p_customer_email: input.customerEmail || null,
-      p_customer_phone: input.customerPhone || null,
-      p_visit_start: input.visitStart || null,
-      p_visit_end: input.visitEnd || null,
-      p_activities: input.activities,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
 
   if (!response.ok) {
