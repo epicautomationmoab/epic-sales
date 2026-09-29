@@ -23,7 +23,7 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
   const[query,setQuery]=useState("");
   const[owner,setOwner]=useState("All");
   const[selected,setSelected]=useState<SalesLead|null>(null);
-  const owners=useMemo(()=>["All","Unclaimed",...Array.from(new Set(leads.map(l=>l.claimed_by_name||l.assigned_rep_name).filter(Boolean) as string[])).sort()], [leads]);
+  const claimedOwners=useMemo(()=>Array.from(new Set(leads.map(l=>l.claimed_by_name||l.assigned_rep_name).filter(Boolean) as string[])).sort(), [leads]);
   const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return leads.filter(l=>{
     const leadOwner=l.claimed_by_name||l.assigned_rep_name||"Unclaimed";
     if(owner!=="All"&&leadOwner!==owner)return false;
@@ -32,8 +32,16 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
   });},[leads,owner,query]);
 
   return <>
-    <div className={styles.toolbar}><div><strong>Active Leads {filtered.length}</strong><div className={styles.toolbarSub}>This is the work queue. Click a customer to work them in Customer 360.</div></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>{owners.map(name=><button key={name} onClick={()=>setOwner(name)} style={{border:"1px solid #d9e0e6",background:owner===name?"#111827":"#fff",color:owner===name?"#fff":"#26303b",borderRadius:999,padding:"8px 13px",fontWeight:800,cursor:"pointer"}}>{name}</button>)}</div>
+    <div className={styles.toolbar}><div><strong>Abandoned Carts {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
+    <div className={styles.ownerFilterRow}>
+      <select className={styles.ownerSelect} value={owner} onChange={e=>setOwner(e.target.value)} aria-label="Filter abandoned carts by owner">
+        <option value="All">All</option>
+        <option value="Unclaimed">Unclaimed</option>
+        <optgroup label="Claimed">
+          {claimedOwners.map(name=><option key={name} value={name}>{name}</option>)}
+        </optgroup>
+      </select>
+    </div>
     <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Visit Window</th><th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>)}</tbody></table></div>
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
