@@ -9,6 +9,8 @@ export type SalesRateRow = {
   sales_help_text: string | null;
 };
 
+export type SalesBookingLink = { experience_id: string; booking_url: string; };
+
 export type SalesExperienceFee = {
   experience_id: string;
   experience_name: string;
@@ -95,6 +97,14 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
   }
 
   return response.json() as Promise<SalesRateRow[]>;
+}
+
+export async function getSalesBookingLinks(): Promise<SalesBookingLink[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/sales_booking_links?select=experience_id,booking_url&is_active=eq.true`, {
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY }, cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Unable to load booking links.");
+  return response.json() as Promise<SalesBookingLink[]>;
 }
 
 export async function getSalesExperienceFees(): Promise<SalesExperienceFee[]> {
