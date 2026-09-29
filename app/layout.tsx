@@ -3,8 +3,8 @@ import "./globals.css";
 import Customer360Enhancer from "./customer-360/Customer360Enhancer";
 
 export const metadata: Metadata = {
-  title: "Epic Sales",
-  description: "Sales leads and quoting for Epic 4X4 Adventures",
+  title: "EpicC360 — Epic 4X4 Adventures",
+  description: "Epic 4X4 Adventures customer communications, sales, history, and service workspace",
   icons: {
     icon: "https://myepicreservation.com/epic-logo.png",
     shortcut: "https://myepicreservation.com/epic-logo.png",
