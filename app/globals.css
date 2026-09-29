@@ -209,3 +209,41 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .modalDates { grid-template-columns: 1fr; }
   .nav { grid-template-columns: 1fr; }
 }
+
+
+/* EpicC360 shared product identity */
+.epicC360Brand {
+  min-height: 150px;
+  padding: 18px 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.epicC360Brand img {
+  display: block;
+  width: min(164px, 88%);
+  max-height: 72px;
+  object-fit: contain;
+}
+.epicC360Product {
+  margin-top: 12px;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -.035em;
+}
+.epicC360Product::first-letter { color: #d71920; }
+.epicC360Tagline {
+  margin-top: 7px;
+  max-width: 170px;
+  color: #aeb8c6;
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
