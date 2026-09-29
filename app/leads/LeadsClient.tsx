@@ -41,8 +41,8 @@ function repColor(name:string|null){return name?repColors[name]||null:null;}
 export default function LeadsClient({leads}:{leads:SalesLead[]}){
   const[query,setQuery]=useState("");
   const[owner,setOwner]=useState("All");
-  const[sortKey,setSortKey]=useState<SortKey>("visit");
-  const[sortDir,setSortDir]=useState<SortDir>("asc");
+  const[sortKey,setSortKey]=useState<SortKey>("shopped");
+  const[sortDir,setSortDir]=useState<SortDir>("desc");
   const[selected,setSelected]=useState<SalesLead|null>(null);
   const[busyId,setBusyId]=useState<string|null>(null);
   const[error,setError]=useState("");
