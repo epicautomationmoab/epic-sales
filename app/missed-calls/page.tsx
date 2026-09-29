@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
+import EpicC360Sidebar from "../EpicC360Sidebar";
 import MissedCallsClient, { type MissedCallItem } from "./MissedCallsClient";
 import styles from "./MissedCalls.module.css";
 
@@ -32,23 +33,18 @@ export default async function MissedCallsPage() {
 
   return (
     <main className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}><div className={styles.logoText}>EPIC 4X4</div><div className={styles.salesText}>SALES</div></div>
-        <nav className={styles.nav}>
-          <a href="/inbox">Inbox</a>
-          <a href="/leads">Leads</a>
-          <a href="/customers">Customers</a>
-          <a href="/">Quote Builder</a>
-          <a className={styles.active} href="/missed-calls">Missed Calls</a>
-          <a href="/call-recordings">Call Recordings</a>
-        </nav>
-        <div className={styles.sidebarFooter}><div>Signed in as</div><strong>{profile.display_name}</strong></div>
-      </aside>
-
+      <EpicC360Sidebar
+        active="missed-calls"
+        profileName={profile.display_name}
+        className={styles.sidebar}
+        navClassName={styles.nav}
+        activeClassName={styles.active}
+        footerClassName={styles.sidebarFooter}
+      />
       <section className={styles.main}>
         <header className={styles.header}>
-          <div><div className={styles.eyebrow}>Epic Sales</div><h1>Missed Calls</h1><p>Voicemails, abandoned calls, and unanswered calls that still need a human decision.</p></div>
-          <a className={styles.quoteButton} href="/">+ Build Quote</a>
+          <div><div className={styles.eyebrow}>EpicC360 · Attention Queue</div><h1>Missed Calls</h1><p>Calls that still need a human follow-up decision.</p></div>
+          <a className={styles.quoteButton} href="/quote">+ Build Quote</a>
         </header>
         {error ? <div className={styles.error}>{error}</div> : <MissedCallsClient initialItems={items} />}
       </section>
