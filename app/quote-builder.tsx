@@ -188,8 +188,10 @@ export default function QuoteBuilder() {
     setPhone("");
     setVisitStart("");
     setVisitEnd("");
+    setDetailsOpen(false);
     setSaveMessage("");
     setActive("quotes");
+    window.history.replaceState({}, "", window.location.pathname);
   }
 
   async function openQuote(quoteId: string) {
@@ -406,6 +408,7 @@ export default function QuoteBuilder() {
             <section>
               <div className="sectionHeading">
                 <div><h2>{editingQuoteId ? `Edit Quote ${editingQuoteId.slice(0, 8)}` : "Build Estimate"}</h2></div>
+                <button className="secondary" type="button" onClick={newQuote}>+ New Quote</button>
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
