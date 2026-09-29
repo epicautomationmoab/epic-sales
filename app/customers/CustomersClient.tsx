@@ -40,16 +40,16 @@ export default function CustomersClient(){
   return <>
     <section className={styles.searchPanel}>
       <div className={styles.searchWrap}>
-        <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search guest name, email, phone, confirmation, TripWorks ID…" />
+        <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, email, phone, confirmation, TripWorks ID…" />
         {loading?<span>Searching…</span>:null}
       </div>
     </section>
 
     {error?<div className={styles.error}>{error}</div>:null}
     {query.trim().length<2?null:
-      !loading&&!results.length?<div className={styles.empty}><strong>No guest found</strong><span>Try a different name, email, phone number, or reservation confirmation.</span></div>:
+      !loading&&!results.length?<div className={styles.empty}><strong>No match found</strong><span>Try a different name, email, phone number, or reservation confirmation.</span></div>:
       <section className={styles.results}>{results.map(c=><button key={c.identity_key} className={styles.customerCard} onClick={()=>setSelected(c)}>
-        <div className={styles.cardTop}><div><div className={styles.name}>{c.customer_name||c.email||c.phone||"Unknown guest"}</div><div className={styles.contact}>{[c.email,c.phone].filter(Boolean).join(" · ")||"No contact details"}</div></div><div className={styles.lastSeen}>{fmtDate(c.last_seen_at)}</div></div>
+        <div className={styles.cardTop}><div><div className={styles.name}>{c.customer_name||c.email||c.phone||"Unknown person"}</div><div className={styles.contact}>{[c.email,c.phone].filter(Boolean).join(" · ")||"No contact details"}</div></div><div className={styles.lastSeen}>{fmtDate(c.last_seen_at)}</div></div>
         <div className={styles.meta}>
           {c.has_open_lead?<span className={styles.lead}>OPEN LEAD</span>:null}
           {c.reservation_count>0?<span>{c.reservation_count} reservation{c.reservation_count===1?"":"s"}</span>:null}
