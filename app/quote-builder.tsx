@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getRecentSalesQuotes,
   getSalesExperienceFees,
+  getSalesBookingLinks,
   getSalesQuoteDetail,
   getSalesRates,
   saveSalesQuote,
@@ -100,6 +101,7 @@ export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
+  const [bookingLinks, setBookingLinks] = useState<Record<string, string>>({});
   const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -113,14 +115,16 @@ export default function QuoteBuilder() {
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([getSalesRates(), getSalesExperienceFees()])
-      .then(([rows, fees]) => {
+    Promise.all([getSalesRates(), getSalesExperienceFees(), getSalesBookingLinks()])
+      .then(([rows, fees, links]) => {
         const built = buildExperiences(rows);
         setExperiences(built);
         setExperienceFees(fees);
+        setBookingLinks(Object.fromEntries(links.map((link) => [link.experience_id, link.booking_url])));
         setActivities([blankActivity()]);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales pricing"))
@@ -277,6 +281,60 @@ export default function QuoteBuilder() {
     }
   }
 
+  async function handleSaveAndEmail() {
+    if (!email.trim()) { setSaveMessage("Add a guest email before sending the quote."); return; }
+    if (!hasAnyTicket) { setSaveMessage("Add at least one ticket before sending the quote."); return; }
+    setEmailing(true); setSaveMessage("");
+    try {
+      const result = await saveSalesQuote({
+        quoteId: editingQuoteId, customerName: name, customerEmail: email, customerPhone: phone,
+        visitStart, visitEnd,
+        activities: activities.map((activity) => ({
+          experienceId: activity.experienceId, tripSafe: activity.tripSafe, premier: activity.premier,
+          tickets: Object.entries(activity.qty).filter(([, quantity]) => quantity > 0)
+            .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })),
+        })),
+      });
+      setEditingQuoteId(result.quote_id);
+      const first = name.trim().split(/\s+/)[0] || "there";
+      const lines = [`Hi ${first},`, "", "It was great talking with you! I put together the quote we discussed for your Moab adventure."];
+      for (const item of calculatedActivities) {
+        if (!item.experience) continue;
+        lines.push("", item.experience.name);
+        for (const ticket of item.experience.tickets) {
+          const qty = item.activity.qty[ticket.id] ?? 0;
+          if (qty > 0) lines.push(`• ${qty} × ${ticket.name} — ${money.format(ticket.price * qty)}`);
+        }
+        if (item.privateFee > 0) lines.push(`• ${item.privateFeeRule?.fee_label || "Private Tour Fee"} — ${money.format(item.privateFee)}`);
+        if (item.activity.tripSafe) lines.push("• TripSafe selected");
+        if (item.activity.premier) lines.push("• Premier Adventure Assure selected");
+        lines.push(`Estimated activity total: ${money.format(item.total)}`);
+      }
+      lines.push("", `ESTIMATED TRIP TOTAL: ${money.format(totals.total)}`, "",
+        "I'll follow up as we discussed. In the meantime, please call me at 435-220-2700 if you have any questions or if you're ready to book. I'd be happy to take care of it for you.");
+      const online = calculatedActivities.filter((item) => item.experience && bookingLinks[item.experience.id]);
+      if (online.length) {
+        lines.push("", "Prefer to book online?");
+        for (const item of online) lines.push("", item.experience!.name, bookingLinks[item.experience!.id]);
+        lines.push("", "Availability is not held until a reservation is completed. Online booking will let you choose from currently available dates and departure times.");
+      }
+      const response = await fetch("/api/customer-communications", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: "email", opportunity_id: result.opportunity_id, email: email.trim(),
+          customer_name: name.trim() || null, subject: "Your Epic 4X4 Adventure Quote", message_text: lines.join("\n")
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Unable to send quote email.");
+      setDetailsOpen(false);
+      setSaveMessage(`Quote emailed to ${email.trim()}.`);
+      getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Unable to save and email quote.");
+    } finally { setEmailing(false); }
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -374,7 +432,7 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
             <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update Quote" : "Save Quote"}</button>
-            <button className="secondary modalSecondary" type="button" disabled={!email}>Save & Email Quote (email wiring next)</button>
+            <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button>
           </div>
         </div>
       )}
