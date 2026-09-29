@@ -59,6 +59,33 @@ export default function Customer360Modal(props:Props){
   const pastReservations=(data?.reservations||[]).filter(r=>!activeReservations.some(a=>a.id===r.id));
   const openLeads=(data?.opportunities||[]).filter(o=>o.status==="open");
   const futureDrafts=(data?.drafts||[]).filter(d=>d.is_current_draft!==false&&!d.converted_at);
+
+  async function openStaffBookingCard(){
+    const draft=futureDrafts[0];
+    if(!draft)return;
+    const url=`/staff-booking?draft=${encodeURIComponent(draft.id)}`;
+    const pictureInPicture=(window as any).documentPictureInPicture;
+    if(pictureInPicture?.requestWindow){
+      try{
+        const pipWindow=await pictureInPicture.requestWindow({width:430,height:720});
+        pipWindow.document.title="Epic Staff Booking";
+        pipWindow.document.body.style.margin="0";
+        pipWindow.document.body.style.overflow="hidden";
+        const frame=pipWindow.document.createElement("iframe");
+        frame.src=url;
+        frame.title="Epic Staff Booking";
+        frame.style.width="100%";
+        frame.style.height="100vh";
+        frame.style.border="0";
+        frame.style.display="block";
+        pipWindow.document.body.appendChild(frame);
+        return;
+      }catch{
+        // Fall through to a normal helper window if Picture-in-Picture is unavailable or blocked.
+      }
+    }
+    window.open(url,"epic-staff-booking","popup=yes,width=680,height=820,resizable=yes,scrollbars=yes");
+  }
   const lifetimeSpend=(data?.reservations||[]).reduce((sum,r)=>sum+(r.total_amount_cents||0),0);
   const communications=(data?.calls?.length||0)+(data?.texts?.length||0)+(data?.emails?.length||0);
   const hasCalls=(data?.calls?.length||0)>0;
@@ -72,7 +99,7 @@ export default function Customer360Modal(props:Props){
   if(!badges.length)badges.push("New Customer");
 
   return <div className={styles.backdrop} onMouseDown={e=>{if(e.currentTarget===e.target)onClose();}}><section className={styles.modal} role="dialog" aria-modal="true" aria-label="EpicC360">
-    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<a className={styles.button} href={`mailto:${identity.email}`}>Email</a>:null}{identity?.phone?<a className={styles.button} href={`sms:${identity.phone}`}>Text</a>:null}<a className={styles.buttonPrimary} href="/quote">Build Quote</a>{futureDrafts.length?<a className={styles.button} href={`/staff-booking?draft=${encodeURIComponent(futureDrafts[0].id)}`} target="_blank" rel="noreferrer">Book It</a>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
+    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<a className={styles.button} href={`mailto:${identity.email}`}>Email</a>:null}{identity?.phone?<a className={styles.button} href={`sms:${identity.phone}`}>Text</a>:null}<a className={styles.buttonPrimary} href="/quote">Build Quote</a>{futureDrafts.length?<button className={styles.button} type="button" onClick={openStaffBookingCard}>Book It</button>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
     {loading?<div className={styles.loading}>Loading EpicC360…</div>:error?<div className={styles.error}>{error}</div>:!data?<div className={styles.empty}>No customer record found.</div>:<div className={styles.body}>
       <main className={styles.journey}><div className={styles.lifecycleHeader}><div><div className={styles.eyebrow}>Customer Lifecycle</div><h3>Customer Lifecycle</h3></div><span>{timeline.length} events</span></div><div className={styles.filters}>{([['all','All'],['call','Calls'],['text','Texts'],['email','Emails'],['reservation','Reservations']] as Array<[LifecycleFilter,string]>).map(([value,label])=>{const hasActivity=value==="call"?hasCalls:value==="text"?hasTexts:value==="email"?hasEmails:false;const presenceClass=value==="call"&&hasActivity?styles.filterHasCalls:value==="text"&&hasActivity?styles.filterHasTexts:value==="email"&&hasActivity?styles.filterHasEmails:"";return <button key={value} className={`${styles.filter} ${presenceClass} ${filter===value?styles.filterActive:""}`} onClick={()=>setFilter(value)}>{label}</button>;})}</div><div className={styles.timeline}>{visibleTimeline.length?visibleTimeline.map(item=><article key={item.id} className={`${styles.event} ${styles[item.kind]}`}><div className={styles.eventTop}><strong>{item.title}</strong><span>{fmtDateTime(item.at)}</span></div>{item.meta?<div className={styles.eventMeta}>{item.meta}</div>:null}{item.body?<div className={styles.eventBody}>{item.body}</div>:null}{item.href?<a href={item.href} target={item.href.startsWith("http")?"_blank":undefined} rel={item.href.startsWith("http")?"noreferrer":undefined}>{item.hrefLabel||"Open"}</a>:null}{item.secondaryHref?<><span> · </span><a href={item.secondaryHref} target="_blank" rel="noreferrer">{item.secondaryHrefLabel||"Open"}</a></>:null}{item.kind==="call"&&item.transcript?<CallTranscript transcript={item.transcript}/>:null}</article>):<div className={styles.emptyTimeline}>No activity in this view yet.</div>}</div></main>
       <aside className={styles.sidebar}><div className={styles.commandTitle}><div className={styles.eyebrow}>Current Customer Context</div><h3>Command Center</h3></div>
