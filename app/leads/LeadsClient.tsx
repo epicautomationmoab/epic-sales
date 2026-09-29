@@ -16,8 +16,7 @@ export type SalesLead = {
 };
 
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
-function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric"});}
-function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
+function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric"});}\nfunction fmtShopped(v:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}\nfunction dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
 
 export default function LeadsClient({leads}:{leads:SalesLead[]}){
   const[query,setQuery]=useState("");
@@ -42,7 +41,7 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
         </optgroup>
       </select>
     </div>
-    <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Visit Window</th><th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>)}</tbody></table></div>
+    <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Shopped</th><th>Visit Window</th><th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{fmtShopped(l.shopping_last_activity_at)}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>)}</tbody></table></div>
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
