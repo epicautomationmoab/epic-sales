@@ -21,20 +21,18 @@ export default async function StaffBookingPage({searchParams}:{searchParams:Prom
   if(!profile||!token||profile.role==="workstation") return <main className={styles.shell}><section className={styles.card}>Employee login required.</section></main>;
   if(!draftId)return <main className={styles.shell}><section className={styles.card}>Draft is required.</section></main>;
 
-  const query=new URLSearchParams({id:"eq."+draftId,select:"id,confirmation_code,customer_name,activity_date,start_time,experience_name,option_name,value_cents,tripworks_customer_code,raw_payload"});
-  const response=await fetch(SUPABASE_URL+"/rest/v1/sales_drafts?"+query.toString(),{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token},cache:"no-store"});
-  const rows=await response.json().catch(()=>[]);
-  const row=rows[0];
+  const response=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_staff_booking_draft",{
+    method:"POST",
+    headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify({p_draft_id:draftId}),
+    cache:"no-store"
+  });
+  const row=await response.json().catch(()=>null);
   if(!response.ok||!row)return <main className={styles.shell}><section className={styles.card}>Unable to load booking draft.</section></main>;
 
-  const trip=row.raw_payload||{};
-  const order=Array.isArray(trip.tripOrders)?trip.tripOrders[0]||{}:{};
-  const booking=Array.isArray(order.bookings)?order.bookings[0]||{}:{};
-  const slot=order.experience_timeslot||{};
-  const addons=Array.isArray(booking.addons)?booking.addons:[];
-  const products=Array.isArray(booking.booking_products)?booking.booking_products:[];
-  const customerCode=row.tripworks_customer_code||trip?.customer?.code||null;
-  const customerUrl=customerCode?"https://epic4x4.tripworks.com/customer/"+encodeURIComponent(customerCode)+"/trips":null;
+  const addons=Array.isArray(row.addons)?row.addons:[];
+  const products=Array.isArray(row.products)?row.products:[];
+  const customerUrl=row.tripworks_customer_url||null;
 
   return <main className={styles.shell}><section className={styles.card}>
     <div className={styles.top}><div><div className={styles.eyebrow}>EpicC360 · Staff Booking</div><h1>Book It</h1><p className={styles.name}>{row.customer_name||"Customer"}</p></div><div className={styles.draft}>Draft {row.confirmation_code||"—"}</div></div>
