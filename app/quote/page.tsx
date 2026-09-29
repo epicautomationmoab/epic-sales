@@ -4,18 +4,6 @@ import QuoteBuilder from "../quote-builder";
 import EpicC360Sidebar from "../EpicC360Sidebar";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 
-const sidebarStyle = {
-  position: "fixed",
-  inset: "0 auto 0 0",
-  width: 220,
-  background: "#111926",
-  color: "#cfd7e3",
-  display: "flex",
-  flexDirection: "column",
-  zIndex: 30,
-  boxShadow: "8px 0 28px rgba(9,17,29,.12)",
-} as const;
-
 const navStyle = "epicC360QuoteNav";
 const activeStyle = "epicC360QuoteActive";
 const footerStyle = "epicC360QuoteFooter";
