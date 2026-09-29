@@ -33,7 +33,7 @@ export default async function QuotePage() {
         activeClassName={activeStyle}
         footerClassName={footerStyle}
       />
-      <style>{`.epicC360QuoteSidebar{position:fixed;inset:0 auto 0 0;width:220px;background:#111926;color:#cfd7e3;display:flex;flex-direction:column;z-index:30;box-shadow:8px 0 28px rgba(9,17,29,.12)}.quote-host{margin-left:220px}`}</style>
+      <style>{`.epicC360QuoteSidebar{position:fixed;inset:0 auto 0 0;width:220px;background:#111926;color:#cfd7e3;display:flex;flex-direction:column;z-index:30;box-shadow:8px 0 28px rgba(9,17,29,.12)}.quote-host{margin-left:220px}.quote-host .content{margin-left:0;max-width:1240px;margin-right:auto;padding:28px 34px 42px}.quote-host .quoteGrid{grid-template-columns:minmax(520px,1.15fr) minmax(390px,.85fr);gap:28px}@media(max-width:1100px){.quote-host .quoteGrid{grid-template-columns:1fr}}`}</style>
       <div className="quote-host"><QuoteBuilder /></div>
     </>
   );
