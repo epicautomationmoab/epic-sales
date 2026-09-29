@@ -21,7 +21,7 @@ export default async function CustomersPage(){
       footerClassName={styles.sidebarFooter}
     />
     <section className={styles.main}>
-      <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>Guests</h1></div></header>
+      <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>C360</h1></div></header>
       <CustomersClient/>
     </section>
   </main>;
