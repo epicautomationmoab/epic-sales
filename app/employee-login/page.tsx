@@ -29,15 +29,152 @@ export default function EmployeeLoginPage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f3f5f7", padding: 24 }}>
-      <form onSubmit={submit} style={{ width: "100%", maxWidth: 420, background: "#fff", border: "1px solid #dfe4e9", borderRadius: 16, padding: 32, boxShadow: "0 18px 50px rgba(20,31,45,.12)" }}>
-        <h1 style={{ margin: 0, textAlign: "center", color: "#182230" }}>Epic Sales</h1>
-        <p style={{ textAlign: "center", color: "#667085", marginBottom: 24 }}>Sign in with your EpicTools employee account.</p>
-        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" required style={{ width: "100%", height: 46, border: "1px solid #cfd6de", borderRadius: 9, padding: "0 12px", marginBottom: 12 }} />
-        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" required style={{ width: "100%", height: 46, border: "1px solid #cfd6de", borderRadius: 9, padding: "0 12px" }} />
-        {error ? <p style={{ color: "#b42318" }}>{error}</p> : null}
-        <button type="submit" disabled={submitting} style={{ width: "100%", height: 46, marginTop: 18, border: 0, borderRadius: 9, background: "#d5521d", color: "#fff", fontWeight: 800 }}>{submitting ? "Signing in..." : "Sign in"}</button>
+    <main className="loginPage">
+      <form onSubmit={submit} className="loginCard">
+        <div className="accentBar" />
+        <img
+          src="https://myepicreservation.com/epic-logo.png"
+          alt="Epic 4X4 Adventures"
+          className="epicLogo"
+        />
+        <h1 className="productName">
+          Epic<span>C360</span>
+        </h1>
+        <p className="subtitle">Sign in with your EpicTools employee account.</p>
+
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="Email"
+          autoComplete="email"
+          required
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="Password"
+          autoComplete="current-password"
+          required
+        />
+
+        {error ? <p className="error">{error}</p> : null}
+
+        <button type="submit" disabled={submitting}>
+          {submitting ? "Signing in..." : "Sign in"}
+        </button>
       </form>
+
+      <style jsx>{`
+        .loginPage {
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          background:
+            radial-gradient(circle at 50% 30%, rgba(255, 106, 36, 0.08), transparent 34%),
+            #f3f5f7;
+        }
+
+        .loginCard {
+          position: relative;
+          width: 100%;
+          max-width: 440px;
+          overflow: hidden;
+          box-sizing: border-box;
+          padding: 34px 32px 32px;
+          background: #fff;
+          border: 1px solid #dfe4e9;
+          border-radius: 18px;
+          box-shadow: 0 20px 55px rgba(20, 31, 45, 0.13);
+        }
+
+        .accentBar {
+          position: absolute;
+          inset: 0 0 auto;
+          height: 5px;
+          background: linear-gradient(90deg, #d71920, #ff6a24);
+        }
+
+        .epicLogo {
+          display: block;
+          width: 150px;
+          max-height: 66px;
+          object-fit: contain;
+          margin: 4px auto 15px;
+        }
+
+        .productName {
+          margin: 0;
+          text-align: center;
+          color: #182230;
+          font-size: 42px;
+          line-height: 1;
+          letter-spacing: -0.045em;
+          font-weight: 900;
+        }
+
+        .productName span {
+          color: #e0521d;
+        }
+
+        .subtitle {
+          margin: 17px 0 26px;
+          text-align: center;
+          color: #667085;
+          font-size: 16px;
+          line-height: 1.45;
+        }
+
+        input {
+          width: 100%;
+          height: 50px;
+          box-sizing: border-box;
+          border: 1px solid #cfd6de;
+          border-radius: 10px;
+          padding: 0 14px;
+          margin-bottom: 12px;
+          background: #fff;
+          color: #182230;
+          outline: none;
+          font-size: 16px;
+          transition: border-color 120ms ease, box-shadow 120ms ease;
+        }
+
+        input:focus {
+          border-color: #ff9a69;
+          box-shadow: 0 0 0 3px rgba(255, 106, 36, 0.12);
+        }
+
+        .error {
+          margin: 2px 0 0;
+          color: #b42318;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        button {
+          width: 100%;
+          height: 48px;
+          margin-top: 8px;
+          border: 0;
+          border-radius: 10px;
+          background: #d9521e;
+          color: #fff;
+          font-weight: 900;
+          font-size: 17px;
+          transition: background 120ms ease, transform 120ms ease;
+        }
+
+        button:hover:not(:disabled) {
+          background: #c94717;
+        }
+
+        button:active:not(:disabled) {
+          transform: translateY(1px);
+        }
+      `}</style>
     </main>
   );
 }
