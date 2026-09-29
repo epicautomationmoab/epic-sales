@@ -29,7 +29,7 @@ function twReservationUrl(code:string|null){return code?`https://epic4x4.tripwor
 
 export default function Customer360Modal(props:Props){
   const{open,onClose,contactId,opportunityId,reservationId,reservationConfirmation,phone,email}=props;
-  const[data,setData]=useState<Customer360|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");
+  const[data,setData]=useState<Customer360|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");
 
   useEffect(()=>{if(!open)return;const controller=new AbortController();setFilter("all");(async()=>{setLoading(true);setError("");try{const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(opportunityId)q.set("opportunity",opportunityId);if(reservationId)q.set("reservation",reservationId);if(reservationConfirmation)q.set("confirmation",reservationConfirmation);if(phone)q.set("phone",phone);if(email)q.set("email",email);const r=await fetch(`/api/customer-360?${q.toString()}`,{cache:"no-store",signal:controller.signal});const p=await r.json();if(!r.ok)throw new Error(p?.error||"Unable to load Customer 360.");setData(p.customer||null);}catch(e){if((e as Error).name!=="AbortError")setError(e instanceof Error?e.message:"Unable to load Customer 360.");}finally{setLoading(false);}})();return()=>controller.abort();},[open,contactId,opportunityId,reservationId,reservationConfirmation,phone,email]);
 
@@ -52,6 +52,30 @@ export default function Customer360Modal(props:Props){
   },[data]);
 
   const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):item.kind===filter),[timeline,filter]);
+
+  async function sendCommunication(){
+    if(!data||!composeChannel||!composeBody.trim())return;
+    setSending(true);setError("");setSendStatus("");
+    try{
+      const reservation=(data.reservations||[]).find(r=>!r.is_cancelled)||(data.reservations||[])[0]||null;
+      const opportunity=(data.opportunities||[]).find(o=>o.status==="open")||(data.opportunities||[])[0]||null;
+      const r=await fetch("/api/customer-communications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        channel:composeChannel,
+        confirmation:reservation?.confirmation_code||reservationConfirmation||null,
+        opportunity_id:opportunity?.id||opportunityId||null,
+        contact_id:data.identity.contact_id||contactId||null,
+        email:data.identity.email||email||null,
+        phone:data.identity.phone||phone||null,
+        customer_name:data.identity.name||null,
+        subject:composeChannel==="email"?composeSubject:null,
+        message_text:composeBody.trim()
+      })});
+      const p=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(p?.error||"Unable to send message.");
+      setComposeBody("");setSendStatus(composeChannel==="email"?"Email sent.":"Text sent.");setComposeChannel(null);
+    }catch(e){setError(e instanceof Error?e.message:"Unable to send message.");}
+    finally{setSending(false);}
+  }
 
   if(!open)return null;
   const identity=data?.identity;
@@ -99,7 +123,9 @@ export default function Customer360Modal(props:Props){
   if(!badges.length)badges.push("New Customer");
 
   return <div className={styles.backdrop} onMouseDown={e=>{if(e.currentTarget===e.target)onClose();}}><section className={styles.modal} role="dialog" aria-modal="true" aria-label="EpicC360">
-    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<a className={styles.button} href={`mailto:${identity.email}`}>Email</a>:null}{identity?.phone?<a className={styles.button} href={`sms:${identity.phone}`}>Text</a>:null}<a className={styles.buttonPrimary} href="/quote">Build Quote</a>{futureDrafts.length?<button className={styles.button} type="button" onClick={openStaffBookingCard}>Book It</button>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
+    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<button className={styles.button} type="button" onClick={()=>{setComposeChannel("email");setSendStatus("");}}>Email</button>:null}{identity?.phone?<button className={styles.button} type="button" onClick={()=>{setComposeChannel("text");setSendStatus("");}}>Text</button>:null}<a className={styles.buttonPrimary} href="/quote">Build Quote</a>{futureDrafts.length?<button className={styles.button} type="button" onClick={openStaffBookingCard}>Book It</button>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
+    {composeChannel&&data?<div className={styles.composer}><div className={styles.composerTop}><strong>{composeChannel==="email"?"Email":"Text"} {data.identity.name||"customer"}</strong><button className={styles.closeSmall} type="button" onClick={()=>setComposeChannel(null)}>×</button></div>{composeChannel==="email"?<input className={styles.composeInput} value={composeSubject} onChange={e=>setComposeSubject(e.target.value)} placeholder="Subject"/>:null}<textarea className={styles.composeText} rows={5} value={composeBody} onChange={e=>setComposeBody(e.target.value)} placeholder={composeChannel==="email"?"Write email…":"Write text…"} maxLength={composeChannel==="text"?1600:20000}/><div className={styles.composeActions}><button className={styles.button} type="button" onClick={()=>setComposeChannel(null)}>Cancel</button><button className={styles.buttonPrimary} type="button" disabled={sending||!composeBody.trim()} onClick={()=>void sendCommunication()}>{sending?"Sending…":composeChannel==="email"?"Send Email":"Send Text"}</button></div></div>:null}
+    {sendStatus?<div className={styles.sendStatus}>{sendStatus}</div>:null}
     {loading?<div className={styles.loading}>Loading EpicC360…</div>:error?<div className={styles.error}>{error}</div>:!data?<div className={styles.empty}>No customer record found.</div>:<div className={styles.body}>
       <main className={styles.journey}><div className={styles.lifecycleHeader}><div><div className={styles.eyebrow}>Customer Lifecycle</div><h3>Customer Lifecycle</h3></div><span>{timeline.length} events</span></div><div className={styles.filters}>{([['all','All'],['call','Calls'],['text','Texts'],['email','Emails'],['reservation','Reservations']] as Array<[LifecycleFilter,string]>).map(([value,label])=>{const hasActivity=value==="call"?hasCalls:value==="text"?hasTexts:value==="email"?hasEmails:false;const presenceClass=value==="call"&&hasActivity?styles.filterHasCalls:value==="text"&&hasActivity?styles.filterHasTexts:value==="email"&&hasActivity?styles.filterHasEmails:"";return <button key={value} className={`${styles.filter} ${presenceClass} ${filter===value?styles.filterActive:""}`} onClick={()=>setFilter(value)}>{label}</button>;})}</div><div className={styles.timeline}>{visibleTimeline.length?visibleTimeline.map(item=><article key={item.id} className={`${styles.event} ${styles[item.kind]}`}><div className={styles.eventTop}><strong>{item.title}</strong><span>{fmtDateTime(item.at)}</span></div>{item.meta?<div className={styles.eventMeta}>{item.meta}</div>:null}{item.body?<div className={styles.eventBody}>{item.body}</div>:null}{item.href?<a href={item.href} target={item.href.startsWith("http")?"_blank":undefined} rel={item.href.startsWith("http")?"noreferrer":undefined}>{item.hrefLabel||"Open"}</a>:null}{item.secondaryHref?<><span> · </span><a href={item.secondaryHref} target="_blank" rel="noreferrer">{item.secondaryHrefLabel||"Open"}</a></>:null}{item.kind==="call"&&item.transcript?<CallTranscript transcript={item.transcript}/>:null}</article>):<div className={styles.emptyTimeline}>No activity in this view yet.</div>}</div></main>
       <aside className={styles.sidebar}><div className={styles.commandTitle}><div className={styles.eyebrow}>Current Customer Context</div><h3>Command Center</h3></div>
