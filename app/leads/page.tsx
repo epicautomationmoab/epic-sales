@@ -48,8 +48,8 @@ export default async function LeadsPage() {
         footerClassName={styles.sidebarFooter}
       />
       <section className={styles.main}>
-        <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360 · Sales</div><h1>Active Leads</h1><p>Ongoing sales opportunities. The complete customer relationship stays in EpicC360.</p></div><a className={styles.quoteButton} href="/quote">+ Build Quote</a></header>
-        <section className={styles.kpis}><div className={`${styles.kpi} ${styles.kpiPrimary}`}><span>Active Lead Value</span><strong>${(openValue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{leads.length} active opportunities</small></div><div className={styles.kpi}><span>Active Leads</span><strong>{leads.length}</strong><small>Still being worked</small></div><div className={styles.kpi}><span>Claimed</span><strong>{claimed}</strong><small>Owned by a rep</small></div><div className={styles.kpi}><span>Unclaimed</span><strong>{unclaimed}</strong><small>Needs ownership</small></div></section>
+        <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>Abandoned Carts</h1></div><a className={styles.quoteButton} href="/quote">+ Build Quote</a></header>
+        <section className={styles.kpis}><div className={`${styles.kpi} ${styles.kpiPrimary}`}><span>Abandoned Cart Value</span><strong>${(openValue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div><div className={styles.kpi}><span>Abandoned Carts</span><strong>{leads.length}</strong></div><div className={styles.kpi}><span>Claimed</span><strong>{claimed}</strong></div><div className={styles.kpi}><span>Unclaimed</span><strong>{unclaimed}</strong></div></section>
         {error ? <div className={styles.error}>{error}</div> : <LeadsClient leads={leads} />}
       </section>
     </main>
