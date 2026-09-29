@@ -145,7 +145,7 @@ export default function QuoteBuilder() {
   }
 
   function addActivity() {
-    setActivities((current) => [...current, blankActivity(experiences[0]?.id || "")]);
+    setActivities((current) => [...current, blankActivity()]);
   }
 
   function removeActivity(key: string) {
@@ -310,28 +310,28 @@ export default function QuoteBuilder() {
           <div className="grid quoteGrid">
             <section>
               <div className="sectionHeading">
-                <div><h2>{editingQuoteId ? `Edit Quote ${editingQuoteId.slice(0, 8)}` : "Build Estimate"}</h2><p className="muted compact">One quote can include multiple tours and rentals.</p></div>
+                <div><h2>{editingQuoteId ? `Edit Quote ${editingQuoteId.slice(0, 8)}` : "Build Estimate"}</h2></div>
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
-              {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays }, index) => experience && (
+              {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays }, index) => (
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
-                  <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                  {experience.tickets.map((ticket) => (
+                  <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                  {experience ? experience.tickets.map((ticket) => (
                     <div className="ticketRow" key={ticket.id}>
                       <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
                       <div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div>
                     </div>
-                  ))}
+                  )) : null}
                   {privateFeeRule && (
                     <div className="toggleRow">
                       <div><strong>{privateFeeRule.fee_label}</strong><div className="ticketMeta">Automatically added once to this private tour, regardless of vehicle quantity.</div></div>
                       <strong>{money.format(privateFee)}</strong>
                     </div>
                   )}
-                  <div className="toggleRow"><div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div><input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} /></div>
-                  {experience.line === "rental" && (
+                  {experience ? <div className="toggleRow"><div><strong>TripSafe</strong><div className="ticketMeta">Optional protection at 9% for this activity</div></div><input type="checkbox" checked={activity.tripSafe} onChange={(e) => updateActivity(activity.key, { tripSafe: e.target.checked })} /></div> : null}
+                  {experience?.line === "rental" && (
                     <div className="toggleRow">
                       <div><strong>Premier Adventure Assure</strong><div className="ticketMeta">$69/day · currently {rentalDays} day{rentalDays === 1 ? "" : "s"}</div></div>
                       <input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} />
@@ -344,7 +344,7 @@ export default function QuoteBuilder() {
 
             <section className="card summaryCard">
               <h2>Quote Summary</h2>
-              {!calculatedActivities.length ? <p className="muted">Add an activity to begin an estimate.</p> : null}
+              {!calculatedActivities.some((item) => Boolean(item.experience)) ? <p className="muted">Add an activity to begin an estimate.</p> : null}
               {calculatedActivities.map(({ activity, experience, total }, index) => experience && (
                 <div className="quoteActivitySummary" key={activity.key}><div><strong>{index + 1}. {experience.name}</strong></div><strong>{money.format(total)}</strong></div>
               ))}
