@@ -15,22 +15,73 @@ export type SalesLead = {
   assignments:Array<{id:string;assigned_rep_name:string|null;assigned_at:string|null;unassigned_at:string|null;assignment_source:string|null}>;
 };
 
+type SortKey="visit"|"shopped";
+type SortDir="asc"|"desc";
+
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
 function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric"});}
 function fmtShopped(v:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
 function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
+function timestamp(v:string|null){if(!v)return Number.POSITIVE_INFINITY;const t=new Date(v.length===10?`${v}T12:00:00`:v).getTime();return Number.isNaN(t)?Number.POSITIVE_INFINITY:t;}
 
 export default function LeadsClient({leads}:{leads:SalesLead[]}){
   const[query,setQuery]=useState("");
   const[owner,setOwner]=useState("All");
+  const[sortKey,setSortKey]=useState<SortKey>("visit");
+  const[sortDir,setSortDir]=useState<SortDir>("asc");
   const[selected,setSelected]=useState<SalesLead|null>(null);
+  const[busyId,setBusyId]=useState<string|null>(null);
+  const[error,setError]=useState("");
   const claimedOwners=useMemo(()=>Array.from(new Set(leads.map(l=>l.claimed_by_name||l.assigned_rep_name).filter(Boolean) as string[])).sort(), [leads]);
-  const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return leads.filter(l=>{
-    const leadOwner=l.claimed_by_name||l.assigned_rep_name||"Unclaimed";
-    if(owner!=="All"&&leadOwner!==owner)return false;
-    if(!q)return true;
-    return[l.customer_name,l.email,l.phone_e164,l.interest_label,leadOwner,...(l.drafts||[]).flatMap(d=>[d.confirmation_code,d.experience_name,d.option_name])].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
-  });},[leads,owner,query]);
+
+  const filtered=useMemo(()=>{
+    const q=query.trim().toLowerCase();
+    const rows=leads.filter(l=>{
+      const leadOwner=l.claimed_by_name||l.assigned_rep_name||"Unclaimed";
+      if(owner!=="All"&&leadOwner!==owner)return false;
+      if(!q)return true;
+      return[l.customer_name,l.email,l.phone_e164,l.interest_label,leadOwner,...(l.drafts||[]).flatMap(d=>[d.confirmation_code,d.experience_name,d.option_name])].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
+    });
+    return rows.sort((a,b)=>{
+      const av=sortKey==="visit"?timestamp(a.activity_window_start):timestamp(a.shopping_last_activity_at);
+      const bv=sortKey==="visit"?timestamp(b.activity_window_start):timestamp(b.shopping_last_activity_at);
+      if(av===bv)return (a.customer_name||"").localeCompare(b.customer_name||"");
+      return sortDir==="asc"?av-bv:bv-av;
+    });
+  },[leads,owner,query,sortKey,sortDir]);
+
+  function toggleSort(key:SortKey){
+    if(sortKey===key)setSortDir(d=>d==="asc"?"desc":"asc");
+    else{setSortKey(key);setSortDir(key==="shopped"?"desc":"asc");}
+  }
+
+  async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
+    let note="";
+    if(kind==="retire"){
+      const entered=window.prompt("Why are you closing this abandoned cart?");
+      if(entered===null)return;
+      note=entered.trim();
+      if(!note){setError("Add a short reason before closing the cart.");return;}
+    }
+    if(kind==="mark_lost"){
+      const entered=window.prompt("Why was this abandoned cart lost?");
+      if(entered===null)return;
+      note=entered.trim();
+      if(!note){setError("Add a short reason before marking the cart lost.");return;}
+    }
+    setBusyId(lead.id);setError("");
+    try{
+      const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        action:kind,
+        opportunity_id:lead.id,
+        reason:kind==="retire"?"other":kind==="mark_lost"?"other":undefined,
+        note_text:note||undefined,
+      })});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload?.error||"Unable to update abandoned cart.");
+      window.location.reload();
+    }catch(e){setError(e instanceof Error?e.message:"Unable to update abandoned cart.");setBusyId(null);}
+  }
 
   return <>
     <div className={styles.toolbar}><div><strong>Abandoned Carts {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
@@ -43,7 +94,24 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
         </optgroup>
       </select>
     </div>
-    <div className={styles.tableCard}><table className={styles.table}><thead><tr><th>Customer</th><th>Shopped</th><th>Visit Window</th><th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th></tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}><td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td><td><div className={styles.mainLine}>{fmtShopped(l.shopping_last_activity_at)}</div></td><td><div className={styles.mainLine}>{dateWindow(l)}</div></td><td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td><td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td></tr>)}</tbody></table></div>
+    {error?<div className={styles.error}>{error}</div>:null}
+    <div className={styles.tableCard}><table className={styles.table}><thead><tr>
+      <th>Name</th>
+      <th><button className={styles.sortButton} onClick={()=>toggleSort("visit")}>Visit Window {sortKey==="visit"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
+      <th><button className={styles.sortButton} onClick={()=>toggleSort("shopped")}>Shopped {sortKey==="shopped"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
+      <th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th><th>Actions</th>
+    </tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}>
+      <td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td>
+      <td><div className={styles.mainLine}>{dateWindow(l)}</div></td>
+      <td><div className={styles.mainLine}>{fmtShopped(l.shopping_last_activity_at)}</div></td>
+      <td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td>
+      <td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
+      <td><div className={styles.rowActions} onClick={e=>e.stopPropagation()}>
+        {!l.claimed_by_name&&!l.assigned_rep_name?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
+        <button disabled={busyId===l.id} onClick={()=>void action(l,"retire")}>Close</button>
+        <button className={styles.lostAction} disabled={busyId===l.id} onClick={()=>void action(l,"mark_lost")}>Lost</button>
+      </div></td>
+    </tr>)}</tbody></table></div>
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
