@@ -353,8 +353,7 @@ export default function QuoteBuilder() {
         if (item.privateFee > 0) detailRows.push(`<div style="padding:4px 0">• ${escapeHtml(item.privateFeeRule?.fee_label || "Private Tour Fee")} — ${money.format(item.privateFee)}</div>`);
         if (item.activity.tripSafe) detailRows.push(`<div style="padding:4px 0">• TripSafe — ${money.format(item.tripSafeAmount)}</div>`);
         if (item.activity.premier) detailRows.push(`<div style="padding:4px 0">• Premier Adventure Assure — ${money.format(item.premierAmount)}</div>`);
-        detailRows.push(`<div style="padding:4px 0">• Taxes — ${money.format(item.primaryTax + item.secondaryTax)}</div>`);
-        detailRows.push(`<div style="padding:4px 0">• TripWorks booking fee (4%) — ${money.format(item.twFee)}</div>`);
+        detailRows.push(`<div style="padding:4px 0">• Taxes &amp; Fees — ${money.format(item.primaryTax + item.secondaryTax + item.twFee)}</div>`);
         return `<div style="margin:18px 0;padding:18px 20px;border:1px solid #e5e7eb;border-left:4px solid #d9471c;border-radius:8px;background:#ffffff"><div style="font-size:17px;font-weight:700;margin-bottom:8px">${escapeHtml(item.experience!.name)}</div>${detailRows.join("")}<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-weight:700"><span>Estimated activity total</span><span>${money.format(item.total)}</span></div></div>`;
       }).join("");
       const onlineButtons = online.map((item) => `<div style="margin:7px 0"><a href="${escapeHtml(bookingLinks[item.experience!.id])}" style="color:#d9471c;text-decoration:underline;font-weight:600">Learn more about ${escapeHtml(item.experience!.name)}</a></div>`).join("");
