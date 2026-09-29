@@ -119,6 +119,30 @@ export default function QuoteBuilder() {
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const customerQuery = new URLSearchParams();
+    const contact = params.get("contact");
+    const opportunity = params.get("opportunity");
+    const reservation = params.get("reservation");
+    if (contact) customerQuery.set("contact", contact);
+    if (opportunity) customerQuery.set("opportunity", opportunity);
+    if (reservation) customerQuery.set("reservation", reservation);
+    if (customerQuery.size) {
+      fetch(`/api/customer-360?${customerQuery.toString()}`, { cache: "no-store" })
+        .then(async (response) => {
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) throw new Error(payload?.error || "Unable to load customer details.");
+          return payload?.customer || null;
+        })
+        .then((customer) => {
+          if (!customer?.identity) return;
+          setName(String(customer.identity.name || ""));
+          setEmail(String(customer.identity.email || ""));
+          setPhone(String(customer.identity.phone || ""));
+        })
+        .catch((err) => setSaveMessage(err instanceof Error ? err.message : "Unable to load customer details."));
+    }
+
     Promise.all([getSalesRates(), getSalesExperienceFees(), getSalesBookingLinks()])
       .then(([rows, fees, links]) => {
         const built = buildExperiences(rows);
