@@ -12,7 +12,7 @@ export default async function QuotePage() {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("epic_access_token")?.value;
   const profile = await getAuthenticatedTeamProfile(accessToken);
-  if (!profile) redirect("/employee-login");
+  if (!profile || !profile.active || profile.role === "workstation") redirect("/employee-login");
 
   return (
     <>
