@@ -321,7 +321,7 @@ export default function QuoteBuilder() {
       });
       setEditingQuoteId(result.quote_id);
       const first = name.trim().split(/\s+/)[0] || "there";
-      const lines = [`Hi ${first},`, "", "It was great talking with you! I put together the quote we discussed for your Moab adventure."];
+      const lines = [`Hi ${first},`, "", "I’m excited to help you plan your Moab adventure. I’ve put together the quote below based on your request."];
       for (const item of calculatedActivities) {
         if (!item.experience) continue;
         lines.push("", item.experience.name);
@@ -332,9 +332,9 @@ export default function QuoteBuilder() {
         if (item.privateFee > 0) lines.push(`• ${item.privateFeeRule?.fee_label || "Private Tour Fee"} — ${money.format(item.privateFee)}`);
         if (item.activity.tripSafe) lines.push("• TripSafe selected");
         if (item.activity.premier) lines.push("• Premier Adventure Assure selected");
-        lines.push(`Estimated activity total: ${money.format(item.total)}`);
+        if (calculatedActivities.filter((activity) => activity.experience).length > 1) lines.push(`Estimated activity total: ${money.format(item.total)}`);
       }
-      lines.push("", `ESTIMATED TRIP TOTAL: ${money.format(totals.total)}`, "",
+      lines.push("", `Estimated Trip Total: ${money.format(totals.total)}`, "",
         "I'll follow up as we discussed. In the meantime, please call me at 435-220-2700 if you have any questions or if you're ready to book. I'd be happy to take care of it for you.");
       const online = calculatedActivities.filter((item) => item.experience && bookingLinks[item.experience.id]);
       if (online.length) {
@@ -342,11 +342,24 @@ export default function QuoteBuilder() {
         for (const item of online) lines.push("", item.experience!.name, bookingLinks[item.experience!.id]);
         lines.push("", "Availability is not held until a reservation is completed. Online booking will let you choose from currently available dates and departure times.");
       }
+      const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      const quoteCards = calculatedActivities.filter((item) => item.experience).map((item) => {
+        const detailRows = item.experience!.tickets.flatMap((ticket) => {
+          const qty = item.activity.qty[ticket.id] ?? 0;
+          return qty > 0 ? [\`<div style="padding:4px 0">• ${qty} × ${escapeHtml(ticket.name)} — ${money.format(ticket.price * qty)}</div>\`] : [];
+        });
+        if (item.privateFee > 0) detailRows.push(\`<div style="padding:4px 0">• ${escapeHtml(item.privateFeeRule?.fee_label || "Private Tour Fee")} — ${money.format(item.privateFee)}</div>\`);
+        if (item.activity.tripSafe) detailRows.push('<div style="padding:4px 0">• TripSafe selected</div>');
+        if (item.activity.premier) detailRows.push('<div style="padding:4px 0">• Premier Adventure Assure selected</div>');
+        return \`<div style="margin:18px 0;padding:18px 20px;border:1px solid #e5e7eb;border-left:4px solid #d9471c;border-radius:8px;background:#ffffff"><div style="font-size:17px;font-weight:700;margin-bottom:8px">${escapeHtml(item.experience!.name)}</div>${detailRows.join("")}</div>\`;
+      }).join("");
+      const onlineButtons = online.map((item) => \`<div style="margin:10px 0"><a href="${escapeHtml(bookingLinks[item.experience!.id])}" style="display:inline-block;background:#d9471c;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:6px">Book ${escapeHtml(item.experience!.name)} Online</a></div>\`).join("");
+      const messageHtml = \`<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:15px;line-height:1.6;max-width:680px"><div style="border-top:5px solid #d9471c;padding-top:22px"><div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d9471c">Epic 4X4 Adventures</div><div style="font-size:26px;font-weight:700;margin:4px 0 22px">Your Moab Adventure Quote</div><p>Hi ${escapeHtml(first)},</p><p>I’m excited to help you plan your Moab adventure. I’ve put together the quote below based on your request.</p>${quoteCards}<div style="margin:22px 0;padding:16px 20px;background:#f5f5f5;border-radius:8px"><div style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Estimated Trip Total</div><div style="font-size:26px;font-weight:700">${money.format(totals.total)}</div></div><p>I’ll follow up as we discussed. In the meantime, please call me at <a href="tel:+14352202700" style="color:#d9471c;text-decoration:none;font-weight:600">435-220-2700</a> if you have any questions or if you’re ready to book. I’d be happy to take care of it for you.</p>${online.length ? \`<div style="margin-top:26px"><div style="font-size:17px;font-weight:700;margin-bottom:8px">Prefer to book online?</div>${onlineButtons}<p style="font-size:13px;color:#6b7280;margin-top:12px">Availability is not held until a reservation is completed. Online booking will let you choose from currently available dates and departure times.</p></div>\` : ""}</div></div>\`;
       const response = await fetch("/api/customer-communications", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           channel: "email", opportunity_id: result.opportunity_id, email: email.trim(),
-          customer_name: name.trim() || null, subject: "Your Epic 4X4 Adventure Quote", message_text: lines.join("\n")
+          customer_name: name.trim() || null, subject: "Your Epic 4X4 Adventure Quote", message_text: lines.join("\n"), message_html: messageHtml
         }),
       });
       const payload = await response.json().catch(() => ({}));
