@@ -100,7 +100,7 @@ export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
-  const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
+  const [activities, setActivities] = useState<QuoteActivity[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -121,7 +121,7 @@ export default function QuoteBuilder() {
         const built = buildExperiences(rows);
         setExperiences(built);
         setExperienceFees(fees);
-        if (built.length) setActivities([blankActivity(built[0].id)]);
+        setActivities([]);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales pricing"))
       .finally(() => setLoading(false));
@@ -149,12 +149,12 @@ export default function QuoteBuilder() {
   }
 
   function removeActivity(key: string) {
-    setActivities((current) => current.length === 1 ? current : current.filter((item) => item.key !== key));
+    setActivities((current) => current.filter((item) => item.key !== key));
   }
 
   function newQuote() {
     setEditingQuoteId(null);
-    setActivities([blankActivity(experiences[0]?.id || "")]);
+    setActivities([]);
     setName("");
     setEmail("");
     setPhone("");
@@ -339,11 +339,12 @@ export default function QuoteBuilder() {
                   )}
                 </div>
               ))}
-              {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>+ Add Another Activity</button>}
+              {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>{activities.length ? "+ Add Another Activity" : "+ Add Activity"}</button>}
             </section>
 
             <section className="card summaryCard">
               <h2>Quote Summary</h2>
+              {!calculatedActivities.length ? <p className="muted">Add an activity to begin an estimate.</p> : null}
               {calculatedActivities.map(({ activity, experience, total }, index) => experience && (
                 <div className="quoteActivitySummary" key={activity.key}><div><strong>{index + 1}. {experience.name}</strong></div><strong>{money.format(total)}</strong></div>
               ))}
