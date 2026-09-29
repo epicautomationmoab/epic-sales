@@ -33,7 +33,7 @@ export default function EmployeeLoginPage() {
       <form onSubmit={submit} className="loginCard">
         <div className="accentBar" />
         <img
-          src="https://myepicreservation.com/epic-logo.png"
+          src="https://raw.githubusercontent.com/epicautomationmoab/epic-tools-app/main/public/epic-logo-black.png"
           alt="Epic 4X4 Adventures"
           className="epicLogo"
         />
