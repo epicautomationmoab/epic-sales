@@ -23,6 +23,20 @@ function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10
 function fmtShopped(v:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
 function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
 function timestamp(v:string|null){if(!v)return Number.POSITIVE_INFINITY;const t=new Date(v.length===10?`${v}T12:00:00`:v).getTime();return Number.isNaN(t)?Number.POSITIVE_INFINITY:t;}
+const repColors:Record<string,{solid:string;tint:string}> = {
+  "Jennifer Johnson": {solid:"#D71920",tint:"#FFF1F2"},
+  "Jenna McAllister": {solid:"#0F766E",tint:"#ECFDF5"},
+  "Kim Halls": {solid:"#A16207",tint:"#FFFBEB"},
+  "Lonnie Laidman": {solid:"#7C3AED",tint:"#F5F3FF"},
+  "Price Baker": {solid:"#2563EB",tint:"#EFF6FF"},
+  "Alex Austin": {solid:"#15803D",tint:"#F0FDF4"},
+  "Cody Prueitt": {solid:"#C2410C",tint:"#FFF7ED"},
+  "Dylan Jochim": {solid:"#475569",tint:"#F8FAFC"},
+  "Maggie Goodwin": {solid:"#0E7490",tint:"#ECFEFF"},
+  "Randy Stene": {solid:"#4D7C0F",tint:"#F7FEE7"},
+  "Taylin McCurdy": {solid:"#B45309",tint:"#FFF7ED"},
+};
+function repColor(name:string|null){return name?repColors[name]||null:null;}
 
 export default function LeadsClient({leads}:{leads:SalesLead[]}){
   const[query,setQuery]=useState("");
@@ -100,12 +114,12 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
       <th><button className={styles.sortButton} onClick={()=>toggleSort("visit")}>Visit Window {sortKey==="visit"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
       <th><button className={styles.sortButton} onClick={()=>toggleSort("shopped")}>Shopped {sortKey==="shopped"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
       <th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th><th>Actions</th>
-    </tr></thead><tbody>{filtered.map(l=><tr key={l.id} onClick={()=>setSelected(l)}>
+    </tr></thead><tbody>{filtered.map(l=><tr key={l.id} className={repColor(l.claimed_by_name||l.assigned_rep_name)?styles.claimedRow:undefined} style={repColor(l.claimed_by_name||l.assigned_rep_name)?{backgroundColor:repColor(l.claimed_by_name||l.assigned_rep_name)!.tint,borderLeft:`4px solid ${repColor(l.claimed_by_name||l.assigned_rep_name)!.solid}`}:{}} onClick={()=>setSelected(l)}>
       <td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td>
       <td><div className={styles.mainLine}>{dateWindow(l)}</div></td>
       <td><div className={styles.mainLine}>{fmtShopped(l.shopping_last_activity_at)}</div></td>
       <td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td>
-      <td>{l.claimed_by_name||l.assigned_rep_name||"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
+      <td>{l.claimed_by_name||l.assigned_rep_name?<span className={styles.ownerBadge} style={{borderColor:repColor(l.claimed_by_name||l.assigned_rep_name)?.solid,color:repColor(l.claimed_by_name||l.assigned_rep_name)?.solid}}>{l.claimed_by_name||l.assigned_rep_name}</span>:"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
       <td><div className={styles.rowActions} onClick={e=>e.stopPropagation()}>
         {!l.claimed_by_name&&!l.assigned_rep_name?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
         <button disabled={busyId===l.id} onClick={()=>void action(l,"retire")}>Close</button>
