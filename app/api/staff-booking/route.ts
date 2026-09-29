@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 
-const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"").replace(/\/+$/,"");
-const SUPABASE_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
+const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
+const SUPABASE_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 
 export async function GET(request:NextRequest){
   const token=request.cookies.get("epic_access_token")?.value;
