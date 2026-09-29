@@ -311,7 +311,6 @@ export default function QuoteBuilder() {
             <section>
               <div className="sectionHeading">
                 <div><h2>{editingQuoteId ? `Edit Quote ${editingQuoteId.slice(0, 8)}` : "Build Estimate"}</h2><p className="muted compact">One quote can include multiple tours and rentals.</p></div>
-                <button className="secondary" type="button" onClick={addActivity} disabled={!experiences.length}>+ Add Activity</button>
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
