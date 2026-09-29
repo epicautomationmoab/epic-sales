@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
+import EpicC360Sidebar from "../EpicC360Sidebar";
 import CallRecordingsClient, { type Recording } from "./CallRecordingsClient";
 import styles from "./CallRecordings.module.css";
 
@@ -23,8 +24,6 @@ async function loadRecordings(accessToken: string) {
   const payload = await response.json();
   const recordings = Array.isArray(payload) ? payload as Recording[] : [];
 
-  // Best-effort, read-only enrichment for Call Recordings only. This does not
-  // change shared routing or Readiness behavior.
   try {
     const matchResponse = await fetch(
       `${SUPABASE_URL}/rest/v1/callrail_calls?matched_reservation_id=not.is.null&select=callrail_call_id,matched_reservation_id`,
@@ -72,23 +71,18 @@ export default async function CallRecordingsPage() {
 
   return (
     <main className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}><div className={styles.logoText}>EPIC 4X4</div><div className={styles.salesText}>SALES</div></div>
-        <nav className={styles.nav}>
-          <a href="/inbox">Inbox</a>
-          <a href="/leads">Leads</a>
-          <a href="/customers">Customers</a>
-          <a href="/">Quote Builder</a>
-          <a href="/missed-calls">Missed Calls</a>
-          <a className={styles.active} href="/call-recordings">Call Recordings</a>
-        </nav>
-        <div className={styles.sidebarFooter}><div>Signed in as</div><strong>{profile.display_name}</strong></div>
-      </aside>
-
+      <EpicC360Sidebar
+        active="call-recordings"
+        profileName={profile.display_name}
+        className={styles.sidebar}
+        navClassName={styles.nav}
+        activeClassName={styles.active}
+        footerClassName={styles.sidebarFooter}
+      />
       <section className={styles.main}>
         <header className={styles.header}>
-          <div><div className={styles.eyebrow}>Epic Sales</div><h1>Call Recordings</h1><p>Search and review CallRail recordings without leaving the Sales workspace.</p></div>
-          <a className={styles.quoteButton} href="/">+ Build Quote</a>
+          <div><div className={styles.eyebrow}>EpicC360 · History</div><h1>Call Recordings</h1><p>Search and review recorded customer calls as part of the complete customer history.</p></div>
+          <a className={styles.quoteButton} href="/quote">+ Build Quote</a>
         </header>
         {error ? <div className={styles.error}>{error}</div> : <CallRecordingsClient recordings={recordings} />}
       </section>
