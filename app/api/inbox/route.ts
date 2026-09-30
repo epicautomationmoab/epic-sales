@@ -42,9 +42,10 @@ export async function GET(request: NextRequest) {
       const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
-    const [threads, blockedRows] = await Promise.all([
+    const [threads, blockedRows, phoneReport] = await Promise.all([
       rpc(session.accessToken, "get_epic_routed_inbox_v2", { p_include_cleaned: includeClosed }),
       rpc(session.accessToken, "get_epic_sales_blocked_domains", {}),
+      rpc(session.accessToken, "get_epic_phone_report", { p_local_date: null }),
     ]);
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
     const filteredThreads = (Array.isArray(threads) ? threads : []).filter((thread: { kind?: string; email?: string | null }) => {
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ ok: true, threads: enrichedThreads });
+    return NextResponse.json({ ok: true, threads: enrichedThreads, phone_summary: phoneReport?.summary || {} });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load inbox." }, { status: 500 });
   }
