@@ -99,6 +99,40 @@ export async function GET(request: NextRequest) {
 
   try {
     const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+
+    let pbxCalls:any[] = [];
+    const identityPhone=String(customer?.identity?.phone||params.get("phone")||"").replace(/\D/g,"").slice(-10);
+    if(identityPhone.length===10){
+      const pbxParams=new URLSearchParams({
+        normalized_customer_phone:`eq.${identityPhone}`,
+        direction:"eq.Outbound",
+        select:"id,start_time,disposition,billsec,duration_seconds,caller_name,src,matched_reservation_id,matched_opportunity_id"
+      });
+      const pbxResponse=await fetch(`${SUPABASE_URL}/rest/v1/grandstream_cdr_events?${pbxParams.toString()}&order=start_time.desc&limit=500`,{
+        headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`},cache:"no-store"
+      });
+      if(pbxResponse.ok){
+        const rows=await pbxResponse.json().catch(()=>[]) as any[];
+        pbxCalls=rows.map((row:any)=>({
+          id:`pbx-${row.id}`,
+          at:row.start_time,
+          direction:"outbound",
+          answered:row.disposition==="ANSWERED",
+          voicemail:false,
+          duration_seconds:Number(row.billsec||row.duration_seconds||0),
+          recording_url:null,
+          summary:null,
+          transcription:null,
+          lead_score:null,
+          lead_explanation:null,
+          source_name:row.caller_name||(`Ext. ${row.src||""}`),
+          campaign:"Grandstream PBX",
+          matched_reservation_id:row.matched_reservation_id||null,
+          matched_opportunity_id:row.matched_opportunity_id||null
+        }));
+      }
+    }
+
     const confirmations = [...new Set((customer?.reservations || []).map((r:any)=>String(r.confirmation_code||"").trim()).filter(Boolean))] as string[];
 
     let readinessByConfirmation = new Map<string, any>();
@@ -131,6 +165,7 @@ export async function GET(request: NextRequest) {
           mpwr_reservation_url:readiness?.mpwr_reservation_url||null,
         };
       }),
+      calls:[...(customer.calls||[]),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
     } : customer;
 
