@@ -36,7 +36,8 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const selectedEvents=(report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
     if(selectedMetric==="answered")return e.disposition==="ANSWERED"&&Number(e.billsec||0)>0;
-    if(selectedMetric==="no-answer")return e.disposition==="NO ANSWER"&&String(e.action_note||"")!=="answered elsewhere";
+    if(selectedMetric==="no-answer")return e.disposition==="NO ANSWER"&&String(e.action_note||"")!=="answered elsewhere"&&Number(e.duration_seconds||0)>=7;
+    if(selectedMetric==="interrupted")return e.disposition==="NO ANSWER"&&String(e.action_note||"")!=="answered elsewhere"&&Number(e.duration_seconds||0)<7;
     return false;
   });
   for(const p of report.pauses||[]){const k=String(p.extension||"");const x=pauseTotals.get(k)||{seconds:0,count:0};x.seconds+=Number(p.paused_seconds||0);x.count+=1;pauseTotals.set(k,x);}
@@ -61,20 +62,20 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
         <section style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:14,overflow:"hidden",marginBottom:16}}>
           <div style={{padding:16,borderBottom:"1px solid #e7ebef"}}><h2 style={{margin:0}}>Team Phone Activity</h2></div>
           <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Agent","Inbound Answered","No-answer Rings","Inbound Talk","Outbound Answered","Outbound Talk","Out of Queue"].map(h=><th key={h} style={{textAlign:"left",padding:12,fontSize:10,textTransform:"uppercase",color:"#7c8793",borderBottom:"1px solid #edf0f3"}}>{h}</th>)}</tr></thead><tbody>
-            {(report.agents||[]).map((a:any)=>{const p=pauseTotals.get(String(a.extension));return <tr key={String(a.extension)}><td style={{padding:12,borderBottom:"1px solid #edf0f3"}}><strong>{a.agent_name||"Ext. "+a.extension}</strong><div style={{fontSize:11,color:"#87919b"}}>Ext. {a.extension}</div></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=answered`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{a.inbound_answered_calls||0}</a></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=no-answer`} style={{fontWeight:900,color:"#b9471f",textDecoration:"underline",textUnderlineOffset:3}}>{a.true_no_answer_rings||0}</a></td><td style={{padding:12}}>{duration(a.inbound_talk_seconds)}</td><td style={{padding:12}}>{a.outbound_answered_calls||0}</td><td style={{padding:12}}>{duration(a.outbound_talk_seconds)}</td><td style={{padding:12}}>{p?duration(p.seconds)+" · "+p.count+"x":"—"}</td></tr>})}
+            {(report.agents||[]).map((a:any)=>{const p=pauseTotals.get(String(a.extension));return <tr key={String(a.extension)}><td style={{padding:12,borderBottom:"1px solid #edf0f3"}}><strong>{a.agent_name||"Ext. "+a.extension}</strong><div style={{fontSize:11,color:"#87919b"}}>Ext. {a.extension}</div></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=answered`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{a.inbound_answered_calls||0}</a></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=no-answer`} style={{fontWeight:900,color:"#b9471f",textDecoration:"underline",textUnderlineOffset:3}}>{a.true_no_answer_rings||0}</a>{Number(a.interrupted_no_answer_rings||0)>0?<div style={{fontSize:10,color:"#8a93a0",marginTop:3}}>{a.interrupted_no_answer_rings} short/interrupted</div>:null}</td><td style={{padding:12}}>{duration(a.inbound_talk_seconds)}</td><td style={{padding:12}}>{a.outbound_answered_calls||0}</td><td style={{padding:12}}>{duration(a.outbound_talk_seconds)}</td><td style={{padding:12}}>{p?duration(p.seconds)+" · "+p.count+"x":"—"}</td></tr>})}
           </tbody></table></div>
         </section>
 
         {selectedExtension&&selectedMetric?<section style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:14,overflow:"hidden",marginBottom:16}}>
           <div style={{padding:16,borderBottom:"1px solid #e7ebef",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
-            <div><h2 style={{margin:0}}>{selectedMetric==="answered"?"Answered Calls":"No-Answer Rings"} · Ext. {selectedExtension}</h2><div style={{fontSize:12,color:"#788290",marginTop:4}}>{selectedEvents.length} event{selectedEvents.length===1?"":"s"} for the selected date.</div></div>
+            <div><h2 style={{margin:0}}>{selectedMetric==="answered"?"Answered Calls":selectedMetric==="interrupted"?"Short / Interrupted Rings":"No-Answer Rings"} · Ext. {selectedExtension}</h2><div style={{fontSize:12,color:"#788290",marginTop:4}}>{selectedEvents.length} event{selectedEvents.length===1?"":"s"} for the selected date.</div></div>
             <a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}`} style={{fontWeight:800,color:"#56606d"}}>Close</a>
           </div>
           <div style={{padding:"0 16px"}}>
             {selectedEvents.length?selectedEvents.map((e:any,i:number)=><div key={String(e.session)+String(e.event_time)+i} style={{display:"grid",gridTemplateColumns:"160px 1fr auto",gap:16,alignItems:"center",padding:"12px 0",borderBottom:"1px solid #edf0f3"}}>
               <strong>{phone(e.caller_phone)}</strong>
               <span style={{color:"#56606d"}}>{time(e.event_time)}</span>
-              <span style={{fontWeight:800,color:selectedMetric==="answered"?"#25693b":"#b9471f"}}>{selectedMetric==="answered"?"Answered · "+duration(e.billsec):"No answer · rang "+duration(e.duration_seconds)}</span>
+              <span style={{fontWeight:800,color:selectedMetric==="answered"?"#25693b":selectedMetric==="interrupted"?"#6f7884":"#b9471f"}}>{selectedMetric==="answered"?"Answered · "+duration(e.billsec):selectedMetric==="interrupted"?"Interrupted · "+duration(e.duration_seconds):"No answer · full ring "+duration(e.duration_seconds)}</span>
             </div>):<div style={{padding:18,color:"#788290"}}>No matching events.</div>}
           </div>
         </section>:null}
