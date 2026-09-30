@@ -113,23 +113,42 @@ export async function GET(request: NextRequest) {
       });
       if(pbxResponse.ok){
         const rows=await pbxResponse.json().catch(()=>[]) as any[];
-        pbxCalls=rows.map((row:any)=>({
-          id:`pbx-${row.id}`,
-          at:row.start_time,
-          direction:"outbound",
-          answered:row.disposition==="ANSWERED",
-          voicemail:false,
-          duration_seconds:Number(row.billsec||row.duration_seconds||0),
-          recording_url:null,
-          summary:null,
-          transcription:null,
-          lead_score:null,
-          lead_explanation:null,
-          source_name:row.caller_name||(`Ext. ${row.src||""}`),
-          campaign:"Grandstream PBX",
-          matched_reservation_id:row.matched_reservation_id||null,
-          matched_opportunity_id:row.matched_opportunity_id||null
-        }));
+        const callIds=rows.map((row:any)=>String(row.id||"")).filter(Boolean);
+        let recordingByCall=new Map<string,any>();
+        if(callIds.length){
+          const recordingParams=new URLSearchParams({
+            grandstream_cdr_id:`in.(${callIds.join(",")})`,
+            select:"grandstream_cdr_id,storage_path,transcription_status,transcription_text,ai_summary,updated_at"
+          });
+          const recordingResponse=await fetch(
+            `${SUPABASE_URL}/rest/v1/telnyx_call_recordings?${recordingParams.toString()}&order=updated_at.desc`,
+            {headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`},cache:"no-store"}
+          );
+          if(recordingResponse.ok){
+            const recordingRows=await recordingResponse.json().catch(()=>[]) as any[];
+            recordingByCall=new Map(recordingRows.map((recording:any)=>[String(recording.grandstream_cdr_id),recording]));
+          }
+        }
+        pbxCalls=rows.map((row:any)=>{
+          const recording=recordingByCall.get(String(row.id))||null;
+          return {
+            id:`pbx-${row.id}`,
+            at:row.start_time,
+            direction:"outbound",
+            answered:row.disposition==="ANSWERED",
+            voicemail:false,
+            duration_seconds:Number(row.billsec||row.duration_seconds||0),
+            recording_url:recording?.storage_path?`/api/customer-360/recording?call=${encodeURIComponent(String(row.id))}`:null,
+            summary:recording?.ai_summary||null,
+            transcription:recording?.transcription_text||null,
+            lead_score:null,
+            lead_explanation:null,
+            source_name:row.caller_name||(`Ext. ${row.src||""}`),
+            campaign:"Grandstream PBX",
+            matched_reservation_id:row.matched_reservation_id||null,
+            matched_opportunity_id:row.matched_opportunity_id||null
+          };
+        });
       }
     }
 
