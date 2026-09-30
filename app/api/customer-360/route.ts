@@ -103,53 +103,8 @@ export async function GET(request: NextRequest) {
     let pbxCalls:any[] = [];
     const identityPhone=String(customer?.identity?.phone||params.get("phone")||"").replace(/\D/g,"").slice(-10);
     if(identityPhone.length===10){
-      const pbxParams=new URLSearchParams({
-        normalized_customer_phone:`eq.${identityPhone}`,
-        direction:"eq.Outbound",
-        select:"id,start_time,disposition,billsec,duration_seconds,caller_name,src,matched_reservation_id,matched_opportunity_id"
-      });
-      const pbxResponse=await fetch(`${SUPABASE_URL}/rest/v1/grandstream_cdr_events?${pbxParams.toString()}&order=start_time.desc&limit=500`,{
-        headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`},cache:"no-store"
-      });
-      if(pbxResponse.ok){
-        const rows=await pbxResponse.json().catch(()=>[]) as any[];
-        const callIds=rows.map((row:any)=>String(row.id||"")).filter(Boolean);
-        let recordingByCall=new Map<string,any>();
-        if(callIds.length){
-          const recordingParams=new URLSearchParams({
-            grandstream_cdr_id:`in.(${callIds.join(",")})`,
-            select:"grandstream_cdr_id,storage_path,transcription_status,transcription_text,ai_summary,updated_at"
-          });
-          const recordingResponse=await fetch(
-            `${SUPABASE_URL}/rest/v1/telnyx_call_recordings?${recordingParams.toString()}&order=updated_at.desc`,
-            {headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`},cache:"no-store"}
-          );
-          if(recordingResponse.ok){
-            const recordingRows=await recordingResponse.json().catch(()=>[]) as any[];
-            recordingByCall=new Map(recordingRows.map((recording:any)=>[String(recording.grandstream_cdr_id),recording]));
-          }
-        }
-        pbxCalls=rows.map((row:any)=>{
-          const recording=recordingByCall.get(String(row.id))||null;
-          return {
-            id:`pbx-${row.id}`,
-            at:row.start_time,
-            direction:"outbound",
-            answered:row.disposition==="ANSWERED",
-            voicemail:false,
-            duration_seconds:Number(row.billsec||row.duration_seconds||0),
-            recording_url:recording?.storage_path?`/api/customer-360/recording?call=${encodeURIComponent(String(row.id))}`:null,
-            summary:recording?.ai_summary||null,
-            transcription:recording?.transcription_text||null,
-            lead_score:null,
-            lead_explanation:null,
-            source_name:row.caller_name||(`Ext. ${row.src||""}`),
-            campaign:"Grandstream PBX",
-            matched_reservation_id:row.matched_reservation_id||null,
-            matched_opportunity_id:row.matched_opportunity_id||null
-          };
-        });
-      }
+      const rows=await rpcNamed(session.accessToken,"get_epic_outbound_calls_for_phone",{p_phone:identityPhone}).catch(()=>[]);
+      pbxCalls=Array.isArray(rows)?rows:[];
     }
 
     const confirmations = [...new Set((customer?.reservations || []).map((r:any)=>String(r.confirmation_code||"").trim()).filter(Boolean))] as string[];
