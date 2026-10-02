@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
 import styles from "./Customers.module.css";
 
@@ -13,8 +13,9 @@ type CustomerResult={
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
 function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
 
-export default function CustomersClient(){
-  const[query,setQuery]=useState("");
+export default function CustomersClient({initialQuery="",autoOpen=false}:{initialQuery?:string;autoOpen?:boolean}){
+  const[query,setQuery]=useState(initialQuery);
+  const autoOpened=useRef(false);
   const[results,setResults]=useState<CustomerResult[]>([]);
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState("");
@@ -30,12 +31,18 @@ export default function CustomersClient(){
         const r=await fetch(`/api/customers?q=${encodeURIComponent(q)}`,{cache:"no-store",signal:controller.signal});
         const p=await r.json();
         if(!r.ok)throw new Error(p?.error||"Unable to search customers.");
-        setResults(p.customers||[]);
+        const customers=(p.customers||[]) as CustomerResult[];
+        setResults(customers);
+        if(autoOpen&&!autoOpened.current&&customers.length){
+          const digits=query.replace(/\D/g,"").slice(-10);
+          const exact=digits?customers.find(c=>String(c.phone||"").replace(/\D/g,"").slice(-10)===digits):null;
+          if(exact||customers.length===1){autoOpened.current=true;setSelected(exact||customers[0]);}
+        }
       }catch(e){if((e as Error).name!=="AbortError")setError(e instanceof Error?e.message:"Unable to search customers.");}
       finally{setLoading(false);}
     },250);
     return()=>{window.clearTimeout(timer);controller.abort();};
-  },[query]);
+  },[query,autoOpen]);
 
   return <>
     <section className={styles.searchPanel}>
