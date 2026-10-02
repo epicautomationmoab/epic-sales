@@ -5,7 +5,8 @@ import EpicC360Sidebar from "../EpicC360Sidebar";
 import CustomersClient from "./CustomersClient";
 import styles from "./Customers.module.css";
 
-export default async function CustomersPage(){
+export default async function CustomersPage({searchParams}:{searchParams:Promise<{q?:string}>}){
+  const params=await searchParams;
   const cookieStore=await cookies();
   const accessToken=cookieStore.get("epic_access_token")?.value;
   const profile=await getAuthenticatedTeamProfile(accessToken);
@@ -22,7 +23,7 @@ export default async function CustomersPage(){
     />
     <section className={styles.main}>
       <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>C360</h1></div></header>
-      <CustomersClient/>
+      <CustomersClient initialQuery={params.q||""}/>
     </section>
   </main>;
 }
