@@ -15,7 +15,7 @@ function time(v:any){if(!v)return "—";const d=new Date(String(v));return Numbe
 function phone(v:any){const d=String(v||"").replace(/\D/g,"").slice(-10);return d.length===10?"("+d.slice(0,3)+") "+d.slice(3,6)+"-"+d.slice(6):String(v||"Unknown");}
 
 async function loadReport(token:string,date?:string){
-  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_epic_phone_report_v3",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date||null}),cache:"no-store"});
+  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_epic_phone_report_v4",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date||null}),cache:"no-store"});
   if(!r.ok)throw new Error(await r.text());
   return await r.json() as Report;
 }
