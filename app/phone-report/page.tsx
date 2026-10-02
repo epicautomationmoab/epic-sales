@@ -14,7 +14,7 @@ function time(v:any){if(!v)return "—";const d=new Date(String(v));return Numbe
 function phone(v:any){const d=String(v||"").replace(/\D/g,"").slice(-10);return d.length===10?"("+d.slice(0,3)+") "+d.slice(3,6)+"-"+d.slice(6):String(v||"Unknown");}
 
 async function loadReport(token:string,date?:string){
-  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_epic_phone_report",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date||null}),cache:"no-store"});
+  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_epic_phone_report_v2",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date||null}),cache:"no-store"});
   if(!r.ok)throw new Error(await r.text());
   return await r.json() as Report;
 }
@@ -34,6 +34,15 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const selectedExtension=params.extension||"";
   const selectedMetric=params.metric||"";
   const selectedSession=params.session||"";
+  const answeredEvents=(report.agent_events||[]).filter((e:any)=>String(e.extension||"")===selectedExtension&&e.disposition==="ANSWERED"&&Number(e.billsec||0)>0);
+  const salesOpportunities=answeredEvents.filter((e:any)=>e.is_sales_opportunity);
+  const bookedSales=salesOpportunities.filter((e:any)=>e.call_outcome==="booked");
+  const attributedRevenue=bookedSales.reduce((sum:number,e:any)=>sum+Number(e.booking_revenue_cents||0),0);
+  const conversionRate=salesOpportunities.length?Math.round((bookedSales.length/salesOpportunities.length)*100):0;
+  const money=(cents:any)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(Number(cents||0)/100);
+  const statusLabel=(e:any)=>e.customer_status==="new_caller"?"NEW CALLER":e.customer_status==="existing_customer"?"EXISTING CUSTOMER":e.customer_status==="returning_caller"?"RETURNING CALLER":"CALLER";
+  const purposeLabel=(e:any)=>e.call_purpose==="sales_inquiry"?"Sales Inquiry":e.call_purpose==="existing_reservation"?"Existing Reservation":e.call_purpose==="short_call"?"Short Call":"General";
+  const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`BOOKED ${money(e.booking_revenue_cents)}`:e.call_outcome==="existing_reservation_handled"?"Reservation Handled":e.call_outcome==="no_booking_yet"?"No Booking Yet":e.call_outcome==="short_call"?"Short Call":"Answered";
   const selectedEvents=(selectedMetric==="outbound"?report.outbound_events||[]:report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
     if(selectedMetric==="answered")return e.disposition==="ANSWERED"&&Number(e.billsec||0)>0;
@@ -72,11 +81,23 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
             <div><h2 style={{margin:0}}>{selectedMetric==="answered"?"Answered Calls":selectedMetric==="outbound"?"Outbound Answered Calls":"No-Answer Rings"} · Ext. {selectedExtension}</h2><div style={{fontSize:12,color:"#788290",marginTop:4}}>{selectedEvents.length} event{selectedEvents.length===1?"":"s"} for the selected date.</div></div>
             <a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}`} style={{fontWeight:800,color:"#56606d"}}>Close</a>
           </div>
+          {selectedMetric==="answered"?<div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,padding:"14px 16px",background:"#f8fafb",borderBottom:"1px solid #e7ebef"}}>
+            {[
+              ["Sales Opportunities",salesOpportunities.length],
+              ["Booked",bookedSales.length],
+              ["Attributed Revenue",money(attributedRevenue)],
+              ["Conversion",salesOpportunities.length?conversionRate+"%":"—"]
+            ].map(([label,value])=><div key={String(label)} style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:9,fontWeight:900,color:"#7c8793",textTransform:"uppercase"}}>{label}</div><div style={{fontSize:20,fontWeight:900,marginTop:4}}>{String(value)}</div></div>)}
+          </div>:null}
           <div style={{padding:"0 16px"}}>
-            {selectedEvents.length?selectedEvents.map((e:any,i:number)=><div key={String(e.session)+String(e.event_time)+i} style={{display:"grid",gridTemplateColumns:"220px 1fr auto",gap:16,alignItems:"center",padding:"12px 0",borderBottom:"1px solid #edf0f3"}}>
-              {selectedMetric==="outbound"?<div><strong style={{color:"#18202b"}}>{phone(e.called_phone)}</strong>{e.matched_customer_name?<div style={{fontSize:12,fontWeight:800,color:"#e4511d",marginTop:2}}>{e.matched_customer_name}{e.matched_confirmation_code?` · ${e.matched_confirmation_code}`:""}</div>:<div style={{fontSize:11,color:"#87919b",marginTop:2}}>No customer match</div>}{e.has_recording||e.has_transcript||e.has_summary?<div style={{fontSize:10,color:"#788290",marginTop:2}}>{[e.has_recording?"Recording":null,e.has_transcript?"Transcript":null,e.has_summary?"Summary":null].filter(Boolean).join(" · ")}</div>:null}</div>:<a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&session=${encodeURIComponent(String(e.session||""))}`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{phone(e.caller_phone)}</a>}
-              <span style={{color:"#56606d"}}>{time(e.event_time)}</span>
-              <span style={{fontWeight:800,color:selectedMetric==="no-answer"?"#b9471f":"#25693b"}}>{selectedMetric==="outbound"?"Answered · "+duration(e.billsec):selectedMetric==="answered"?"Answered · "+duration(e.billsec):"No answer · rang "+duration(e.duration_seconds)}</span>
+            {selectedEvents.length?selectedEvents.map((e:any,i:number)=><div key={String(e.session)+String(e.event_time)+i} style={{display:"grid",gridTemplateColumns:selectedMetric==="answered"?"minmax(300px,1.5fr) 130px minmax(180px,1fr)":"220px 1fr auto",gap:16,alignItems:"center",padding:"12px 0",borderBottom:"1px solid #edf0f3"}}>
+              {selectedMetric==="outbound"?<div><strong style={{color:"#18202b"}}>{phone(e.called_phone)}</strong>{e.matched_customer_name?<div style={{fontSize:12,fontWeight:800,color:"#e4511d",marginTop:2}}>{e.matched_customer_name}{e.matched_confirmation_code?` · ${e.matched_confirmation_code}`:""}</div>:<div style={{fontSize:11,color:"#87919b",marginTop:2}}>No customer match</div>}{e.has_recording||e.has_transcript||e.has_summary?<div style={{fontSize:10,color:"#788290",marginTop:2}}>{[e.has_recording?"Recording":null,e.has_transcript?"Transcript":null,e.has_summary?"Summary":null].filter(Boolean).join(" · ")}</div>:null}</div>:selectedMetric==="answered"?<div>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}><strong style={{color:"#18202b"}}>{e.customer_name||phone(e.caller_phone)}</strong>{e.customer_name?<span style={{fontSize:11,color:"#788290"}}>{phone(e.caller_phone)}</span>:null}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}><span style={{fontSize:9,fontWeight:900,color:e.customer_status==="new_caller"?"#a94720":"#53606e",background:"#f2f4f6",borderRadius:999,padding:"3px 7px"}}>{statusLabel(e)}</span><span style={{fontSize:10,fontWeight:800,color:"#53606e"}}>{purposeLabel(e)}</span>{e.booking_experience?<span style={{fontSize:10,color:"#788290"}}>· {e.booking_experience}</span>:e.existing_experience?<span style={{fontSize:10,color:"#788290"}}>· {e.existing_experience}</span>:null}</div>
+                <div style={{marginTop:5}}><a href={`/customers?q=${encodeURIComponent(String(e.caller_phone||""))}`} style={{fontSize:11,fontWeight:900,color:"#d84a1b",textDecoration:"underline",textUnderlineOffset:2}}>Open EpicC360 →</a>{e.booking_confirmation_code?<span style={{fontSize:11,color:"#788290",marginLeft:8}}>{e.booking_confirmation_code}</span>:e.existing_confirmation_code?<span style={{fontSize:11,color:"#788290",marginLeft:8}}>{e.existing_confirmation_code}</span>:null}</div>
+              </div>:<a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&session=${encodeURIComponent(String(e.session||""))}`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{phone(e.caller_phone)}</a>}
+              <span style={{color:"#56606d"}}>{time(e.event_time)}{selectedMetric==="answered"?<div style={{fontSize:11,color:"#87919b",marginTop:2}}>{duration(e.billsec)}</div>:null}</span>
+              <span style={{fontWeight:900,color:selectedMetric==="no-answer"?"#b9471f":e.call_outcome==="booked"?"#25693b":"#56606d"}}>{selectedMetric==="outbound"?"Answered · "+duration(e.billsec):selectedMetric==="answered"?outcomeLabel(e):"No answer · rang "+duration(e.duration_seconds)}</span>
             </div>):<div style={{padding:18,color:"#788290"}}>No matching events.</div>}
           </div>
         </section>:null}
