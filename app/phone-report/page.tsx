@@ -44,7 +44,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const statusLabel=(e:any)=>e.customer_status==="new_caller"?"NEW CALLER":e.customer_status==="existing_customer"?"EXISTING CUSTOMER":e.customer_status==="returning_caller"?"RETURNING CALLER":"CALLER";
   const purposeLabel=(e:any)=>e.call_purpose==="sales_inquiry"?"Sales Inquiry":e.call_purpose==="existing_reservation"?"Reservation Service":"Other";
   const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`💫 Sale ${money(e.booking_revenue_cents)}`:e.call_outcome==="existing_reservation_handled"?"Reservation Service":e.call_outcome==="no_booking_yet"?"Sales Lead":"Other";
-  const outboundPurposeLabel=(e:any)=>e.outbound_purpose==="courtesy_call"?"Courtesy Call":e.outbound_purpose==="voicemail_return"?"Returned Voicemail":e.outbound_purpose==="missed_call_recovery"?"Recovered Missed Call":e.outbound_purpose==="abandoned_cart"?"Abandoned Cart Lead":"Other";
+  const outboundPurposeLabel=(e:any)=>e.outbound_purpose==="courtesy_call"?"Courtesy Call":e.outbound_purpose==="voicemail_return"?"Returned Voicemail":e.outbound_purpose==="missed_call_recovery"?"Recovered Missed Call":e.outbound_purpose==="abandoned_cart"?"Abandoned Cart Lead":"";
   const selectedEvents=(selectedMetric==="outbound"?report.outbound_events||[]:report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
     if(selectedMetric==="answered")return e.disposition==="ANSWERED"&&Number(e.billsec||0)>0;
@@ -114,7 +114,6 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
                   {e.is_courtesy_call?<span style={{fontSize:9,fontWeight:900,color:"#53606e",background:"#f2f4f6",borderRadius:999,padding:"3px 7px"}}>COURTESY CALL</span>:null}
                   {e.is_abandoned_cart_lead?<span style={{fontSize:9,fontWeight:900,color:"#a94720",background:"#fff2ed",borderRadius:999,padding:"3px 7px"}}>ABANDONED CART</span>:null}
                   {e.returned_voicemail?<span style={{fontSize:9,fontWeight:900,color:"#6b4a00",background:"#fff7da",borderRadius:999,padding:"3px 7px"}}>RETURNED VOICEMAIL</span>:e.is_missed_call_recovery?<span style={{fontSize:9,fontWeight:900,color:"#25693b",background:"#eef8f1",borderRadius:999,padding:"3px 7px"}}>RECOVERED MISSED CALL</span>:null}
-                  {!e.is_courtesy_call&&!e.is_abandoned_cart_lead&&!e.is_missed_call_recovery?<span style={{fontSize:9,fontWeight:900,color:"#53606e",background:"#f2f4f6",borderRadius:999,padding:"3px 7px"}}>OTHER</span>:null}
                 </div>
                 <div style={{marginTop:5}}><PhoneReportC360Link contactId={e.contact_id||null} reservationId={e.sale_reservation_id||e.matched_reservation_id||null} reservationConfirmation={e.sale_confirmation_code||e.matched_confirmation_code||null} phone={e.called_phone||null}/>{e.sale_confirmation_code?<span style={{fontSize:11,color:"#788290",marginLeft:8}}>{e.sale_confirmation_code}</span>:e.matched_confirmation_code?<span style={{fontSize:11,color:"#788290",marginLeft:8}}>{e.matched_confirmation_code}</span>:null}</div>
               </div>:selectedMetric==="answered"?<div>
