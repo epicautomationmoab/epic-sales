@@ -72,7 +72,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
           {[
             ["Calls In",s.inbound_queue_calls??0],
             ["Answered",s.answered_live??0],
-            ["Answer Speed",duration(s.avg_answer_wait_seconds)],
+            ["Avg Human Answer",duration(s.avg_answer_wait_seconds)],
             ["Missed / Abandoned",s.missed??0]
           ].map(([label,value])=><div key={String(label)} style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:12,padding:14}}><div style={{fontSize:10,fontWeight:900,color:"#7c8793",textTransform:"uppercase"}}>{label}</div><div style={{fontSize:26,fontWeight:900,marginTop:6}}>{String(value)}</div></div>)}
         </section>
