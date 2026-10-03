@@ -40,6 +40,7 @@ export default function InboxClient(){
   const counts=useMemo(()=>({open:threads.filter(t=>t.is_open).length,sales:threads.filter(t=>t.is_open&&t.lane==="sales").length,service:threads.filter(t=>t.is_open&&t.lane==="service").length}),[threads]);
   return <>
     <section className={styles.phoneKpis}>
+      <div><span>Total Calls</span><strong>{phoneSummary.inbound_queue_calls??0}</strong></div>
       <div><span>Median Answer</span><strong>{phoneSummary.median_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.median_answer_wait_seconds)}s`}</strong></div>
       <div><span>Average Answer</span><strong>{phoneSummary.avg_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.avg_answer_wait_seconds)}s`}</strong></div>
       <div><span>Longest Wait</span><strong>{phoneSummary.longest_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.longest_answer_wait_seconds)}s`}</strong></div>
