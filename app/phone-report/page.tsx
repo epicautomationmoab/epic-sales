@@ -68,8 +68,9 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
         <form style={{display:"flex",gap:8}}><input type="date" name="date" defaultValue={String(report.date||params.date||"")} style={{height:40,border:"1px solid #d6dde5",borderRadius:9,padding:"0 10px"}}/><button className={styles.quoteButton} type="submit">View Date</button></form>
       </header>
       {error?<div className={styles.error}>{error}</div>:<>
-        <section style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,marginBottom:18}}>
+        <section style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:12,marginBottom:18}}>
           {[
+            ["Total Calls",s.inbound_queue_calls??0],
             ["Median Answer",duration(s.median_answer_wait_seconds)],
             ["Average Answer",duration(s.avg_answer_wait_seconds)],
             ["Longest Wait",duration(s.longest_answer_wait_seconds)]
