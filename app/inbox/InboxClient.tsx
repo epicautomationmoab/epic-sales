@@ -42,7 +42,7 @@ export default function InboxClient(){
     <section className={styles.phoneKpis}>
       <div><span>Calls In Today</span><strong>{phoneSummary.inbound_queue_calls??0}</strong></div>
       <div><span>Answered</span><strong>{phoneSummary.answered_live??0}</strong></div>
-      <div><span>Answer Speed</span><strong>{phoneSummary.avg_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.avg_answer_wait_seconds)}s`}</strong></div>
+      <div><span>Avg Human Answer</span><strong>{phoneSummary.avg_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.avg_answer_wait_seconds)}s`}</strong></div>
       <div className={styles.phoneKpiMiss}><span>Missed / Abandoned</span><strong>{phoneSummary.missed??0}</strong></div>
     </section>
     <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>Inbox <span className={styles.count}>{counts.open}</span></h1><p>Every open customer conversation, in one place. Closed conversations remain in EpicC360 and can be found under Customers.</p></div><div className={styles.filters}><button className={`${styles.filter} ${filter==="open"?styles.filterActive:""}`} onClick={()=>setFilter("open")}>Open {counts.open}</button><button className={`${styles.filter} ${filter==="sales"?styles.filterActive:""}`} onClick={()=>setFilter("sales")}>Sales {counts.sales}</button><button className={`${styles.filter} ${filter==="service"?styles.filterActive:""}`} onClick={()=>setFilter("service")}>Service {counts.service}</button></div></header>
