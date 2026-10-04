@@ -101,10 +101,13 @@ export async function GET(request: NextRequest) {
     const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
 
     let pbxCalls:any[] = [];
+    let pbxInboundCalls:any[] = [];
     const identityPhone=String(customer?.identity?.phone||params.get("phone")||"").replace(/\D/g,"").slice(-10);
     if(identityPhone.length===10){
-      const rows=await rpcNamed(session.accessToken,"get_epic_outbound_calls_for_phone",{p_phone:identityPhone}).catch(()=>[]);
-      pbxCalls=Array.isArray(rows)?rows:[];
+      const outboundRows=await rpcNamed(session.accessToken,"get_epic_outbound_calls_for_phone",{p_phone:identityPhone}).catch(()=>[]);
+      const inboundRows=await rpcNamed(session.accessToken,"get_epic_inbound_call_sessions_for_phone",{p_phone:identityPhone}).catch(()=>[]);
+      pbxCalls=Array.isArray(outboundRows)?outboundRows:[];
+      pbxInboundCalls=Array.isArray(inboundRows)?inboundRows:[];
     }
 
     const confirmations = [...new Set((customer?.reservations || []).map((r:any)=>String(r.confirmation_code||"").trim()).filter(Boolean))] as string[];
@@ -140,6 +143,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...(customer.calls||[]),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
+      pbx_inbound_calls:pbxInboundCalls,
       cancellation_agreements:cancellationEvents,
     } : customer;
 
