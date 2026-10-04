@@ -78,6 +78,43 @@ function normalizeCustomerReservationTimes(customer:any) {
   };
 }
 
+function mergeCallRailWithPbxInbound(callrailCalls:any[],pbxInboundCalls:any[]) {
+  const inboundIndexes=callrailCalls.map((call:any,index:number)=>({call,index})).filter(x=>x.call?.direction==="inbound");
+  const used=new Set<number>();
+  const merged=pbxInboundCalls.map((pbx:any)=>{
+    const pbxAt=new Date(pbx.at||0).getTime();
+    let best:{call:any;index:number;delta:number}|null=null;
+    for(const candidate of inboundIndexes){
+      if(used.has(candidate.index))continue;
+      const callAt=new Date(candidate.call.at||0).getTime();
+      if(!pbxAt||!callAt)continue;
+      const delta=Math.abs(pbxAt-callAt);
+      if(delta<=180000&&(!best||delta<best.delta))best={call:candidate.call,index:candidate.index,delta};
+    }
+    if(best)used.add(best.index);
+    const call=best?.call||{};
+    return {
+      ...call,
+      ...pbx,
+      id:pbx.id||`pbx-in-${pbx.session}`,
+      direction:"inbound",
+      answered:Boolean(pbx.answered),
+      voicemail:Boolean(pbx.voicemail),
+      recording_url:call.recording_url||null,
+      summary:call.summary||call.lead_explanation||null,
+      transcription:call.transcription||null,
+      lead_score:call.lead_score??null,
+      lead_explanation:call.lead_explanation||null,
+      source_name:call.source_name||"Grandstream PBX",
+      campaign:call.campaign||null,
+      matched_reservation_id:call.matched_reservation_id||null,
+      matched_opportunity_id:call.matched_opportunity_id||null,
+    };
+  });
+  const remaining=callrailCalls.filter((call:any,index:number)=>call?.direction!=="inbound"||!used.has(index));
+  return [...merged,...remaining].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime());
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
@@ -101,10 +138,13 @@ export async function GET(request: NextRequest) {
     const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
 
     let pbxCalls:any[] = [];
+    let pbxInboundCalls:any[] = [];
     const identityPhone=String(customer?.identity?.phone||params.get("phone")||"").replace(/\D/g,"").slice(-10);
     if(identityPhone.length===10){
-      const rows=await rpcNamed(session.accessToken,"get_epic_outbound_calls_for_phone",{p_phone:identityPhone}).catch(()=>[]);
-      pbxCalls=Array.isArray(rows)?rows:[];
+      const outboundRows=await rpcNamed(session.accessToken,"get_epic_outbound_calls_for_phone",{p_phone:identityPhone}).catch(()=>[]);
+      const inboundRows=await rpcNamed(session.accessToken,"get_epic_inbound_call_sessions_for_phone",{p_phone:identityPhone}).catch(()=>[]);
+      pbxCalls=Array.isArray(outboundRows)?outboundRows:[];
+      pbxInboundCalls=Array.isArray(inboundRows)?inboundRows:[];
     }
 
     const confirmations = [...new Set((customer?.reservations || []).map((r:any)=>String(r.confirmation_code||"").trim()).filter(Boolean))] as string[];
@@ -139,7 +179,7 @@ export async function GET(request: NextRequest) {
           mpwr_reservation_url:readiness?.mpwr_reservation_url||null,
         };
       }),
-      calls:[...(customer.calls||[]),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
+      calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
     } : customer;
 
