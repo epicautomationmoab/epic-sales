@@ -51,6 +51,14 @@ type ActivityAvailabilityState = {
   timeslots: TripWorksTimeslot[];
 };
 
+type PendingBooking = {
+  experienceId: string;
+  experienceName: string;
+  date: string;
+  time: string;
+  total: number;
+};
+
 function collectTimeslots(value: unknown, found = new Map<string, TripWorksTimeslot>()) {
   if (Array.isArray(value)) {
     value.forEach((item) => collectTimeslots(item, found));
@@ -199,6 +207,7 @@ export default function QuoteBuilder() {
   const [saveMessage, setSaveMessage] = useState("");
   const [availabilityDates, setAvailabilityDates] = useState<Record<string, string>>({});
   const [availabilityByActivity, setAvailabilityByActivity] = useState<Record<string, ActivityAvailabilityState>>({});
+  const [pendingBooking, setPendingBooking] = useState<PendingBooking | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -274,32 +283,35 @@ export default function QuoteBuilder() {
     });
   }
 
-  async function openQuoteBookingCard(input: {
-    experienceName: string;
-    date: string;
-    time: string;
-    total: number;
-    tickets: Array<{ name: string; quantity: number }>;
-    tripSafe: boolean;
-    premier: boolean;
-  }) {
+  async function openQuoteBookingCard(quoteId: string, booking: PendingBooking) {
+    const detail = await getSalesQuoteDetail(quoteId);
+    const savedActivity = detail.activities.find((item) => item.experience_id === booking.experienceId);
+    if (!savedActivity) throw new Error("Saved quote activity could not be found.");
+
+    const q = detail.quote;
+    const savedActivityTotal = Number((savedActivity as unknown as { total_cents?: number }).total_cents);
     const params = new URLSearchParams({
       source: "quote",
-      customer: name.trim(),
-      experience: input.experienceName,
-      date: input.date,
-      time: input.time,
-      total: String(Math.round(input.total * 100)),
-      tickets: JSON.stringify(input.tickets),
-      tripsafe: input.tripSafe ? "1" : "0",
-      premier: input.premier ? "1" : "0",
+      quote: quoteId,
+      customer: String(q.customer_name || ""),
+      email: String(q.customer_email || ""),
+      phone: String(q.customer_phone_e164 || ""),
+      experience: savedActivity.experience_name || booking.experienceName,
+      date: booking.date,
+      time: booking.time,
+      total: String(Number.isFinite(savedActivityTotal) ? savedActivityTotal : Math.round(booking.total * 100)),
+      tickets: JSON.stringify(savedActivity.items
+        .filter((item) => item.quantity > 0)
+        .map((item) => ({ name: item.ticket_type_name, quantity: item.quantity }))),
+      tripsafe: savedActivity.tripsafe_selected ? "1" : "0",
+      premier: savedActivity.premier_selected ? "1" : "0",
     });
     const helperUrl = `/quote-booking-helper?${params.toString()}`;
 
     const pictureInPicture = (window as any).documentPictureInPicture;
     if (pictureInPicture?.requestWindow) {
       try {
-        const pipWindow = await pictureInPicture.requestWindow({ width: 430, height: 720 });
+        const pipWindow = await pictureInPicture.requestWindow({ width: 430, height: 760 });
         pipWindow.document.title = "Epic Staff Booking";
         pipWindow.document.body.style.margin = "0";
         pipWindow.document.body.style.overflow = "hidden";
@@ -312,13 +324,24 @@ export default function QuoteBuilder() {
         frame.style.display = "block";
         pipWindow.document.body.appendChild(frame);
       } catch {
-        window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=820,resizable=yes,scrollbars=yes");
+        window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=860,resizable=yes,scrollbars=yes");
       }
     } else {
-      window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=820,resizable=yes,scrollbars=yes");
+      window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=860,resizable=yes,scrollbars=yes");
     }
 
     window.open("https://epic4x4.tripworks.com/trips", "_blank");
+  }
+
+  function beginBooking(booking: PendingBooking) {
+    if (editingQuoteId) {
+      void openQuoteBookingCard(editingQuoteId, booking).catch((err) => {
+        setSaveMessage(err instanceof Error ? err.message : "Unable to open booking helper.");
+      });
+      return;
+    }
+    setPendingBooking(booking);
+    setDetailsOpen(true);
   }
 
   async function checkAvailability(activityKey: string, experienceId: string) {
@@ -375,6 +398,7 @@ export default function QuoteBuilder() {
     setSaveMessage("");
     setAvailabilityDates({});
     setAvailabilityByActivity({});
+    setPendingBooking(null);
     setActive("quotes");
     window.history.replaceState({}, "", window.location.pathname);
   }
@@ -484,6 +508,15 @@ export default function QuoteBuilder() {
       setEditingQuoteId(result.quote_id);
       setDetailsOpen(false);
       getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
+
+      if (pendingBooking) {
+        const booking = pendingBooking;
+        setPendingBooking(null);
+        await openQuoteBookingCard(result.quote_id, booking);
+        setSaveMessage(`Quote ${result.quote_id.slice(0, 8)} saved and ready to book.`);
+        return;
+      }
+
       const customerSearch = phone.trim() || email.trim() || name.trim();
       if (customerSearch) {
         window.location.href = `/customers?q=${encodeURIComponent(customerSearch)}&open=1`;
@@ -665,16 +698,12 @@ export default function QuoteBuilder() {
                               <button
                                 className="secondary availabilityBookButton"
                                 type="button"
-                                onClick={() => openQuoteBookingCard({
+                                onClick={() => beginBooking({
+                                  experienceId: experience.id,
                                   experienceName: experience.name,
                                   date: availabilityByActivity[activity.key]?.date || availabilityDates[activity.key] || visitStart,
                                   time: slot.time_label || slot.label || slot.full_label || slot.start_time || "",
                                   total,
-                                  tickets: experience.tickets
-                                    .map((ticket) => ({ name: ticket.name, quantity: activity.qty[ticket.id] ?? 0 }))
-                                    .filter((ticket) => ticket.quantity > 0),
-                                  tripSafe: activity.tripSafe,
-                                  premier: activity.premier,
                                 })}
                               >
                                 Book It
@@ -733,7 +762,7 @@ export default function QuoteBuilder() {
       {detailsOpen && (
         <div className="modalBackdrop" onMouseDown={() => setDetailsOpen(false)}>
           <div className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="sectionHeading"><div><h2>{editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">Contact info is optional unless you want this attached to a lead.</p></div><button className="removeLink" onClick={() => setDetailsOpen(false)}>Close</button></div>
+            <div className="sectionHeading"><div><h2>{pendingBooking ? "Save & Book It" : editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">{pendingBooking ? "Add or confirm the guest details before handing this quote to TripWorks." : "Contact info is optional unless you want this attached to a lead."}</p></div><button className="removeLink" onClick={() => { setDetailsOpen(false); setPendingBooking(null); }}>Close</button></div>
             <div className="field"><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" /></div>
             <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
             <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" /></div>
@@ -741,8 +770,8 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
-            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
-            <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button>
+            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : pendingBooking ? "Save & Book It" : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
           </div>
         </div>
       )}
