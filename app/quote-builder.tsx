@@ -23,6 +23,86 @@ type QuoteActivity = {
   premier: boolean;
 };
 
+type TripWorksAvailabilityTicket = {
+  customer_type?: { id?: number; name?: string; is_visible?: boolean };
+  availability_cnt?: number;
+  passenger_count?: number;
+  hold_cnt?: number;
+};
+
+type TripWorksTimeslot = {
+  id?: number;
+  label?: string;
+  time_label?: string;
+  full_label?: string;
+  start_time?: string;
+  note?: string;
+  capacity_cnt?: number;
+  availability_cnt?: number;
+  passenger_count?: number;
+  experience_timeslot_status?: { name?: string; slug?: string };
+  availabilities?: TripWorksAvailabilityTicket[];
+};
+
+type ActivityAvailabilityState = {
+  date: string;
+  loading: boolean;
+  error: string;
+  timeslots: TripWorksTimeslot[];
+};
+
+function collectTimeslots(value: unknown, found = new Map<string, TripWorksTimeslot>()) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectTimeslots(item, found));
+    return Array.from(found.values());
+  }
+  if (!value || typeof value !== "object") return Array.from(found.values());
+
+  const record = value as Record<string, unknown>;
+  const looksLikeTimeslot =
+    typeof record.start_time === "string" &&
+    record.experience_timeslot_status &&
+    typeof record.experience_timeslot_status === "object";
+
+  if (looksLikeTimeslot) {
+    const slot = record as TripWorksTimeslot;
+    const key = String(slot.id ?? slot.start_time ?? found.size);
+    found.set(key, slot);
+    return Array.from(found.values());
+  }
+
+  Object.values(record).forEach((item) => collectTimeslots(item, found));
+  return Array.from(found.values());
+}
+
+function requestTripWorksAvailability(experienceId: string, date: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      reject(new Error("TripWorks availability timed out. Make sure TripWorks is open, signed in, and the Epic bridge extension is installed."));
+    }, 12000);
+
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window) return;
+      const data = event.data as { type?: string; requestId?: string; ok?: boolean; data?: unknown; error?: string };
+      if (data?.type !== "EPIC_TW_AVAILABILITY_RESPONSE" || data.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      if (data.ok) resolve(data.data);
+      else reject(new Error(data.error || "TripWorks availability request failed."));
+    }
+
+    window.addEventListener("message", onMessage);
+    window.postMessage({
+      type: "EPIC_TW_AVAILABILITY_REQUEST",
+      requestId,
+      experienceId,
+      date,
+    }, "*");
+  });
+}
+
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 function ticketSortRank(name: string) {
@@ -117,6 +197,8 @@ export default function QuoteBuilder() {
   const [saving, setSaving] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [availabilityDates, setAvailabilityDates] = useState<Record<string, string>>({});
+  const [availabilityByActivity, setAvailabilityByActivity] = useState<Record<string, ActivityAvailabilityState>>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -180,6 +262,58 @@ export default function QuoteBuilder() {
 
   function removeActivity(key: string) {
     setActivities((current) => current.filter((item) => item.key !== key));
+    setAvailabilityDates((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    setAvailabilityByActivity((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  async function checkAvailability(activityKey: string, experienceId: string) {
+    const date = availabilityDates[activityKey] || visitStart;
+    if (!date) {
+      setAvailabilityByActivity((current) => ({
+        ...current,
+        [activityKey]: { date: "", loading: false, error: "Choose a date first.", timeslots: [] },
+      }));
+      return;
+    }
+
+    setAvailabilityByActivity((current) => ({
+      ...current,
+      [activityKey]: { date, loading: true, error: "", timeslots: current[activityKey]?.timeslots || [] },
+    }));
+
+    try {
+      const payload = await requestTripWorksAvailability(experienceId, date);
+      const timeslots = collectTimeslots(payload).sort((a, b) =>
+        String(a.start_time || a.time_label || "").localeCompare(String(b.start_time || b.time_label || ""))
+      );
+      setAvailabilityByActivity((current) => ({
+        ...current,
+        [activityKey]: {
+          date,
+          loading: false,
+          error: timeslots.length ? "" : "TripWorks returned no timeslots for this date.",
+          timeslots,
+        },
+      }));
+    } catch (err) {
+      setAvailabilityByActivity((current) => ({
+        ...current,
+        [activityKey]: {
+          date,
+          loading: false,
+          error: err instanceof Error ? err.message : "Unable to load TripWorks availability.",
+          timeslots: [],
+        },
+      }));
+    }
   }
 
   function newQuote() {
@@ -192,6 +326,8 @@ export default function QuoteBuilder() {
     setVisitEnd("");
     setDetailsOpen(false);
     setSaveMessage("");
+    setAvailabilityDates({});
+    setAvailabilityByActivity({});
     setActive("quotes");
     window.history.replaceState({}, "", window.location.pathname);
   }
@@ -215,6 +351,8 @@ export default function QuoteBuilder() {
         premier: activity.premier_selected,
         qty: Object.fromEntries(activity.items.map((item) => [item.ticket_type_id, item.quantity])),
       })));
+      setAvailabilityDates(Object.fromEntries(detail.activities.map((activity) => [activity.id, String(q.visit_start_date || "")])));
+      setAvailabilityByActivity({});
       setActive("quotes");
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to open quote.");
@@ -422,6 +560,59 @@ export default function QuoteBuilder() {
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
                   <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                  {experience ? (
+                    <div className="availabilityCheck">
+                      <div className="field availabilityDateField">
+                        <label>Activity date</label>
+                        <input
+                          type="date"
+                          value={availabilityDates[activity.key] ?? visitStart}
+                          onChange={(e) => setAvailabilityDates((current) => ({ ...current, [activity.key]: e.target.value }))}
+                        />
+                      </div>
+                      <button
+                        className="secondary availabilityButton"
+                        type="button"
+                        onClick={() => checkAvailability(activity.key, experience.id)}
+                        disabled={availabilityByActivity[activity.key]?.loading}
+                      >
+                        {availabilityByActivity[activity.key]?.loading ? "Checking..." : "Check Availability"}
+                      </button>
+                    </div>
+                  ) : null}
+                  {availabilityByActivity[activity.key]?.error ? (
+                    <div className="availabilityError">{availabilityByActivity[activity.key].error}</div>
+                  ) : null}
+                  {availabilityByActivity[activity.key]?.timeslots.length ? (
+                    <div className="availabilityResults">
+                      {availabilityByActivity[activity.key].timeslots.map((slot, slotIndex) => {
+                        const status = slot.experience_timeslot_status?.name || "Unknown";
+                        const open = slot.experience_timeslot_status?.slug === "open" || status.toLowerCase() === "open";
+                        const visibleTickets = (slot.availabilities || []).filter((item) => item.customer_type?.is_visible !== false);
+                        return (
+                          <div className="availabilitySlot" key={String(slot.id ?? slot.start_time ?? slotIndex)}>
+                            <div className="availabilitySlotTop">
+                              <strong>{slot.time_label || slot.label || slot.full_label || slot.start_time || "Timeslot"}</strong>
+                              <span className={open ? "availabilityStatus open" : "availabilityStatus"}>{status}</span>
+                            </div>
+                            <div className="ticketMeta">
+                              {typeof slot.availability_cnt === "number" ? `${slot.availability_cnt} available` : "Availability loaded"}
+                              {slot.note ? ` · ${slot.note}` : ""}
+                            </div>
+                            {visibleTickets.length ? (
+                              <div className="availabilityTickets">
+                                {visibleTickets.map((item, ticketIndex) => (
+                                  <span key={String(item.customer_type?.id ?? ticketIndex)}>
+                                    {item.customer_type?.name || "Ticket"}: {item.availability_cnt ?? "—"}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   {experience ? experience.tickets.map((ticket) => (
                     <div className="ticketRow" key={ticket.id}>
                       <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
