@@ -10,7 +10,7 @@ function dateLabel(value:string|null){
   return Number.isNaN(date.getTime())?value:date.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
 }
 
-export default async function QuoteBookingHelperPage({searchParams}:{searchParams:Promise<{customer?:string;experience?:string;date?:string;time?:string;total?:string;tickets?:string;tripsafe?:string;premier?:string}>}){
+export default async function QuoteBookingHelperPage({searchParams}:{searchParams:Promise<{quote?:string;customer?:string;email?:string;phone?:string;experience?:string;date?:string;time?:string;total?:string;tickets?:string;tripsafe?:string;premier?:string}>}){
   const params=await searchParams;
   const store=await cookies();
   const token=store.get("epic_access_token")?.value;
@@ -39,6 +39,7 @@ export default async function QuoteBookingHelperPage({searchParams}:{searchParam
       <div><span>Time</span><strong>{params.time||"—"}</strong></div>
       <div><span>Quoted Total</span><strong>{Number.isFinite(totalCents)?money.format(totalCents/100):"—"}</strong></div>
     </div>
+    {(params.email||params.phone)?<section className={styles.section}><h2>Guest</h2>{params.email?<div className={styles.line}><div><strong>{params.email}</strong></div></div>:null}{params.phone?<div className={styles.line}><div><strong>{params.phone}</strong></div></div>:null}</section>:null}
     {tickets.length?<section className={styles.section}><h2>Tickets / Vehicles</h2>{tickets.map((ticket,index)=><div className={styles.line} key={index}><div><strong>{ticket.name}</strong></div><em>Qty {ticket.quantity}</em></div>)}</section>:null}
     {(params.tripsafe==="1"||params.premier==="1")?<section className={styles.section}><h2>Protection</h2>{params.tripsafe==="1"?<div className={styles.line}><div><strong>TripSafe</strong></div><em>Selected</em></div>:null}{params.premier==="1"?<div className={styles.line}><div><strong>Premier Adventure Assure</strong></div><em>Selected</em></div>:null}</section>:null}
     <div className={styles.total}><span>Quote Total</span><strong>{Number.isFinite(totalCents)?money.format(totalCents/100):"—"}</strong></div>
