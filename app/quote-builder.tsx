@@ -593,7 +593,7 @@ export default function QuoteBuilder() {
                           <div className="availabilitySlot" key={String(slot.id ?? slot.start_time ?? slotIndex)}>
                             <div className="availabilitySlotTop">
                               <strong>{slot.time_label || slot.label || slot.full_label || slot.start_time || "Timeslot"}</strong>
-                              <span className={open ? "availabilityStatus open" : "availabilityStatus"}>{status}</span>
+                              <span className={open ? "availabilityStatus open" : status.toLowerCase() === "closed" ? "availabilityStatus closed" : "availabilityStatus"}>{status}</span>
                             </div>
                             {visibleTickets.length ? (
                               <div className="availabilityTickets">
