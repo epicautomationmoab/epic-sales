@@ -124,6 +124,17 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .addActivityFull { width: 100%; margin-top: 12px; }
 .activityCard { margin-bottom: 16px; }
 .activityHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.availabilityCheck { display: flex; gap: 10px; align-items: end; margin: 12px 0; }
+.availabilityDateField { flex: 1; margin-bottom: 0; }
+.availabilityButton { white-space: nowrap; margin-bottom: 0; }
+.availabilityError { margin: 8px 0 12px; padding: 10px 12px; border: 1px solid #f0c7c0; border-radius: 8px; background: #fff7f5; color: #9f2d1b; font-size: 13px; }
+.availabilityResults { margin: 10px 0 14px; border: 1px solid #e2e6ea; border-radius: 10px; overflow: hidden; }
+.availabilitySlot { padding: 11px 12px; border-bottom: 1px solid #edf0f3; }
+.availabilitySlot:last-child { border-bottom: 0; }
+.availabilitySlotTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.availabilityStatus { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; background: #f1f3f5; font-size: 12px; font-weight: 700; }
+.availabilityStatus.open { background: #e8f6ec; }
+.availabilityTickets { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 7px; font-size: 12px; color: #4b5563; }
 .activityNumber { font-weight: 900; color: #d5521d; text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
 .removeLink { border: 0; background: transparent; color: #b42318; font-weight: 800; }
 .field { display: grid; gap: 6px; margin-bottom: 14px; }
