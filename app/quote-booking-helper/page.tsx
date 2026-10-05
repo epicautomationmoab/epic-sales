@@ -44,7 +44,10 @@ export default async function QuoteBookingHelperPage({searchParams}:{searchParam
       <CopyValue label="Phone" value={params.phone||""}/>
     </div></section>
     {tickets.length?<section className={styles.section}><h2>Tickets / Vehicles</h2>{tickets.map((ticket,index)=><div className={styles.line} key={index}><div><strong>{ticket.name}</strong></div><em>Qty {ticket.quantity}</em></div>)}</section>:null}
-    {(params.tripsafe==="1"||params.premier==="1")?<section className={styles.section}><h2>Protection</h2>{params.tripsafe==="1"?<div className={styles.line}><div><strong>TripSafe</strong></div><em>Selected</em></div>:null}{params.premier==="1"?<div className={styles.line}><div><strong>Premier Adventure Assure</strong></div><em>Selected</em></div>:null}</section>:null}
+    <section className={styles.section}><h2>Protection</h2>
+      <div className={styles.line}><div><strong>TripSafe</strong></div><em>{params.tripsafe==="1"?"Selected":"Not selected"}</em></div>
+      <div className={styles.line}><div><strong>Premier Adventure Assure</strong></div><em>{params.premier==="1"?"Selected":"Not selected"}</em></div>
+    </section>
     <div className={styles.total}><span>Quote Total</span><strong>{Number.isFinite(totalCents)?money.format(totalCents/100):"—"}</strong></div>
   </section></main>;
 }
