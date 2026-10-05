@@ -38,7 +38,7 @@ export default async function QuoteBookingHelperPage({searchParams}:{searchParam
       <div><span>Time</span><strong>{params.time||"—"}</strong></div>
       <div><span>Quoted Total</span><strong>{Number.isFinite(totalCents)?money.format(totalCents/100):"—"}</strong></div>
     </div>
-    <section className={styles.section}><h2>Guest</h2><div className="copyFields">
+    <section className={styles.section}><h2>Guest</h2><div className={styles.copyFields}>
       <CopyValue label="Name" value={params.customer||""}/>
       <CopyValue label="Email" value={params.email||""}/>
       <CopyValue label="Phone" value={params.phone||""}/>
