@@ -347,12 +347,6 @@ export default function QuoteBuilder() {
   }
 
   function beginBooking(booking: PendingBooking) {
-    if (editingQuoteId) {
-      void openQuoteBookingCard(editingQuoteId, booking).catch((err) => {
-        setSaveMessage(err instanceof Error ? err.message : "Unable to open booking helper.");
-      });
-      return;
-    }
     setPendingBooking(booking);
     setDetailsOpen(true);
   }
@@ -808,7 +802,7 @@ export default function QuoteBuilder() {
       {detailsOpen && (
         <div className="modalBackdrop" onMouseDown={() => { setDetailsOpen(false); setPendingBooking(null); }}>
           <div className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="sectionHeading"><div><h2>{pendingBooking ? "Save & Book It" : editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">{pendingBooking ? "Add or confirm the guest details before handing this quote to TripWorks." : "Contact info is optional unless you want this attached to a lead."}</p></div><button className="removeLink" onClick={() => { setDetailsOpen(false); setPendingBooking(null); }}>Close</button></div>
+            <div className="sectionHeading"><div><h2>{pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">{pendingBooking ? "Confirm the guest details and save the current quote before handing it to TripWorks." : "Contact info is optional unless you want this attached to a lead."}</p></div><button className="removeLink" onClick={() => { setDetailsOpen(false); setPendingBooking(null); }}>Close</button></div>
             <div className="field"><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" /></div>
             <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
             <div className="field"><label>Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" /></div>
@@ -816,7 +810,7 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
-            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : pendingBooking ? "Save & Book It" : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
+            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
             {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
           </div>
         </div>
