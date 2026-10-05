@@ -274,6 +274,53 @@ export default function QuoteBuilder() {
     });
   }
 
+  async function openQuoteBookingCard(input: {
+    experienceName: string;
+    date: string;
+    time: string;
+    total: number;
+    tickets: Array<{ name: string; quantity: number }>;
+    tripSafe: boolean;
+    premier: boolean;
+  }) {
+    const params = new URLSearchParams({
+      source: "quote",
+      customer: name.trim(),
+      experience: input.experienceName,
+      date: input.date,
+      time: input.time,
+      total: String(Math.round(input.total * 100)),
+      tickets: JSON.stringify(input.tickets),
+      tripsafe: input.tripSafe ? "1" : "0",
+      premier: input.premier ? "1" : "0",
+    });
+    const helperUrl = `/staff-booking?${params.toString()}`;
+
+    const pictureInPicture = (window as any).documentPictureInPicture;
+    if (pictureInPicture?.requestWindow) {
+      try {
+        const pipWindow = await pictureInPicture.requestWindow({ width: 430, height: 720 });
+        pipWindow.document.title = "Epic Staff Booking";
+        pipWindow.document.body.style.margin = "0";
+        pipWindow.document.body.style.overflow = "hidden";
+        const frame = pipWindow.document.createElement("iframe");
+        frame.src = helperUrl;
+        frame.title = "Epic Staff Booking";
+        frame.style.width = "100%";
+        frame.style.height = "100vh";
+        frame.style.border = "0";
+        frame.style.display = "block";
+        pipWindow.document.body.appendChild(frame);
+      } catch {
+        window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=820,resizable=yes,scrollbars=yes");
+      }
+    } else {
+      window.open(helperUrl, "epic-staff-booking", "popup=yes,width=680,height=820,resizable=yes,scrollbars=yes");
+    }
+
+    window.open("https://epic4x4.tripworks.com/trips", "_blank");
+  }
+
   async function checkAvailability(activityKey: string, experienceId: string) {
     const date = availabilityDates[activityKey] || visitStart;
     if (!date) {
@@ -556,7 +603,7 @@ export default function QuoteBuilder() {
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
               {error && <div className="card"><p className="muted">{error}</p></div>}
-              {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays }, index) => (
+              {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays, total }, index) => (
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
                   <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
@@ -614,6 +661,25 @@ export default function QuoteBuilder() {
                               </div>
                             )}
                             {slot.note ? <div className="ticketMeta availabilityNote">{slot.note}</div> : null}
+                            {open ? (
+                              <button
+                                className="secondary availabilityBookButton"
+                                type="button"
+                                onClick={() => openQuoteBookingCard({
+                                  experienceName: experience.name,
+                                  date: availabilityByActivity[activity.key]?.date || availabilityDates[activity.key] || visitStart,
+                                  time: slot.time_label || slot.label || slot.full_label || slot.start_time || "",
+                                  total,
+                                  tickets: experience.tickets
+                                    .map((ticket) => ({ name: ticket.name, quantity: activity.qty[ticket.id] ?? 0 }))
+                                    .filter((ticket) => ticket.quantity > 0),
+                                  tripSafe: activity.tripSafe,
+                                  premier: activity.premier,
+                                })}
+                              >
+                                Book It
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
