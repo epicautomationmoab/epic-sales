@@ -42,10 +42,12 @@ export async function GET(request: NextRequest) {
       const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
-    const [threads, blockedRows, phoneReport] = await Promise.all([
+    const [threads, blockedRows, phoneReport, collaborators, mentions] = await Promise.all([
       rpc(session.accessToken, "get_epic_routed_inbox_v2", { p_include_cleaned: includeClosed }),
       rpc(session.accessToken, "get_epic_sales_blocked_domains", {}),
       rpc(session.accessToken, "get_epic_phone_report", { p_local_date: null }),
+      rpc(session.accessToken, "get_epic_inbox_collaborators", {}),
+      rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
     const filteredThreads = (Array.isArray(threads) ? threads : []).filter((thread: { kind?: string; email?: string | null }) => {
@@ -86,7 +88,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ ok: true, threads: enrichedThreads, phone_summary: phoneReport?.summary || {} });
+    return NextResponse.json({
+      ok: true,
+      threads: enrichedThreads,
+      phone_summary: phoneReport?.summary || {},
+      team_members: Array.isArray(collaborators) ? collaborators : [],
+      mentions: mentions || { unread_count: 0, thread_keys: [] },
+    });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load inbox." }, { status: 500 });
   }
@@ -104,6 +112,10 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "note") {
       const result = await rpc(session.accessToken, "epic_sales_add_inbox_thread_note", { p_thread_key: body.thread_key, p_note_text: body.note_text || "" });
+      return NextResponse.json(result || { ok: true });
+    }
+    if (body.action === "read_mentions") {
+      const result = await rpc(session.accessToken, "epic_sales_mark_inbox_thread_mentions_read", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
     }
     if (body.action === "route") {
