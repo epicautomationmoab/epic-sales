@@ -595,19 +595,25 @@ export default function QuoteBuilder() {
                               <strong>{slot.time_label || slot.label || slot.full_label || slot.start_time || "Timeslot"}</strong>
                               <span className={open ? "availabilityStatus open" : "availabilityStatus"}>{status}</span>
                             </div>
-                            <div className="ticketMeta">
-                              {typeof slot.availability_cnt === "number" ? `${slot.availability_cnt} available` : "Availability loaded"}
-                              {slot.note ? ` · ${slot.note}` : ""}
-                            </div>
                             {visibleTickets.length ? (
                               <div className="availabilityTickets">
-                                {visibleTickets.map((item, ticketIndex) => (
-                                  <span key={String(item.customer_type?.id ?? ticketIndex)}>
-                                    {item.customer_type?.name || "Ticket"}: {item.availability_cnt ?? "—"}
-                                  </span>
-                                ))}
+                                {visibleTickets.map((item, ticketIndex) => {
+                                  const remaining = item.availability_cnt;
+                                  const label = item.customer_type?.name || "Ticket";
+                                  return (
+                                    <span className="availabilityInventory" key={String(item.customer_type?.id ?? ticketIndex)}>
+                                      <strong>{label}</strong>
+                                      <span>{typeof remaining === "number" ? (remaining === 0 ? "Sold out" : `${remaining} left`) : "Availability loaded"}</span>
+                                    </span>
+                                  );
+                                })}
                               </div>
-                            ) : null}
+                            ) : (
+                              <div className="ticketMeta">
+                                {typeof slot.availability_cnt === "number" ? `${slot.availability_cnt} available` : "Availability loaded"}
+                              </div>
+                            )}
+                            {slot.note ? <div className="ticketMeta availabilityNote">{slot.note}</div> : null}
                           </div>
                         );
                       })}
