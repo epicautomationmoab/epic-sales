@@ -39,5 +39,24 @@ export async function POST(request: NextRequest) {
   if (!response.ok) {
     return NextResponse.json({ error: payload?.message || payload?.error || "Unable to save estimate." }, { status: response.status });
   }
+
+  if (payload?.quote_id) {
+    const recalc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/recalculate_epic_sales_quote_financials`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_quote_id: payload.quote_id }),
+      cache: "no-store",
+    });
+    const recalculated = await recalc.json().catch(() => null);
+    if (!recalc.ok) {
+      return NextResponse.json({ error: recalculated?.message || recalculated?.error || "Quote saved but totals could not be recalculated." }, { status: recalc.status });
+    }
+    return NextResponse.json({ ...payload, total_cents: recalculated?.total_cents ?? payload.total_cents });
+  }
+
   return NextResponse.json(payload);
 }
