@@ -132,6 +132,19 @@ function rentalDaysFromTicket(name: string) {
   return dayMatch ? Number(dayMatch[1]) : 1;
 }
 
+function normalizeAvailabilityName(value: string) {
+  return value.toLowerCase().replace(/2025|2026/g, "").replace(/polaris|rzr|ultimate|xp5|xp|1000/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function matchingAvailability(slot: TripWorksTimeslot, ticket: Ticket) {
+  const normalizedTicket = normalizeAvailabilityName(ticket.name);
+  return (slot.availabilities || []).find((item) => {
+    const candidate = normalizeAvailabilityName(item.customer_type?.name || "");
+    if (!candidate) return false;
+    return candidate === normalizedTicket || candidate.includes(normalizedTicket) || normalizedTicket.includes(candidate);
+  });
+}
+
 function buildExperiences(rows: SalesRateRow[]): Experience[] {
   const grouped = new Map<string, Experience>();
   for (const row of rows) {
@@ -449,7 +462,10 @@ export default function QuoteBuilder() {
         return (activity.qty[ticket.id] ?? 0) > 0 ? Math.max(maxDays, rentalDaysFromTicket(ticket.name)) : maxDays;
       }, 1);
     }
-    const premierAmount = experience?.line === "rental" && activity.premier ? 69 * rentalDays : 0;
+    const rentalVehicleCount = experience?.line === "rental"
+      ? experience.tickets.reduce((sum, ticket) => sum + (activity.qty[ticket.id] ?? 0), 0)
+      : 0;
+    const premierAmount = experience?.line === "rental" && activity.premier ? 69 * rentalDays * rentalVehicleCount : 0;
     const twBase = pricingBase + primaryTax + secondaryTax + tripSafeAmount + premierAmount;
     const twFee = twBase * 0.04;
     const total = twBase + twFee;
@@ -464,6 +480,7 @@ export default function QuoteBuilder() {
       tripSafeAmount,
       premierAmount,
       rentalDays,
+      rentalVehicleCount,
       twFee,
       total,
     };
@@ -672,7 +689,24 @@ export default function QuoteBuilder() {
                       {availabilityByActivity[activity.key].timeslots.map((slot, slotIndex) => {
                         const status = slot.experience_timeslot_status?.name || "Unknown";
                         const open = slot.experience_timeslot_status?.slug === "open" || status.toLowerCase() === "open";
-                        const visibleTickets = (slot.availabilities || []).filter((item) => item.customer_type?.is_visible !== false);
+                        const selectedTickets = experience.tickets.filter((ticket) => (activity.qty[ticket.id] ?? 0) > 0);
+                        const selectedAvailability = selectedTickets.map((ticket) => ({
+                          ticket,
+                          quantity: activity.qty[ticket.id] ?? 0,
+                          inventory: matchingAvailability(slot, ticket),
+                        }));
+                        const hasSelectedRentalTickets = experience.line === "rental" && selectedTickets.length > 0;
+                        const rentalSlotSupportsSelection = !hasSelectedRentalTickets || selectedAvailability.some((entry) => (entry.inventory?.availability_cnt ?? 0) > 0);
+                        if (hasSelectedRentalTickets && !rentalSlotSupportsSelection) return null;
+
+                        const visibleTickets = experience.line === "rental" && selectedTickets.length
+                          ? selectedAvailability.filter((entry) => entry.inventory).map((entry) => entry.inventory!)
+                          : (slot.availabilities || []).filter((item) => item.customer_type?.is_visible !== false);
+
+                        const overbookedSelection = selectedAvailability.find((entry) =>
+                          typeof entry.inventory?.availability_cnt === "number" && entry.quantity > entry.inventory.availability_cnt
+                        );
+
                         return (
                           <div className="availabilitySlot" key={String(slot.id ?? slot.start_time ?? slotIndex)}>
                             <div className="availabilitySlotTop">
@@ -687,7 +721,14 @@ export default function QuoteBuilder() {
                                   return (
                                     <span className="availabilityInventory" key={String(item.customer_type?.id ?? ticketIndex)}>
                                       <strong>{label}</strong>
-                                      <span>{typeof remaining === "number" ? (remaining === 0 ? "Sold out" : `${remaining} left`) : "Availability loaded"}</span>
+                                      <span>{(() => {
+                                        if (typeof remaining !== "number") return "Availability loaded";
+                                        const selected = selectedAvailability.find((entry) => entry.inventory === item)?.quantity || 0;
+                                        const afterQuote = remaining - selected;
+                                        if (remaining === 0) return "Sold out";
+                                        if (selected > remaining) return `${remaining} left · quote needs ${selected}`;
+                                        return selected > 0 ? `${afterQuote} left after quote` : `${remaining} left`;
+                                      })()}</span>
                                     </span>
                                   );
                                 })}
@@ -698,7 +739,8 @@ export default function QuoteBuilder() {
                               </div>
                             )}
                             {slot.note ? <div className="ticketMeta availabilityNote">{slot.note}</div> : null}
-                            {open ? (
+                            {overbookedSelection ? <div className="availabilityError">Only {overbookedSelection.inventory?.availability_cnt ?? 0} available for {overbookedSelection.ticket.name}, but this quote needs {overbookedSelection.quantity}.</div> : null}
+                            {open && !overbookedSelection ? (
                               <button
                                 className="secondary availabilityBookButton"
                                 type="button"
