@@ -445,10 +445,6 @@ export default function QuoteBuilder() {
     const privateFee = privateFeeRule ? privateFeeRule.fee_cents / 100 : 0;
     const subtotal = experience ? experience.tickets.reduce((sum, ticket) => sum + ticket.price * (activity.qty[ticket.id] ?? 0), 0) : 0;
     const pricingBase = subtotal + privateFee;
-    const primaryTaxRate = experience?.line === "rental" ? 0.0635 : 0.0735;
-    const secondaryTaxRate = experience?.line === "rental" ? 0.025 : 0;
-    const primaryTax = pricingBase * primaryTaxRate;
-    const secondaryTax = pricingBase * secondaryTaxRate;
     const tripSafeAmount = activity.tripSafe ? pricingBase * 0.09 : 0;
     let rentalDays = 1;
     if (experience?.line === "rental") {
@@ -460,6 +456,10 @@ export default function QuoteBuilder() {
       ? experience.tickets.reduce((sum, ticket) => sum + (activity.qty[ticket.id] ?? 0), 0)
       : 0;
     const premierAmount = experience?.line === "rental" && activity.premier ? 69 * rentalDays * rentalVehicleCount : 0;
+    const primaryTax = experience?.line === "rental"
+      ? (pricingBase + premierAmount) * 0.0635
+      : pricingBase * 0.0735;
+    const secondaryTax = experience?.line === "rental" ? pricingBase * 0.025 : 0;
     const twBase = pricingBase + primaryTax + secondaryTax + tripSafeAmount + premierAmount;
     const twFee = twBase * 0.04;
     const total = twBase + twFee;
