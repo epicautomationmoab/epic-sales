@@ -294,7 +294,7 @@ export default function QuoteBuilder() {
       tripsafe: input.tripSafe ? "1" : "0",
       premier: input.premier ? "1" : "0",
     });
-    const helperUrl = `/staff-booking?${params.toString()}`;
+    const helperUrl = `/quote-booking-helper?${params.toString()}`;
 
     const pictureInPicture = (window as any).documentPictureInPicture;
     if (pictureInPicture?.requestWindow) {
