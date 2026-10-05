@@ -124,6 +124,7 @@ export default function QuoteBuilder() {
     const contact = params.get("contact");
     const opportunity = params.get("opportunity");
     const reservation = params.get("reservation");
+    const quote = params.get("quote");
     if (contact) customerQuery.set("contact", contact);
     if (opportunity) customerQuery.set("opportunity", opportunity);
     if (reservation) customerQuery.set("reservation", reservation);
@@ -150,6 +151,7 @@ export default function QuoteBuilder() {
         setExperienceFees(fees);
         setBookingLinks(Object.fromEntries(links.map((link) => [link.experience_id, link.booking_url])));
         setActivities([blankActivity()]);
+        if (quote) void openQuote(quote);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load sales pricing"))
       .finally(() => setLoading(false));
@@ -296,10 +298,13 @@ export default function QuoteBuilder() {
       });
       setEditingQuoteId(result.quote_id);
       setDetailsOpen(false);
-      setSaveMessage(result.lead_created_or_attached
-        ? `Estimate saved and attached to the lead. Quote ${result.quote_id.slice(0, 8)}.`
-        : `Estimate saved as quote ${result.quote_id.slice(0, 8)}. Add email or phone later to attach it to a lead.`);
       getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
+      const customerSearch = phone.trim() || email.trim() || name.trim();
+      if (customerSearch) {
+        window.location.href = `/customers?q=${encodeURIComponent(customerSearch)}&open=1`;
+        return;
+      }
+      setSaveMessage(`Estimate saved as quote ${result.quote_id.slice(0, 8)}. Add a customer name, email, or phone to open EpicC360.`);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to save estimate.");
     } finally {
@@ -454,7 +459,8 @@ export default function QuoteBuilder() {
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
               <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
-              <button className="primary" type="button" onClick={() => setDetailsOpen(true)}>{editingQuoteId ? "Update Estimate" : "Save Estimate"}</button>
+              <button className="primary" type="button" onClick={() => setDetailsOpen(true)}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
+              {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
             </section>
           </div>
@@ -472,7 +478,7 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
-            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update Quote" : "Save Quote"}</button>
+            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
             <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button>
           </div>
         </div>
