@@ -486,6 +486,10 @@ export default function QuoteBuilder() {
       setSaveMessage("Add at least one ticket before saving the estimate.");
       return;
     }
+    if (pendingBooking && !name.trim()) {
+      setSaveMessage("Add the guest name before booking.");
+      return;
+    }
     setSaving(true);
     setSaveMessage("");
     try {
@@ -760,7 +764,7 @@ export default function QuoteBuilder() {
       </section>
 
       {detailsOpen && (
-        <div className="modalBackdrop" onMouseDown={() => setDetailsOpen(false)}>
+        <div className="modalBackdrop" onMouseDown={() => { setDetailsOpen(false); setPendingBooking(null); }}>
           <div className="modalCard" onMouseDown={(e) => e.stopPropagation()}>
             <div className="sectionHeading"><div><h2>{pendingBooking ? "Save & Book It" : editingQuoteId ? "Update Quote Details" : "Save Quote"}</h2><p className="muted compact">{pendingBooking ? "Add or confirm the guest details before handing this quote to TripWorks." : "Contact info is optional unless you want this attached to a lead."}</p></div><button className="removeLink" onClick={() => { setDetailsOpen(false); setPendingBooking(null); }}>Close</button></div>
             <div className="field"><label>Guest name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" /></div>
