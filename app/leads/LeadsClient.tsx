@@ -23,6 +23,24 @@ function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10
 function fmtShopped(v:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).replace(" at "," ");}
 function dateWindow(l:SalesLead){if(!l.activity_window_start)return"No dates yet";if(!l.activity_window_end||l.activity_window_end===l.activity_window_start)return fmtDate(l.activity_window_start);return`${fmtDate(l.activity_window_start)} – ${fmtDate(l.activity_window_end)}`;}
 function timestamp(v:string|null){if(!v)return Number.POSITIVE_INFINITY;const t=new Date(v.length===10?`${v}T12:00:00`:v).getTime();return Number.isNaN(t)?Number.POSITIVE_INFINITY:t;}
+function firstName(v:string|null|undefined){return (v||"").trim().split(/\s+/)[0]||"there";}
+function interestDescription(l:SalesLead){
+  const draft=l.drafts?.[0];
+  const parts=[draft?.option_name,draft?.experience_name].filter(Boolean) as string[];
+  let description=parts.length?Array.from(new Set(parts)).join(" "):(l.interest_label||"an Epic 4X4 experience");
+  const date=draft?.activity_date||l.activity_window_start;
+  if(date)description+=` for ${fmtDate(date)}`;
+  return description;
+}
+function introductionBody(l:SalesLead,repName:string){
+  return `Hi ${firstName(l.customer_name)},
+
+I’m ${firstName(repName)} with Epic 4X4 Adventures. I saw that you were looking at ${interestDescription(l)} and wanted to introduce myself.
+
+If I can help with your planning, I’d be happy to personally assist. Whether you have questions about the experience, choosing the right option for your group, timing, trails, or just figuring out what will work best for your trip, feel free to reply directly to me.
+
+I’m happy to help make the planning easy.`;
+}
 const repColors:Record<string,{solid:string;tint:string}> = {
   "Jennifer Johnson": {solid:"#D71920",tint:"#FFF1F2"},
   "Jenna McAllister": {solid:"#0F766E",tint:"#ECFDF5"},
@@ -38,12 +56,16 @@ const repColors:Record<string,{solid:string;tint:string}> = {
 };
 function repColor(name:string|null){return name?repColors[name]||null:null;}
 
-export default function LeadsClient({leads}:{leads:SalesLead[]}){
+export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profileName:string}){
   const[query,setQuery]=useState("");
   const[owner,setOwner]=useState("All");
   const[sortKey,setSortKey]=useState<SortKey>("shopped");
   const[sortDir,setSortDir]=useState<SortDir>("desc");
   const[selected,setSelected]=useState<SalesLead|null>(null);
+  const[introLead,setIntroLead]=useState<SalesLead|null>(null);
+  const[introSubject,setIntroSubject]=useState("Happy to help with your Moab plans");
+  const[introBody,setIntroBody]=useState("");
+  const[queuedIntroIds,setQueuedIntroIds]=useState<Set<string>>(new Set());
   const[busyId,setBusyId]=useState<string|null>(null);
   const[error,setError]=useState("");
   const claimedOwners=useMemo(()=>Array.from(new Set(leads.map(l=>l.claimed_by_name||l.assigned_rep_name).filter(Boolean) as string[])).sort(), [leads]);
@@ -67,6 +89,34 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
   function toggleSort(key:SortKey){
     if(sortKey===key)setSortDir(d=>d==="asc"?"desc":"asc");
     else{setSortKey(key);setSortDir(key==="shopped"?"desc":"asc");}
+  }
+
+  function openIntroduction(lead:SalesLead){
+    setError("");
+    setIntroLead(lead);
+    setIntroSubject("Happy to help with your Moab plans");
+    setIntroBody(introductionBody(lead,profileName));
+  }
+
+  async function queueIntroduction(){
+    if(!introLead||!introBody.trim()||!introSubject.trim())return;
+    setBusyId(introLead.id);setError("");
+    try{
+      const response=await fetch("/api/customer-communications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        channel:"email",
+        opportunity_id:introLead.id,
+        email:introLead.email,
+        phone:introLead.phone_e164,
+        customer_name:introLead.customer_name,
+        subject:introSubject.trim(),
+        message_text:introBody.trim()
+      })});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload?.error||"Unable to queue introduction email.");
+      setQueuedIntroIds(current=>new Set(current).add(introLead.id));
+      setIntroLead(null);
+    }catch(e){setError(e instanceof Error?e.message:"Unable to queue introduction email.");}
+    finally{setBusyId(null);}
   }
 
   async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
@@ -114,18 +164,28 @@ export default function LeadsClient({leads}:{leads:SalesLead[]}){
       <th><button className={styles.sortButton} onClick={()=>toggleSort("visit")}>Visit Window {sortKey==="visit"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
       <th><button className={styles.sortButton} onClick={()=>toggleSort("shopped")}>Shopped {sortKey==="shopped"?(sortDir==="asc"?"↑":"↓"):""}</button></th>
       <th>Interest</th><th>Owner</th><th>Drafts</th><th>Lead Value</th><th>Actions</th>
-    </tr></thead><tbody>{filtered.map(l=><tr key={l.id} className={repColor(l.claimed_by_name||l.assigned_rep_name)?styles.claimedRow:undefined} style={repColor(l.claimed_by_name||l.assigned_rep_name)?{backgroundColor:repColor(l.claimed_by_name||l.assigned_rep_name)!.tint,borderLeft:`4px solid ${repColor(l.claimed_by_name||l.assigned_rep_name)!.solid}`}:{}} onClick={()=>setSelected(l)}>
+    </tr></thead><tbody>{filtered.map(l=>{const leadOwner=l.claimed_by_name||l.assigned_rep_name;const canIntroduce=Boolean(l.email&&leadOwner===profileName);return <tr key={l.id} className={repColor(leadOwner)?styles.claimedRow:undefined} style={repColor(leadOwner)?{backgroundColor:repColor(leadOwner)!.tint,borderLeft:`4px solid ${repColor(leadOwner)!.solid}`}:{}} onClick={()=>setSelected(l)}>
       <td><div className={styles.mainLine}>{l.customer_name||"Unnamed lead"}{l.is_past_guest?<span className={styles.vip}>Past Guest</span>:null}</div><div className={styles.subLine}>{l.phone_e164||l.email||"No contact info"}</div></td>
       <td><div className={styles.mainLine}>{dateWindow(l)}</div></td>
       <td><div className={styles.mainLine}>{fmtShopped(l.shopping_last_activity_at)}</div></td>
       <td><div className={styles.mainLine}>{l.interest_label||l.drafts?.[0]?.experience_name||"Not specified"}</div><div className={styles.subLine}>{l.party_needs||l.drafts?.[0]?.option_name||""}</div></td>
-      <td>{l.claimed_by_name||l.assigned_rep_name?<span className={styles.ownerBadge} style={{borderColor:repColor(l.claimed_by_name||l.assigned_rep_name)?.solid,color:repColor(l.claimed_by_name||l.assigned_rep_name)?.solid}}>{l.claimed_by_name||l.assigned_rep_name}</span>:"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
+      <td>{leadOwner?<span className={styles.ownerBadge} style={{borderColor:repColor(leadOwner)?.solid,color:repColor(leadOwner)?.solid}}>{leadOwner}</span>:"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
       <td><div className={styles.rowActions} onClick={e=>e.stopPropagation()}>
-        {!l.claimed_by_name&&!l.assigned_rep_name?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
+        {!leadOwner?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
+        {canIntroduce?<button disabled={busyId===l.id||queuedIntroIds.has(l.id)} onClick={()=>openIntroduction(l)}>{queuedIntroIds.has(l.id)?"Introduction Queued":"Email Introduction"}</button>:null}
         <button disabled={busyId===l.id} onClick={()=>void action(l,"retire")}>Close</button>
         <button className={styles.lostAction} disabled={busyId===l.id} onClick={()=>void action(l,"mark_lost")}>Lost</button>
       </div></td>
-    </tr>)}</tbody></table></div>
+    </tr>})}</tbody></table></div>
+    {introLead?<div style={{position:"fixed",inset:0,background:"rgba(16,24,40,.42)",zIndex:1000,display:"grid",placeItems:"center",padding:24}} onMouseDown={e=>{if(e.currentTarget===e.target)setIntroLead(null);}}>
+      <section role="dialog" aria-modal="true" aria-label="Email introduction" style={{width:"min(720px,100%)",background:"#fff",borderRadius:16,boxShadow:"0 24px 70px rgba(0,0,0,.24)",padding:24,display:"grid",gap:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16}}><div><div style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:".08em",opacity:.55}}>Claimed Lead</div><h2 style={{margin:"4px 0 2px"}}>Email Introduction</h2><div style={{fontSize:13,opacity:.7}}>To {introLead.customer_name||introLead.email} · {introLead.email}</div></div><button type="button" onClick={()=>setIntroLead(null)} aria-label="Close" style={{border:0,background:"transparent",fontSize:28,cursor:"pointer"}}>×</button></div>
+        <label style={{display:"grid",gap:6,fontSize:12,fontWeight:800}}>Subject<input value={introSubject} onChange={e=>setIntroSubject(e.target.value)} maxLength={250} style={{border:"1px solid #d9e0e6",borderRadius:9,padding:"11px 12px",font:"inherit"}}/></label>
+        <label style={{display:"grid",gap:6,fontSize:12,fontWeight:800}}>Message<textarea value={introBody} onChange={e=>setIntroBody(e.target.value)} rows={10} maxLength={20000} style={{border:"1px solid #d9e0e6",borderRadius:9,padding:"12px",resize:"vertical",font:"inherit",lineHeight:1.5}}/></label>
+        <div style={{fontSize:12,opacity:.65}}>This does not send when the lead is claimed. Queue Email is the explicit approval to send it through EpicC360.</div>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setIntroLead(null)}>Cancel</button><button type="button" disabled={busyId===introLead.id||!introSubject.trim()||!introBody.trim()} onClick={()=>void queueIntroduction()}>{busyId===introLead.id?"Queueing…":"Queue Email"}</button></div>
+      </section>
+    </div>:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
