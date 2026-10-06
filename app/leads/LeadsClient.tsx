@@ -10,7 +10,7 @@ export type SalesLead = {
   claimed_by_name:string|null; claimed_at:string|null; activity_window_start:string|null; activity_window_end:string|null;
   shopping_last_activity_at:string|null; interest_label:string|null; party_needs:string|null; lead_capture_note:string|null;
   is_past_guest:boolean|null; prior_booking_count:number|null; tripworks_customer_code?:string|null; tripworks_is_opt_in?:boolean|null;
-  drafts:Array<{id:string;confirmation_code:string|null;experience_name:string|null;option_name:string|null;activity_date:string|null;value_cents:number|null}>;
+  drafts:Array<{id:string;confirmation_code:string|null;experience_name:string|null;option_name:string|null;activity_date:string|null;value_cents:number|null;is_current_draft?:boolean|null;converted_at?:string|null;last_trip_status?:string|null}>;
   notes:Array<{id:string;author_name:string|null;note_text:string|null;created_at:string|null;updated_at:string|null}>;
   assignments:Array<{id:string;assigned_rep_name:string|null;assigned_at:string|null;unassigned_at:string|null;assignment_source:string|null}>;
 };
@@ -32,14 +32,19 @@ function interestDescription(l:SalesLead){
   if(date)description+=` for ${fmtDate(date)}`;
   return description;
 }
+function activeDraftBookingUrl(l:SalesLead){
+  const draft=(l.drafts||[]).find(d=>d.is_current_draft!==false&&!d.converted_at&&d.last_trip_status!=="converted"&&d.confirmation_code);
+  return draft?.confirmation_code?`https://epic4x4.tripworks.com/widgets/tripBuilder?trip=${encodeURIComponent(draft.confirmation_code)}`:null;
+}
 function introductionBody(l:SalesLead,repName:string){
+  const bookingUrl=activeDraftBookingUrl(l);
   return `Hi ${firstName(l.customer_name)},
 
 I’m ${firstName(repName)} with Epic 4X4 Adventures. I saw that you were looking at ${interestDescription(l)} and wanted to introduce myself.
 
 If I can help with your planning, I’d be happy to personally assist. Whether you have questions about the experience, choosing the right option for your group, timing, trails, or just figuring out what will work best for your trip, feel free to reply directly to me.
 
-I’m happy to help make the planning easy.`;
+I’m happy to help make the planning easy.${bookingUrl?`\n\nI’ve also included a link to help you pick up where you left off if you prefer our 24/7 self-service online booking.\n\nContinue Your Booking: ${bookingUrl}`:""}`;
 }
 const repColors:Record<string,{solid:string;tint:string}> = {
   "Jennifer Johnson": {solid:"#D71920",tint:"#FFF1F2"},
