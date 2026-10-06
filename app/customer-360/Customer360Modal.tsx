@@ -14,10 +14,11 @@ type Text={id:string;at:string|null;direction:string|null;body:string|null;agent
 type Email={id:string;at:string|null;direction:string|null;subject:string|null;body:string|null;from_email:string|null;to_emails:string[]|null};
 type Note={id:string;opportunity_id:string|null;author_name:string|null;note_text:string|null;created_at:string|null};
 type CancellationAgreement={id:string;confirmation_code:string|null;status:string|null;sent_at:string|null;opened_at:string|null;accepted_at:string|null;created_at:string|null;policy_title:string|null;customer_name:string|null;signer_name:string|null};
-type Customer360={identity:Identity;reservations:Reservation[];opportunities:Opportunity[];drafts:Draft[];quotes:Quote[];calls:Call[];texts:Text[];emails:Email[];notes:Note[];cancellation_agreements?:CancellationAgreement[]};
+type SalesCallWorkflow={id:string;opportunity_id:string;rep_name:string;objection_code:string|null;objection_detail:string|null;resolution_note:string|null;outcome_code:string|null;next_action:string|null;follow_up_at:string|null;created_at:string|null;updated_at:string|null};
+type Customer360={identity:Identity;reservations:Reservation[];opportunities:Opportunity[];drafts:Draft[];quotes:Quote[];calls:Call[];texts:Text[];emails:Email[];notes:Note[];cancellation_agreements?:CancellationAgreement[];sales_call_workflows?:SalesCallWorkflow[]};
 
 type Props={open:boolean;onClose:()=>void;contactId?:string|null;opportunityId?:string|null;reservationId?:string|null;reservationConfirmation?:string|null;phone?:string|null;email?:string|null};
-type EventItem={id:string;kind:"call"|"text"|"email"|"reservation"|"lead"|"draft"|"quote"|"note"|"agreement";at:string|null;title:string;meta?:string|null;body?:string|null;href?:string|null;hrefLabel?:string|null;secondaryHref?:string|null;secondaryHrefLabel?:string|null;transcript?:string|null};
+type EventItem={id:string;kind:"call"|"sales_call"|"text"|"email"|"reservation"|"lead"|"draft"|"quote"|"note"|"agreement";at:string|null;title:string;meta?:string|null;body?:string|null;href?:string|null;hrefLabel?:string|null;secondaryHref?:string|null;secondaryHrefLabel?:string|null;transcript?:string|null};
 type LifecycleFilter="all"|"call"|"text"|"email"|"reservation";
 
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
@@ -26,6 +27,8 @@ function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10
 function durationLabel(s:number|null){if(s==null)return"";const m=Math.floor(s/60),r=s%60;return m?`${m}m ${r}s`:`${r}s`;}
 function twCustomerUrl(code:string|null){return code?`https://epic4x4.tripworks.com/customer/${encodeURIComponent(code)}/trips`:null;}
 function twReservationUrl(code:string|null){return code?`https://epic4x4.tripworks.com/trip/${encodeURIComponent(code)}/bookings`:null;}
+const objectionLabels:Record<string,string>={price_value:"Price / Value",activity_choice:"Which Activity?",vehicle_choice:"Which Vehicle?",difficulty_safety:"Difficulty / Safety",dates_timing:"Dates / Timing",group_deciding:"Group Still Deciding",competitor:"Comparing Companies",trip_not_final:"Trip Not Finalized",itinerary_help:"Needs Itinerary Help",researching:"Just Researching",other:"Something Else"};
+const outcomeLabels:Record<string,string>={booked:"Booked on the call",quote:"Sending quote",activity_info:"Sending activity information",group_discussion:"Customer will discuss with group",follow_up:"Follow up on a specific date",researching:"Not ready / researching",lost:"Lost",do_not_contact:"Do not contact"};
 
 export default function Customer360Modal(props:Props){
   const{open,onClose,contactId,opportunityId,reservationId,reservationConfirmation,phone,email}=props;
@@ -37,6 +40,23 @@ export default function Customer360Modal(props:Props){
 
   const timeline=useMemo<EventItem[]>(()=>{if(!data)return[];const items:EventItem[]=[];
     for(const c of data.calls||[]){const isPbxInbound=c.direction==="inbound"&&Boolean(c.pbx_outcome);const title=c.direction==="outbound"?"Outbound call":c.answered===false?(c.voicemail?"Missed call — Voicemail":"Missed call"):"Inbound call — Answered";const answerLabel=c.pbx_answered_agent||c.pbx_answered_extension;const pbxMeta=isPbxInbound?[c.answered?(answerLabel?"Answered by "+answerLabel:"Answered"):"No human answer",c.pbx_ring_attempts!=null?c.pbx_ring_attempts+" ring attempt"+(c.pbx_ring_attempts===1?"":"s"):null,c.pbx_queue_wait_seconds!=null?c.pbx_queue_wait_seconds+"s queue wait":null]:[];items.push({id:`c-${c.id}`,kind:"call",at:c.at,title,meta:[...pbxMeta,c.lead_score!=null?`CallRail score ${c.lead_score}`:null,durationLabel(c.duration_seconds),c.source_name,c.campaign].filter(Boolean).join(" · "),body:c.summary||c.lead_explanation||null,href:c.recording_url||undefined,hrefLabel:"Listen to call",transcript:c.transcription});}
+    for(const w of data.sales_call_workflows||[]){
+      const details=[
+        w.objection_code?`Objection: ${objectionLabels[w.objection_code]||w.objection_code}`:null,
+        w.objection_detail?`Guest said: ${w.objection_detail}`:null,
+        w.resolution_note?`How we addressed it: ${w.resolution_note}`:null,
+        w.next_action?`Next step: ${w.next_action}`:null,
+        w.follow_up_at?`Follow-up: ${fmtDateTime(w.follow_up_at)}`:null,
+      ].filter(Boolean).join("\n");
+      items.push({
+        id:`sc-${w.id}`,
+        kind:"sales_call",
+        at:w.created_at||w.updated_at,
+        title:`Sales call notes — ${w.rep_name}`,
+        meta:w.outcome_code?(outcomeLabels[w.outcome_code]||w.outcome_code):null,
+        body:details||null,
+      });
+    }
     for(const t of data.texts||[])items.push({id:`t-${t.id}`,kind:"text",at:t.at,title:t.direction==="outbound"?"Text sent":"Text received",meta:[t.agent_name,t.status].filter(Boolean).join(" · "),body:t.body});
     for(const e of data.emails||[])items.push({id:`e-${e.id}`,kind:"email",at:e.at,title:e.direction==="outbound"?`Email sent${e.subject?`: ${e.subject}`:""}`:`Email received${e.subject?`: ${e.subject}`:""}`,meta:e.direction==="inbound"?(e.from_email?`From ${e.from_email}`:null):(e.to_emails?.length?`To ${e.to_emails.join(", ")}`:null),body:e.body});
     for(const r of data.reservations||[])items.push({id:`r-${r.id}`,kind:"reservation",at:r.created_at||r.updated_at||r.start_time,title:`${r.is_cancelled?"Cancelled reservation":"Reservation"}: ${r.experience_name||r.confirmation_code||"TripWorks booking"}`,meta:[r.business_line,r.trip_status,r.total_amount_cents!=null?money.format(r.total_amount_cents/100):null].filter(Boolean).join(" · "),body:r.start_time?`${fmtDateTime(r.start_time)}${r.people_count?` · ${r.people_count} guests`:""}`:null,href:r.tripworks_booking_url||twReservationUrl(r.confirmation_code)||undefined,hrefLabel:r.confirmation_code?`TripWorks ${r.confirmation_code}`:"Open reservation in TripWorks",secondaryHref:r.mpwr_reservation_url||undefined,secondaryHrefLabel:r.mpwr_confirmation_number?`MPWR ${r.mpwr_confirmation_number}`:"Open MPWR"});
@@ -51,7 +71,7 @@ export default function Customer360Modal(props:Props){
     return items.sort((a,b)=>(b.at?new Date(b.at).getTime():0)-(a.at?new Date(a.at).getTime():0));
   },[data]);
 
-  const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):item.kind===filter),[timeline,filter]);
+  const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):filter==="call"?(item.kind==="call"||item.kind==="sales_call"):item.kind===filter),[timeline,filter]);
 
   async function sendCommunication(){
     if(!data||!composeChannel||!composeBody.trim())return;
@@ -117,7 +137,7 @@ export default function Customer360Modal(props:Props){
   }
   const lifetimeSpend=(data?.reservations||[]).reduce((sum,r)=>sum+(r.total_amount_cents||0),0);
   const communications=(data?.calls?.length||0)+(data?.texts?.length||0)+(data?.emails?.length||0);
-  const hasCalls=(data?.calls?.length||0)>0;
+  const hasCalls=((data?.calls?.length||0)+(data?.sales_call_workflows?.length||0))>0;
   const hasTexts=(data?.texts?.length||0)>0;
   const hasEmails=(data?.emails?.length||0)>0;
   const badges:string[]=[];
