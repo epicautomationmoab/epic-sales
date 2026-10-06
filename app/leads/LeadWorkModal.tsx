@@ -29,6 +29,14 @@ const objectionOptions:Array<{code:ObjectionCode;label:string;prompt:string;ques
   {code:"other",label:"Something Else",prompt:"Listen first, then summarize the concern back to them before trying to solve it.",questions:["Tell me a little more about what is holding you back.","What would need to be true for this to feel like the right choice?"]},
 ];
 
+const activityEmails=[
+  {key:"hells_revenge",name:"Hell’s Revenge",overview:"Hell’s Revenge is one of Moab’s signature slickrock experiences. It combines dramatic scenery with the kind of terrain that makes Moab famous, while your Epic guide helps the group understand what is ahead and how to approach it.",guidance:"It is a great choice for guests who want an unmistakably Moab experience and more excitement than a simple scenic drive. If you tell me a little about your group and comfort level, I can also help you decide which Hell’s Revenge option is the best fit."},
+  {key:"poison_spider",name:"Poison Spider Mesa",overview:"Poison Spider Mesa combines classic Moab scenery with a longer, more varied trail experience. It is a strong choice for guests who want more time on trail and a mix of scenery, slickrock, and off-road terrain.",guidance:"If your group is deciding between Poison Spider and another Epic experience, I can help compare the time commitment, driving experience, and overall feel so you can choose confidently."},
+  {key:"works_sampler",name:"The Works – Moab Sampler",overview:"The Works is designed for guests who want a broader taste of what makes off-roading in Moab special. It gives you variety in a single experience rather than focusing on only one trail personality.",guidance:"It is especially useful when your group wants a well-rounded Moab adventure or when you are not sure which single trail experience best matches everyone. I’m happy to talk through the differences with you."},
+  {key:"rental_rzr",name:"Polaris RZR Rental",overview:"An Epic RZR rental gives you the flexibility to explore Moab on your own schedule in a premium current-model vehicle, with Epic’s local team available to help you plan the right riding area and make the most of your time.",guidance:"If you tell me how many people are riding, how long you want to be out, and the type of terrain you want to experience, I can help match the vehicle and rental duration to your plans."},
+  {key:"xpedition",name:"Polaris Xpedition ADV 5 Northstar",overview:"The Xpedition is a strong choice for groups that want a more enclosed, comfortable way to explore while still having serious off-road capability. It is especially appealing when comfort and weather protection matter as much as trail access.",guidance:"I can help you compare the Xpedition with a RZR based on your group size, the season, the type of driving you want, and how much time you plan to spend on trail."},
+] as const;
+
 const outcomes=[
   ["booked","Booked on the call"],
   ["quote","Sending quote"],
@@ -52,10 +60,32 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const[followUp,setFollowUp]=useState("");
   const[saving,setSaving]=useState(false);
   const[status,setStatus]=useState("");
+  const[activityComposerOpen,setActivityComposerOpen]=useState(false);
+  const[activityKey,setActivityKey]=useState<(typeof activityEmails)[number]["key"]>("hells_revenge");
+  const[activityNote,setActivityNote]=useState("");
+  const[sendingActivity,setSendingActivity]=useState(false);
   const selected=useMemo(()=>objectionOptions.find(o=>o.code===objection)||null,[objection]);
   const draft=lead.drafts?.[0];
   const interest=lead.interest_label||draft?.experience_name||"Not specified";
   const phoneHref=lead.phone_e164?`tel:${lead.phone_e164}`:null;
+  const selectedActivity=activityEmails.find(a=>a.key===activityKey)||activityEmails[0];
+
+  async function sendActivityEmail(){
+    setSendingActivity(true);setStatus("");
+    try{
+      const r=await fetch("/api/sales-activity-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        opportunity_id:lead.id,
+        activity_key:activityKey,
+        personal_message:activityNote.trim()
+      })});
+      const p=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(p?.error||"Unable to send activity information.");
+      setStatus(`${selectedActivity.name} information sent.`);
+      setActivityComposerOpen(false);
+      setActivityNote("");
+    }catch(e){setStatus(e instanceof Error?e.message:"Unable to send activity information.");}
+    finally{setSendingActivity(false);}
+  }
 
   async function save(){
     if(!objection||!outcome){setStatus("Choose the main objection and the call outcome first.");return;}
@@ -135,11 +165,33 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
           <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
             <button type="button" onClick={onOpenIntroduction}>Preview Introduction</button>
             <button type="button" onClick={onOpenCustomer360}>Open Customer 360</button>
-            <span style={{padding:"8px 10px",borderRadius:8,background:"#f6f3ee",fontSize:13,fontWeight:800}}>Activity Information templates coming next</span>
+            <button type="button" disabled={!lead.email} onClick={()=>setActivityComposerOpen(true)} style={{background:"#c6492d",color:"#fff",border:"1px solid #c6492d",borderRadius:8,padding:"8px 12px",fontWeight:900}}>Send Activity Information</button>
           </div>
         </section>
 
-        {status?<div style={{padding:"11px 13px",borderRadius:10,background:status.includes("saved")?"#edf8f1":"#fff4e8",fontWeight:800}}>{status}</div>:null}
+        {activityComposerOpen?<section style={{background:"#fff",border:"2px solid #c6492d",borderRadius:14,padding:20,display:"grid",gap:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>ACTIVITY INFORMATION EMAIL</div><h3 style={{margin:"4px 0"}}>Preview before sending</h3><div style={{fontSize:13,color:"#6b7280"}}>Nothing sends until you click Send Email.</div></div><button type="button" onClick={()=>setActivityComposerOpen(false)} aria-label="Close activity email">×</button></div>
+          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>setActivityKey(e.target.value as (typeof activityEmails)[number]["key"])} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
+          <div style={{background:"#eeeae3",borderRadius:14,padding:14}}>
+            <div style={{background:"#171717",color:"#fff",textAlign:"center",padding:16,fontWeight:900,borderRadius:"10px 10px 0 0"}}>EPIC 4X4 ADVENTURES</div>
+            <div style={{height:4,background:"#c6492d"}}/>
+            <div style={{background:"#fff",padding:24,borderRadius:"0 0 10px 10px",lineHeight:1.6}}>
+              <div style={{fontSize:12,fontWeight:900,letterSpacing:".1em",color:"#b9432b"}}>A LITTLE MORE INFORMATION</div>
+              <h2 style={{margin:"5px 0 14px"}}>About {selectedActivity.name}</h2>
+              <p>Hi {lead.customer_name?lead.customer_name.split(" ")[0]:"there"},</p>
+              <p>I thought I’d send a little more information about <strong>{selectedActivity.name}</strong> since it’s one of the options you’ve been considering.</p>
+              <p>{selectedActivity.overview}</p>
+              <p>{selectedActivity.guidance}</p>
+              {activityNote.trim()?<p>{activityNote.trim()}</p>:null}
+              <div style={{display:"inline-block",background:"#bf452d",color:"#fff",fontWeight:900,borderRadius:9,padding:"11px 16px"}}>Continue Your Booking</div>
+              <div style={{marginTop:18,background:"#f6f3ee",borderRadius:10,padding:14,fontSize:14}}>Reply to this email or call 435-220-2700 and ask for {profileName.split(" ")[0]}. The email will include the rep’s current office hours and an unsubscribe link.</div>
+            </div>
+          </div>
+          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Personal Note <span style={{fontWeight:500,opacity:.6}}>(optional)</span><textarea rows={3} value={activityNote} onChange={e=>setActivityNote(e.target.value)} maxLength={4000} placeholder="Add anything specific from your conversation…" style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit",resize:"vertical"}}/></label>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
+        </section>:null}
+
+        {status?<div style={{padding:"11px 13px",borderRadius:10,background:status.includes("saved")||status.includes("sent")?"#edf8f1":"#fff4e8",fontWeight:800}}>{status}</div>:null}
         <div style={{display:"flex",justifyContent:"flex-end",gap:9,paddingBottom:2}}><button type="button" onClick={onClose}>Close</button><button type="button" disabled={saving} onClick={()=>void save()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"11px 16px",fontWeight:900}}>{saving?"Saving…":"Save Call"}</button></div>
       </div>
     </section>
