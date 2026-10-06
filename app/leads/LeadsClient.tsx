@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
+import LeadWorkModal from "./LeadWorkModal";
 import styles from "./Leads.module.css";
 
 export type SalesLead = {
@@ -65,6 +66,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
   const[sortKey,setSortKey]=useState<SortKey>("shopped");
   const[sortDir,setSortDir]=useState<SortDir>("desc");
   const[selected,setSelected]=useState<SalesLead|null>(null);
+  const[workLead,setWorkLead]=useState<SalesLead|null>(null);
   const[introLead,setIntroLead]=useState<SalesLead|null>(null);
   const[introPersonalNote,setIntroPersonalNote]=useState("");
   const[queuedIntroIds,setQueuedIntroIds]=useState<Set<string>>(new Set());
@@ -168,7 +170,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       <td>{leadOwner?<span className={styles.ownerBadge} style={{borderColor:repColor(leadOwner)?.solid,color:repColor(leadOwner)?.solid}}>{leadOwner}</span>:"Unclaimed"}</td><td>{l.draft_count||0}</td><td>{l.lead_value_cents!=null?money.format(l.lead_value_cents/100):"—"}</td>
       <td><div className={styles.rowActions} onClick={e=>e.stopPropagation()}>
         {!leadOwner?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
-        {canIntroduce?<button disabled={busyId===l.id||queuedIntroIds.has(l.id)} onClick={()=>openIntroduction(l)}>{queuedIntroIds.has(l.id)?"Introduction Queued":"Email Introduction"}</button>:null}
+        {canIntroduce?<><button disabled={busyId===l.id} onClick={()=>setWorkLead(l)}>Work Lead</button><button disabled={busyId===l.id||queuedIntroIds.has(l.id)} onClick={()=>openIntroduction(l)}>{queuedIntroIds.has(l.id)?"Introduction Queued":"Email Introduction"}</button></>:null}
         <button disabled={busyId===l.id} onClick={()=>void action(l,"retire")}>Close</button>
         <button className={styles.lostAction} disabled={busyId===l.id} onClick={()=>void action(l,"mark_lost")}>Lost</button>
       </div></td>
@@ -204,6 +206,13 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
         <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setIntroLead(null)}>Cancel</button><button type="button" disabled={busyId===introLead.id} onClick={()=>void queueIntroduction()}>{busyId===introLead.id?"Sending…":"Queue Email"}</button></div>
       </section>
     </div>:null}
+    {workLead?<LeadWorkModal
+      lead={workLead}
+      profileName={profileName}
+      onClose={()=>setWorkLead(null)}
+      onOpenIntroduction={()=>{const lead=workLead;setWorkLead(null);if(lead)openIntroduction(lead);}}
+      onOpenCustomer360={()=>{const lead=workLead;setWorkLead(null);if(lead)setSelected(lead);}}
+    />:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
