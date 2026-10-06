@@ -50,7 +50,7 @@ export default async function LeadsPage() {
       <section className={styles.main}>
         <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>Abandoned Carts</h1></div><a className={styles.quoteButton} href="/quote">+ Build Quote</a></header>
         <section className={styles.kpis}><div className={`${styles.kpi} ${styles.kpiPrimary}`}><span>Abandoned Cart Value</span><strong>${(openValue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div><div className={styles.kpi}><span>Abandoned Carts</span><strong>{leads.length}</strong></div><div className={styles.kpi}><span>Claimed</span><strong>{claimed}</strong></div><div className={styles.kpi}><span>Unclaimed</span><strong>{unclaimed}</strong></div></section>
-        {error ? <div className={styles.error}>{error}</div> : <LeadsClient leads={leads} />}
+        {error ? <div className={styles.error}>{error}</div> : <LeadsClient leads={leads} profileName={profile.display_name} />}
       </section>
     </main>
   );
