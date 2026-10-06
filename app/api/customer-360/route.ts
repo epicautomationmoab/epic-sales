@@ -168,6 +168,22 @@ export async function GET(request: NextRequest) {
       cancellationEvents=Array.isArray(cancellationRows)?cancellationRows:[];
     }
 
+    const opportunityIds = (customer?.opportunities || []).map((o:any)=>String(o.id||"").trim()).filter(Boolean);
+    let salesCallWorkflows:any[] = [];
+    if (opportunityIds.length) {
+      const headers={apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`};
+      const workflowParams=new URLSearchParams({
+        opportunity_id:`in.(${opportunityIds.join(",")})`,
+        select:"id,opportunity_id,rep_name,objection_code,objection_detail,resolution_note,outcome_code,next_action,follow_up_at,created_at,updated_at",
+        order:"created_at.desc",
+        limit:"25",
+      });
+      const workflowResponse=await fetch(`${SUPABASE_URL}/rest/v1/sales_lead_call_workflows?${workflowParams.toString()}`,{headers,cache:"no-store"});
+      if(workflowResponse.ok){
+        salesCallWorkflows=await workflowResponse.json().catch(()=>[]);
+      }
+    }
+
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -181,6 +197,7 @@ export async function GET(request: NextRequest) {
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
+      sales_call_workflows:salesCallWorkflows,
     } : customer;
 
     return NextResponse.json({ ok: true, customer: enriched });
