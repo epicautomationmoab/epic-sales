@@ -145,6 +145,22 @@ function matchingAvailability(slot: TripWorksTimeslot, ticket: Ticket) {
   });
 }
 
+function isGatewaySharedVehicleExperience(experience: Experience) {
+  return experience.name.toLowerCase().includes("gateway to hell's revenge and fins n' things");
+}
+
+function isGatewayVehicleTicket(ticket: Ticket) {
+  const value = ticket.name.toLowerCase();
+  return value.includes("vehicle") || value.includes("rzr 1000 for 1 - 2 people") || value.includes("rzr 1000 for 3 - 4 people");
+}
+
+function gatewaySelectedVehicleCount(activity: QuoteActivity, experience: Experience) {
+  return experience.tickets.reduce((total, ticket) => {
+    if (!isGatewayVehicleTicket(ticket)) return total;
+    return total + (activity.qty[ticket.id] ?? 0);
+  }, 0);
+}
+
 function buildExperiences(rows: SalesRateRow[]): Experience[] {
   const grouped = new Map<string, Experience>();
   for (const row of rows) {
@@ -697,9 +713,23 @@ export default function QuoteBuilder() {
                           ? selectedAvailability.filter((entry) => entry.inventory).map((entry) => entry.inventory!)
                           : (slot.availabilities || []).filter((item) => item.customer_type?.is_visible !== false);
 
-                        const overbookedSelection = selectedAvailability.find((entry) =>
-                          typeof entry.inventory?.availability_cnt === "number" && entry.quantity > entry.inventory.availability_cnt
-                        );
+                        const gatewaySharedPool = isGatewaySharedVehicleExperience(experience);
+                        const gatewaySelectedVehicles = gatewaySharedPool ? gatewaySelectedVehicleCount(activity, experience) : 0;
+                        const gatewayVehicleInventories = gatewaySharedPool
+                          ? experience.tickets
+                              .filter(isGatewayVehicleTicket)
+                              .map((ticket) => matchingAvailability(slot, ticket))
+                              .filter((item): item is TripWorksAvailabilityTicket => Boolean(item && typeof item.availability_cnt === "number"))
+                          : [];
+                        const gatewaySharedRemaining = gatewayVehicleInventories.length
+                          ? Math.min(...gatewayVehicleInventories.map((item) => item.availability_cnt as number))
+                          : null;
+
+                        const overbookedSelection = gatewaySharedPool && typeof gatewaySharedRemaining === "number" && gatewaySelectedVehicles > gatewaySharedRemaining
+                          ? selectedAvailability.find((entry) => isGatewayVehicleTicket(entry.ticket))
+                          : selectedAvailability.find((entry) =>
+                              typeof entry.inventory?.availability_cnt === "number" && entry.quantity > entry.inventory.availability_cnt
+                            );
 
                         return (
                           <div className="availabilitySlot" key={String(slot.id ?? slot.start_time ?? slotIndex)}>
@@ -717,11 +747,19 @@ export default function QuoteBuilder() {
                                       <strong>{label}</strong>
                                       <span>{(() => {
                                         if (typeof remaining !== "number") return "Availability loaded";
-                                        const selected = selectedAvailability.find((entry) => entry.inventory === item)?.quantity || 0;
-                                        const afterQuote = remaining - selected;
-                                        if (remaining === 0) return "Sold out";
-                                        if (selected > remaining) return `${remaining} left · quote needs ${selected}`;
-                                        return selected > 0 ? `${afterQuote} left after quote` : `${remaining} left`;
+                                        const selectedEntry = selectedAvailability.find((entry) => entry.inventory === item);
+                                        const selected = selectedEntry?.quantity || 0;
+                                        const isGatewayVehicleInventory = gatewaySharedPool && Boolean(
+                                          selectedEntry?.ticket && isGatewayVehicleTicket(selectedEntry.ticket)
+                                        );
+                                        const selectedForPool = isGatewayVehicleInventory ? gatewaySelectedVehicles : selected;
+                                        const poolRemaining = isGatewayVehicleInventory && typeof gatewaySharedRemaining === "number"
+                                          ? gatewaySharedRemaining
+                                          : remaining;
+                                        const afterQuote = poolRemaining - selectedForPool;
+                                        if (poolRemaining === 0) return "Sold out";
+                                        if (selectedForPool > poolRemaining) return `${poolRemaining} left · quote needs ${selectedForPool}`;
+                                        return selectedForPool > 0 ? `${afterQuote} left after quote` : `${poolRemaining} left`;
                                       })()}</span>
                                     </span>
                                   );
@@ -733,7 +771,7 @@ export default function QuoteBuilder() {
                               </div>
                             )}
                             {slot.note ? <div className="ticketMeta availabilityNote">{slot.note}</div> : null}
-                            {overbookedSelection ? <div className="availabilityError">Only {overbookedSelection.inventory?.availability_cnt ?? 0} available for {overbookedSelection.ticket.name}, but this quote needs {overbookedSelection.quantity}.</div> : null}
+                            {overbookedSelection ? <div className="availabilityError">{gatewaySharedPool && typeof gatewaySharedRemaining === "number" ? `Only ${gatewaySharedRemaining} total Gateway vehicles are available for this departure, but this quote needs ${gatewaySelectedVehicles}.` : `Only ${overbookedSelection.inventory?.availability_cnt ?? 0} available for ${overbookedSelection.ticket.name}, but this quote needs ${overbookedSelection.quantity}.`}</div> : null}
                             {open && !overbookedSelection ? (
                               <button
                                 className="secondary availabilityBookButton"
