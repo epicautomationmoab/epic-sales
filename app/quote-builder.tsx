@@ -749,9 +749,9 @@ export default function QuoteBuilder() {
                                         if (typeof remaining !== "number") return "Availability loaded";
                                         const selectedEntry = selectedAvailability.find((entry) => entry.inventory === item);
                                         const selected = selectedEntry?.quantity || 0;
-                                        const isGatewayVehicleInventory = gatewaySharedPool && Boolean(
-                                          selectedEntry?.ticket && isGatewayVehicleTicket(selectedEntry.ticket)
-                                        );
+                                        const isGatewayVehicleInventory = gatewaySharedPool && experience.tickets
+                                          .filter(isGatewayVehicleTicket)
+                                          .some((ticket) => matchingAvailability(slot, ticket) === item);
                                         const selectedForPool = isGatewayVehicleInventory ? gatewaySelectedVehicles : selected;
                                         const poolRemaining = isGatewayVehicleInventory && typeof gatewaySharedRemaining === "number"
                                           ? gatewaySharedRemaining
