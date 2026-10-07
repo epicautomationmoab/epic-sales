@@ -394,6 +394,16 @@ export default function QuoteBuilder() {
   }
 
   async function checkAvailability(activityKey: string, experienceId: string) {
+    const experience = experiences.find((item) => item.id === experienceId);
+    const activity = activities.find((item) => item.key === activityKey);
+    if (experience?.line === "rental" && (!activity || !Object.values(activity.qty).some((quantity) => quantity > 0))) {
+      setAvailabilityByActivity((current) => ({
+        ...current,
+        [activityKey]: { date: availabilityDates[activityKey] || visitStart, loading: false, error: "Choose the rental duration and quantity first.", timeslots: [] },
+      }));
+      return;
+    }
+
     const date = availabilityDates[activityKey] || visitStart;
     if (!date) {
       setAvailabilityByActivity((current) => ({
@@ -697,6 +707,12 @@ export default function QuoteBuilder() {
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
                   <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                  {experience?.line === "rental" ? experience.tickets.map((ticket) => (
+                    <div className="ticketRow" key={ticket.id}>
+                      <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
+                      <div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div>
+                    </div>
+                  )) : null}
                   {experience ? (
                     <div className="availabilityCheck">
                       <div className="field availabilityDateField">
@@ -711,7 +727,7 @@ export default function QuoteBuilder() {
                         className="secondary availabilityButton"
                         type="button"
                         onClick={() => checkAvailability(activity.key, experience.id)}
-                        disabled={availabilityByActivity[activity.key]?.loading}
+                        disabled={availabilityByActivity[activity.key]?.loading || (experience.line === "rental" && !Object.values(activity.qty).some((quantity) => quantity > 0))}
                       >
                         {availabilityByActivity[activity.key]?.loading ? "Checking..." : "Check Availability"}
                       </button>
@@ -732,8 +748,12 @@ export default function QuoteBuilder() {
                           inventory: matchingAvailability(slot, ticket),
                         }));
                         const hasSelectedRentalTickets = experience.line === "rental" && selectedTickets.length > 0;
-                        const rentalSlotSupportsSelection = !hasSelectedRentalTickets || selectedAvailability.some((entry) => (entry.inventory?.availability_cnt ?? 0) > 0);
-                        if (hasSelectedRentalTickets && !rentalSlotSupportsSelection) return null;
+                        const rentalSlotSupportsSelection = !hasSelectedRentalTickets || selectedAvailability.every((entry) =>
+                          Boolean(entry.inventory) &&
+                          typeof entry.inventory?.availability_cnt === "number" &&
+                          entry.inventory.availability_cnt >= entry.quantity
+                        );
+                        if (experience.line === "rental" && (!open || !rentalSlotSupportsSelection)) return null;
 
                         const visibleTickets = experience.line === "rental" && selectedTickets.length
                           ? selectedAvailability.filter((entry) => entry.inventory).map((entry) => entry.inventory!)
@@ -818,7 +838,7 @@ export default function QuoteBuilder() {
                       })}
                     </div>
                   ) : null}
-                  {experience ? experience.tickets.map((ticket) => (
+                  {experience?.line === "tour" ? experience.tickets.map((ticket) => (
                     <div className="ticketRow" key={ticket.id}>
                       <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
                       <div className="qty"><button onClick={() => changeQty(activity.key, ticket.id, -1)}>-</button><span>{activity.qty[ticket.id] ?? 0}</span><button onClick={() => changeQty(activity.key, ticket.id, 1)}>+</button></div>
