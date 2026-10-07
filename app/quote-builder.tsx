@@ -367,6 +367,32 @@ export default function QuoteBuilder() {
     setDetailsOpen(true);
   }
 
+  function beginQuoteBookingFromDetails() {
+    const bookable = calculatedActivities.filter((item) =>
+      item.experience && Object.values(item.activity.qty).some((quantity) => quantity > 0)
+    );
+    if (bookable.length !== 1) {
+      setSaveMessage(bookable.length > 1
+        ? "This quote has multiple activities. Use Book It on the availability card for the activity you want to book first."
+        : "Add at least one ticket before booking.");
+      return;
+    }
+    const item = bookable[0];
+    const availability = availabilityByActivity[item.activity.key];
+    const openSlots = availability?.timeslots.filter((slot) => {
+      const status = slot.experience_timeslot_status?.name || "";
+      return slot.experience_timeslot_status?.slug === "open" || status.toLowerCase() === "open";
+    }) || [];
+    const onlyOpenSlot = openSlots.length === 1 ? openSlots[0] : null;
+    setPendingBooking({
+      experienceId: item.experience!.id,
+      experienceName: item.experience!.name,
+      date: availability?.date || availabilityDates[item.activity.key] || visitStart,
+      time: onlyOpenSlot ? (onlyOpenSlot.time_label || onlyOpenSlot.label || onlyOpenSlot.full_label || onlyOpenSlot.start_time || "") : "",
+      total: item.total,
+    });
+  }
+
   async function checkAvailability(activityKey: string, experienceId: string) {
     const date = availabilityDates[activityKey] || visitStart;
     if (!date) {
@@ -849,6 +875,7 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
             <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={beginQuoteBookingFromDetails} disabled={saving}>Book It</button> : null}
             {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
           </div>
         </div>
