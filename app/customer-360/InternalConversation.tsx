@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-type Note={id:string;note_text:string;author_name:string|null;created_at:string;mentions?:Array<{id:string;display_name:string}>};
+type Note={id:string;note_text:string;author_name:string|null;created_at:string;mentions?:Array<{id:string;display_name:string;response_status?:string|null;responded_at?:string|null}>};
 type Member={id:string;display_name?:string|null;name?:string|null;full_name?:string|null};
 export default function InternalConversation({opportunityId}:{opportunityId:string}){
  const threadKey="opp:"+opportunityId;
@@ -20,7 +20,7 @@ export default function InternalConversation({opportunityId}:{opportunityId:stri
   <div><strong>Internal Team Conversation</strong><div style={{fontSize:11,color:"#627080"}}>Private to Epic employees · shared with Inbox</div></div>
   <div style={{display:"grid",gap:8,maxHeight:270,overflowY:"auto"}}>{notes.length?notes.map(n=><div key={n.id} style={{padding:"9px 10px",borderRadius:9,background:"#f5f7fa",fontSize:12}}>
    <div style={{display:"flex",justifyContent:"space-between",gap:7}}><strong>{n.author_name||"Epic teammate"}</strong><small>{new Date(n.created_at).toLocaleString()}</small></div>
-   <div style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginTop:5}}>{n.note_text}</div>
+   <div style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginTop:5}}>{n.note_text}</div>{(n.mentions||[]).map(m=><div key={m.id} style={{fontSize:11,color:"#626f7d",marginTop:5}}>@{m.display_name}: {m.response_status==="acknowledged"?"Acknowledged":m.response_status==="dismissed"?"Dismissed":m.response_status==="legacy_read"?"Read":m.response_status?"Read":"Awaiting acknowledgment"}{m.responded_at?" · "+new Date(m.responded_at).toLocaleString():""}</div>)}
   </div>):<span style={{fontSize:12,color:"#627080"}}>No internal messages yet.</span>}</div>
   <textarea aria-label="Internal team message" rows={3} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Reply or type @ to tag a teammate…" style={{width:"100%",boxSizing:"border-box",border:"1px solid #cbd5df",borderRadius:9,padding:10,font:"inherit",fontSize:13}}/>
   {candidates.length?<div role="listbox" style={{display:"grid",border:"1px solid #dbe2ea",borderRadius:9,padding:4}}>{candidates.map(m=><button type="button" key={m.id} onClick={()=>tag(m)} style={{border:0,background:"white",textAlign:"left",padding:7,cursor:"pointer"}}>@{m.display_name||m.full_name||m.name}</button>)}</div>:null}
