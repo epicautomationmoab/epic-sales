@@ -184,6 +184,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Inbox team-thread notes belong to the customer lifecycle, even after a sale closes the Inbox thread.
+    let teamThreadNotes:any[]=[];
+    if(opportunityIds.length){
+      const results=await Promise.all(opportunityIds.map(id=>rpcNamed(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:`opp:${id}`}).catch(()=>[])));
+      teamThreadNotes=results.flatMap((rows:any)=>Array.isArray(rows)?rows:[]);
+    }
+
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -198,6 +205,7 @@ export async function GET(request: NextRequest) {
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
+      team_thread_notes:teamThreadNotes,
     } : customer;
 
     return NextResponse.json({ ok: true, customer: enriched });
