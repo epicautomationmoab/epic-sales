@@ -12,9 +12,9 @@ export default function InternalConversation({opportunityId}:{opportunityId:stri
  const [status,setStatus]=useState("");
  useEffect(()=>{let live=true;async function load(){try{const r=await fetch("/api/inbox?thread_key="+encodeURIComponent(threadKey),{cache:"no-store"});const p=await r.json();if(r.ok&&live)setNotes(p.notes||[]);}catch{}}void load();const timer=window.setInterval(load,15000);return()=>{live=false;window.clearInterval(timer)}},[threadKey]);
  useEffect(()=>{let live=true;fetch("/api/inbox",{cache:"no-store"}).then(r=>r.json()).then(p=>{if(live)setMembers(p.team_members||[])}).catch(()=>{});return()=>{live=false}},[]);
- const match=draft.match(/(?:^|\\s)@([\\w-]*)$/);
- const candidates=useMemo(()=>match?members.filter(m=>String(m.display_name||m.full_name||m.name||"").toLowerCase().split(/\\s+/).some(p=>p.startsWith(match[1].toLowerCase()))).slice(0,8):[],[draft,members,match?.[1]]);
- function tag(member:Member){const name=member.display_name||member.full_name||member.name;if(!name)return;setDraft(v=>v.replace(/(^|\\s)@[\\w-]*$/,(_,space:string)=>space+"@"+name+" "));}
+ const match=draft.match(/(?:^|\s)@([\w-]*)$/);
+ const candidates=useMemo(()=>match?members.filter(m=>String(m.display_name||m.full_name||m.name||"").toLowerCase().split(/\s+/).some(p=>p.startsWith(match[1].toLowerCase()))).slice(0,8):[],[draft,members,match?.[1]]);
+ function tag(member:Member){const name=member.display_name||member.full_name||member.name;if(!name)return;setDraft(v=>v.replace(/(^|\s)@[\w-]*$/,(_,space:string)=>space+"@"+name+" "));}
  async function send(){if(!draft.trim())return;setBusy(true);setError("");setStatus("");try{const r=await fetch("/api/inbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"note",thread_key:threadKey,note_text:draft.trim()})});const p=await r.json().catch(()=>({}));if(!r.ok)throw Error(p.error||"Unable to post note");const n=await fetch("/api/inbox?thread_key="+encodeURIComponent(threadKey),{cache:"no-store"});const np=await n.json();if(n.ok)setNotes(np.notes||[]);setDraft("");setStatus("Posted to team conversation.");}catch(e){setError(e instanceof Error?e.message:"Unable to post");}finally{setBusy(false);}}
  return <section style={{border:"1px solid #dbe2ea",borderRadius:12,padding:13,background:"#fff",display:"grid",gap:10}}>
   <div><strong>Internal Team Conversation</strong><div style={{fontSize:11,color:"#627080"}}>Private to Epic employees · shared with Inbox</div></div>
