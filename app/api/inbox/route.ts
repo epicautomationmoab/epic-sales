@@ -110,6 +110,12 @@ export async function POST(request: NextRequest) {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
     }
+    if (body.action === "c360_note") {
+      const entryType=(body as typeof body & { entry_type?: string })?.entry_type;
+      if(entryType!=="customer_note"&&entryType!=="reservation_note")return NextResponse.json({error:"Invalid note type."},{status:400});
+      const result=await rpc(session.accessToken,"epic_sales_add_c360_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||"",p_entry_type:entryType});
+      return NextResponse.json(result||{ok:true});
+    }
     if (body.action === "note") {
       const result = await rpc(session.accessToken, "epic_sales_add_inbox_thread_note", { p_thread_key: body.thread_key, p_note_text: body.note_text || "" });
       return NextResponse.json(result || { ok: true });
