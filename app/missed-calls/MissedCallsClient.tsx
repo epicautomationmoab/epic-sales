@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import styles from "./MissedCalls.module.css";
+import PhoneReportC360Link from "../phone-report/PhoneReportC360Link";
 
 export type MissedCallItem = {
   id: string;
   source_record_id: string | null;
+  contact_id?: string | null;
   status: string;
   subject: string | null;
   summary: string | null;
@@ -117,6 +119,7 @@ export default function MissedCallsClient({ initialItems }: { initialItems: Miss
                   {source ? <span>{source}</span> : null}
                   {campaign ? <span>{campaign}</span> : null}
                   {recording ? <a href={recording} target="_blank" rel="noreferrer">Listen ↗</a> : null}
+                  <PhoneReportC360Link contactId={item.contact_id || null} reservationId={text(m.reservation_id) || null} reservationConfirmation={text(m.confirmation_code) || null} phone={phone || null} />
                 </div>
               </div>
 
