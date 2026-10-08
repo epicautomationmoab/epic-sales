@@ -96,7 +96,7 @@ export default function MissedCallsClient({ initialItems }: { initialItems: Miss
           const m = item.metadata || {};
           const phone = text(m.phone);
           const caller = text(m.caller_name) || phone || "Unknown caller";
-          const callType = text(m.call_type) || (m.voicemail ? "voicemail" : "missed");
+          const rawCallType = text(m.call_type) || (m.voicemail ? "voicemail" : "missed");\n          const callType = rawCallType === "voicemail_transcription" ? "voicemail" : rawCallType;
           const recording = text(m.recording_url);
           const source = text(m.source_name);
           const campaign = text(m.campaign);
