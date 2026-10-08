@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       const result = await rpc(session.accessToken, "epic_sales_add_inbox_thread_note", { p_thread_key: body.thread_key, p_note_text: body.note_text || "" });
       return NextResponse.json(result || { ok: true });
     }
-    if (body.action === "read_mentions") {
+    if (body.action === "respond_mention") {\n      const response = (body as typeof body & { response?: string })?.response;\n      const result = await rpc(session.accessToken, "epic_respond_to_inbox_mention", { p_thread_key: body.thread_key, p_response: response || "" });\n      return NextResponse.json(result || { ok: true });\n    }\n    if (body.action === "read_mentions") {
       const result = await rpc(session.accessToken, "epic_sales_mark_inbox_thread_mentions_read", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
     }
