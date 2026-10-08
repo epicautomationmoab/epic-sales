@@ -1,4 +1,5 @@
-type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings";
+import PingBadge from "./PingBadge";
+type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping";
 
 type Props = {
   active: ActiveSection;
@@ -12,6 +13,7 @@ type Props = {
 
 const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "inbox", href: "/inbox", label: "Inbox" },
+  { key: "ping", href: "/epic-ping", label: "Epic Ping" },
   { key: "missed-calls", href: "/missed-calls", label: "Missed Calls" },
   { key: "leads", href: "/leads", label: "Abandoned Cart" },
   { key: "quote", href: "/quote", label: "Quote Builder" },
@@ -39,7 +41,7 @@ export default function EpicC360Sidebar({
       <nav className={navClassName}>
         {items.map((item) => (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
-            {item.label}
+            {item.label}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
           </a>
         ))}
         {canManage ? <a href="/inbox/blocked-domains">Blocked Email Domains</a> : null}
