@@ -44,7 +44,7 @@ export default function LeadWorkspaceAccess({opportunityId}:{opportunityId:strin
  const owner=lead.claimed_by_name||lead.assigned_rep_name;
  const canWork=owner===profileName;
  return <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-  {canWork?<><button type="button" onClick={()=>setMode("work")}>Work Lead</button><button type="button" disabled={queued||!lead.email} onClick={()=>openIntroduction(lead)}>{queued?"Introduction Queued":"Email Introduction"}</button></>:<span style={{fontSize:12}}>Lead actions available to the assigned rep{owner?`: ${owner}`:" after claiming"}.</span>}
+  <button type="button" onClick={()=>setMode("work")}>Work Lead</button><button type="button" disabled={queued||!lead.email||!canWork} onClick={()=>openIntroduction(lead)}>{queued?"Introduction Queued":"Email Introduction"}</button>{!canWork?<span style={{fontSize:12}}>Assigned to {owner||"no one"} · Introduction email can be sent by the assigned rep.</span>:null}
   {error?<span role="alert" style={{color:"#b42318"}}>{error}</span>:null}
   {mode==="work"?<LeadWorkModal lead={lead} profileName={profileName} onClose={()=>setMode(null)} onOpenIntroduction={()=>openIntroduction(lead)} onOpenCustomer360={()=>setMode(null)}/>:null}
       {introLead?<div style={{position:"fixed",inset:0,background:"rgba(16,24,40,.42)",zIndex:1400,display:"grid",placeItems:"center",padding:24,overflowY:"auto"}} onMouseDown={e=>{if(e.currentTarget===e.target)setIntroLead(null);setMode(null);}}>
