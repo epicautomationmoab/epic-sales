@@ -1,3 +1,4 @@
+import PingBadge from "./PingBadge";
 type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping";
 
 type Props = {
@@ -40,7 +41,7 @@ export default function EpicC360Sidebar({
       <nav className={navClassName}>
         {items.map((item) => (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
-            {item.label}
+            {item.label}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
           </a>
         ))}
         {canManage ? <a href="/inbox/blocked-domains">Blocked Email Domains</a> : null}
