@@ -1,4 +1,4 @@
-type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings";
+type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping";
 
 type Props = {
   active: ActiveSection;
@@ -12,6 +12,7 @@ type Props = {
 
 const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "inbox", href: "/inbox", label: "Inbox" },
+  { key: "ping", href: "/epic-ping", label: "Epic Ping" },
   { key: "missed-calls", href: "/missed-calls", label: "Missed Calls" },
   { key: "leads", href: "/leads", label: "Abandoned Cart" },
   { key: "quote", href: "/quote", label: "Quote Builder" },
