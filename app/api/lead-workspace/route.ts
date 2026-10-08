@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
-const URL_BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/,"");
+const URL_BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 const API_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 export async function GET(request:NextRequest){
  const token=request.cookies.get("epic_access_token")?.value;
