@@ -34,9 +34,10 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   // Manual corrections are layered over automatic classification, never changing source CallRail/PBX records.
   let overrides:Array<{call_session:string;extension:string;event_time:string;reason:string;changed_by_name:string;changed_at:string}>=[];
   try{
-    const r=await fetch(SUPABASE_URL+"/rest/v1/phone_sales_lead_overrides?select=call_session,extension,event_time,reason,changed_by_name,changed_at",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token},cache:"no-store"});
-    if(r.ok)overrides=await r.json();
-  }catch{}
+    const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/get_phone_sales_lead_overrides",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:"{}",cache:"no-store"});
+    if(!r.ok)throw new Error("Unable to load lead corrections: "+await r.text());
+    overrides=await r.json();
+  }catch(e){error=error||String(e);}
   const overrideMap=new Map(overrides.map(o=>[o.call_session+"|"+o.extension+"|"+new Date(o.event_time).getTime(),o]));
   const resolveOverride=(e:any)=>overrideMap.get(String(e.session||"")+"|"+String(e.extension||"")+"|"+new Date(e.event_time).getTime());
   report.agent_events=(report.agent_events||[]).map((e:any)=>({
