@@ -85,6 +85,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
   async function sendActivityEmail(){
     if(!selectedActivity){setStatus("Choose an activity to send.");return;}
+    if(!draft?.id){setStatus("Select a valid customer draft before sending.");return;}
     setSendingActivity(true);setStatus("");
     try{
       if(!lead.claimed_by_name&&!lead.assigned_rep_name){
@@ -95,6 +96,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
       const r=await fetch("/api/sales-activity-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         opportunity_id:lead.id,
         activity_key:activityKey,
+        draft_id:draft?.id||null,
         personal_message:activityNote.trim()
       })});
       const p=await r.json().catch(()=>({}));
