@@ -65,7 +65,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const[saving,setSaving]=useState(false);
   const[status,setStatus]=useState("");
   const[activityComposerOpen,setActivityComposerOpen]=useState(false);
-  const[draftId,setDraftId]=useState<string>(lead.drafts?.[0]?.id||"");
+  const[draftId,setDraftId]=useState<string>((lead.drafts||[]).find(d=>d.is_current_draft===true&&!d.converted_at&&d.last_trip_status!=="converted"&&d.last_trip_status!=="cancelled"&&d.confirmation_code)?.id||lead.drafts?.[0]?.id||"");
   const[activityOverride,setActivityOverride]=useState<string>("");
   const[activityNote,setActivityNote]=useState("");
   const[confirmMismatch,setConfirmMismatch]=useState(false);
@@ -89,7 +89,8 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const phoneHref=lead.phone_e164?`tel:${lead.phone_e164}`:null;
   const selectedActivity=activityEmails.find(a=>a.key===activityKey);
   const mismatchedActivity=Boolean(selectedActivity&&defaultActivityKey&&activityKey!==defaultActivityKey);
-  const draftBookingUrl=draft?.confirmation_code&&draft.is_current_draft!==false&&!draft.converted_at&&draft.last_trip_status!=="converted"?`https://epic4x4.tripworks.com/widgets/tripBuilder?trip=${encodeURIComponent(draft.confirmation_code)}`:null;
+  const draftUnavailableReason=draft?.last_trip_status==="cancelled"?"Draft cancelled in TripWorks":draft?.converted_at||draft?.last_trip_status==="converted"?"Draft already converted to a booking":draft?.is_current_draft===false?"Historical draft — no longer current":!draft?.confirmation_code?"Draft has no confirmation number":"No valid current draft";
+  const draftBookingUrl=draft?.confirmation_code&&draft.is_current_draft!==false&&!draft.converted_at&&draft.last_trip_status!=="converted"&&draft.last_trip_status!=="cancelled"?`https://epic4x4.tripworks.com/widgets/tripBuilder?trip=${encodeURIComponent(draft.confirmation_code)}`:null;
 
 
   async function sendActivityEmail(){
@@ -169,7 +170,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
           ].map(([label,value])=><div key={label} style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".07em",opacity:.55}}>{label}</div><div style={{marginTop:5,fontWeight:800}}>{value}</div></div>)}
         </div>
 
-        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");setConfirmMismatch(false);}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"First listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
+        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");setConfirmMismatch(false);}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"First listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}{d.last_trip_status==="cancelled"?" · Cancelled":d.converted_at||d.last_trip_status==="converted"?" · Booked":d.is_current_draft===false?" · Historical":""}</option>)}</select></label>:null}
         <section style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:14,padding:20}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}>
             <div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>START WITH THE CALL</div><h3 style={{margin:"4px 0 3px",fontSize:22}}>Find out what actually stopped them.</h3><div style={{color:"#606975",lineHeight:1.5}}>Do not start by pitching. Ask the question, listen, then solve the real objection.</div></div>
@@ -226,7 +227,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
             <strong>Confirm before sending</strong>
             <div><span style={{color:"#65717d"}}>Email template: </span><strong>{selectedActivity?.name||"Not selected"}</strong></div>
             <div><span style={{color:"#65717d"}}>Selected draft: </span><strong>{draft?.experience_name||draft?.option_name||"Unknown activity"}</strong>{draft?.confirmation_code?` · ${draft.confirmation_code}`:""}</div>
-            <div><span style={{color:"#65717d"}}>Booking link: </span>{draftBookingUrl?<a href={draftBookingUrl} target="_blank" rel="noopener noreferrer">Open selected TripWorks draft ↗</a>:<strong style={{color:"#a32424"}}>No valid current draft link</strong>}</div>
+            <div><span style={{color:"#65717d"}}>Booking link: </span>{draftBookingUrl?<a href={draftBookingUrl} target="_blank" rel="noopener noreferrer">Open selected TripWorks draft ↗</a>:<strong style={{color:"#a32424"}}>{draftUnavailableReason}</strong>}</div>
             {mismatchedActivity?<label style={{background:"#fff3df",border:"1px solid #e6ae53",padding:12,borderRadius:8,display:"flex",gap:9,alignItems:"flex-start",lineHeight:1.5}}><input type="checkbox" checked={confirmMismatch} onChange={e=>setConfirmMismatch(e.target.checked)} style={{marginTop:5}}/><span><strong>Different activity selected.</strong> The email describes {selectedActivity?.name}, but the booking button resumes {draft?.experience_name||"the selected draft"}. I have checked both and intend to send this combination.</span></label>:null}
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity||!selectedActivity||!draftBookingUrl||(mismatchedActivity&&!confirmMismatch)} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
