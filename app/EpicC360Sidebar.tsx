@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import PingBadge from "./PingBadge";
-type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping";
+type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping" | "catch-up";
 
 type Props = {
   active: ActiveSection;
@@ -17,6 +17,7 @@ type Props = {
 const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "inbox", href: "/inbox", label: "Inbox" },
   { key: "ping", href: "/epic-ping", label: "Epic Ping" },
+  { key: "catch-up", href: "/my-catch-up", label: "My Catch-Up" },
   { key: "missed-calls", href: "/missed-calls", label: "Missed Calls" },
   { key: "leads", href: "/leads", label: "Abandoned Cart" },
   { key: "quote", href: "/quote", label: "Quote Builder" },
