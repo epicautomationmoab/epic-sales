@@ -31,6 +31,9 @@ const objectionOptions:Array<{code:ObjectionCode;label:string;prompt:string;ques
 ];
 
 const activityEmails=[
+  {key:"moab_discovery",name:"Moab Discovery Tour",overview:"Explore Moab’s hidden wonders in comfort.",guidance:"Ancient rock art, captivating caves, and remarkable landscapes."},
+  {key:"gateway_hells_revenge",name:"Gateway to Hell’s Revenge",overview:"Experience two iconic Moab trails with an expert guide.",guidance:"A memorable introduction to the famous slickrock."},
+  {key:"pro_r_ultimate",name:"Hell’s Revenge Pro R Ultimate Experience",overview:"It’s a decidedly grown-up adventure.",guidance:"Performance, legendary slickrock, small groups, and morning or sunset departures."},
   {key:"hells_revenge",name:"Hell’s Revenge",overview:"Hell’s Revenge is one of Moab’s signature slickrock experiences. It combines dramatic scenery with the kind of terrain that makes Moab famous, while your Epic guide helps the group understand what is ahead and how to approach it.",guidance:"It is a great choice for guests who want an unmistakably Moab experience and more excitement than a simple scenic drive. If you tell me a little about your group and comfort level, I can also help you decide which Hell’s Revenge option is the best fit."},
   {key:"poison_spider",name:"Poison Spider Mesa",overview:"Poison Spider Mesa combines classic Moab scenery with a longer, more varied trail experience. It is a strong choice for guests who want more time on trail and a mix of scenery, slickrock, and off-road terrain.",guidance:"If your group is deciding between Poison Spider and another Epic experience, I can help compare the time commitment, driving experience, and overall feel so you can choose confidently."},
   {key:"works_sampler",name:"The Works – Moab Sampler",overview:"The Works is designed for guests who want a broader taste of what makes off-roading in Moab special. It gives you variety in a single experience rather than focusing on only one trail personality.",guidance:"It is especially useful when your group wants a well-rounded Moab adventure or when you are not sure which single trail experience best matches everyone. I’m happy to talk through the differences with you."},
@@ -72,6 +75,9 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const defaultActivityKey=useMemo(()=>{
     const name=`${draft?.experience_name||""} ${draft?.option_name||""}`.toLowerCase();
     if(name.includes("poison spider"))return "poison_spider";
+    if(name.includes("discovery"))return "moab_discovery";
+    if(name.includes("gateway"))return "gateway_hells_revenge";
+    if(name.includes("ultimate experience")||name.includes("adult")||name.includes("pro r ultimate experience"))return "pro_r_ultimate";
     if(name.includes("hell")||name.includes("fins"))return "hells_revenge";
     if(name.includes("works")||name.includes("sampler"))return "works_sampler";
     if(name.includes("xpedition"))return "xpedition";
