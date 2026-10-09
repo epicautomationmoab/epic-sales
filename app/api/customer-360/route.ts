@@ -191,6 +191,27 @@ export async function GET(request: NextRequest) {
       teamThreadNotes=results.flatMap((rows:any)=>Array.isArray(rows)?rows:[]);
     }
 
+    // Enrich existing authorized customer texts with the actual CallRail line used.
+    // Never infer a business SMS number from the customer's phone or from another conversation.
+    let smsNumberById=new Map<string,{epic_number:string|null;customer_number:string|null}>();
+    if(identityPhone.length===10 && Array.isArray(customer?.texts) && customer.texts.length){
+      const params=new URLSearchParams({
+        normalized_customer_phone:`eq.+1${identityPhone}`,
+        select:"message_id,direction,source_number,destination_number",
+        limit:"500",
+      });
+      const response=await fetch(`${SUPABASE_URL}/rest/v1/callrail_text_messages?${params.toString()}`,{
+        headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`},cache:"no-store"
+      });
+      if(response.ok){
+        const rows=await response.json().catch(()=>[]) as Array<{message_id:string;direction:string;source_number:string|null;destination_number:string|null}>;
+        smsNumberById=new Map(rows.map(row=>[row.message_id,{
+          epic_number:row.direction==="inbound"?row.destination_number:row.source_number,
+          customer_number:row.direction==="inbound"?row.source_number:row.destination_number,
+        }]));
+      }
+    }
+
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -203,6 +224,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
+      texts:(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
