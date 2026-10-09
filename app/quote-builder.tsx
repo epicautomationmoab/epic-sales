@@ -316,6 +316,22 @@ export default function QuoteBuilder() {
   const dateSeasonMismatch = [visitStart, visitEnd, ...Object.values(availabilityDates)]
     .filter(Boolean).some(date => /^20\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
 
+  const pending2027: Record<string, string> = {
+    "17327": "No Pro R rentals in 2027. Recommend the Polaris Pro S rental instead.",
+    "17328": "No Pro R rentals in 2027. Recommend the Polaris Pro S rental instead.",
+    "13804": "2027 pricing for Poison Spider Mesa has not been established. Tell the guest we are building our 2027 Poison Spider calendar now and will get back to them promptly.",
+    "16190": "2027 pricing for Poison Spider Mesa has not been established. Tell the guest we are building our 2027 Poison Spider calendar now and will get back to them promptly.",
+    "15783": "We will not run the Pro R Adult Hell's Revenge tour in 2027. Something exciting is coming soon: the Pro R Boost Sand Dune Tour — Moab's only sand dune tour, at Behind the Rocks Trail.",
+    "18197": "We will not run the Pro R Hell's Revenge tour in 2027. Something exciting is coming soon: the Pro R Boost Sand Dune Tour — Moab's only sand dune tour, at Behind the Rocks Trail."
+  };
+  const unavailable2027Options = [
+    {id:"17327", name:"2-Seat Pro R Rental — discontinued"},
+    {id:"17328", name:"4-Seat Pro R Rental — discontinued"},
+    {id:"16190", name:"Poison Spider Mesa Tour — pricing pending"},
+    {id:"13804", name:"Poison Spider Private — pricing pending"},
+    {id:"15783", name:"Pro R Adult Hell's Revenge — discontinued"},
+    {id:"18197", name:"Private Pro R Hell's Revenge — discontinued"}
+  ];
   function updateActivity(key: string, changes: Partial<QuoteActivity>) {
     setActivities((current) => current.map((item) => item.key === key ? { ...item, ...changes } : item));
   }
@@ -789,7 +805,7 @@ export default function QuoteBuilder() {
                   </div>
                 </div>
                 {dateSeasonMismatch && <div className="availabilityError">The activity or visit date does not match {pricingYear} pricing. Correct the year before saving or booking.</div>}
-                {pricingYear === 2027 && <div className="availabilityError">2027 quotes cannot be sent or booked until the seasonal rate schedule and saved totals are verified. Pro R rentals are discontinued; recommend Pro S. Poison Spider and the new Pro R Boost sand-dune tour are pending pricing.</div>}
+                
                 {saveMessage && <p className="ticketMeta">{saveMessage}</p>}
               </div>
               {loading && <div className="card"><p className="muted">Loading Epic experiences and ticket types...</p></div>}
@@ -797,7 +813,7 @@ export default function QuoteBuilder() {
               {!loading && !error && calculatedActivities.map(({ activity, experience, privateFeeRule, privateFee, rentalDays, total }, index) => (
                 <div className="card activityCard" key={activity.key}>
                   <div className="activityHeader"><div className="activityNumber">Activity {index + 1}</div>{activities.length > 1 && <button className="removeLink" type="button" onClick={() => removeActivity(activity.key)}>Remove</button>}</div>
-                  <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                  <div className="field"><label>Experience</label><select value={activity.experienceId} onChange={(e) => changeExperience(activity.key, e.target.value)}><option value="">None</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}{pricingYear === 2027 && unavailable2027Options.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>{pricingYear === 2027 && pending2027[activity.experienceId] && <div className="availabilityError">{pending2027[activity.experienceId]}</div>}
                   {experience?.line === "rental" ? experience.tickets.map((ticket) => (
                     <div className="ticketRow" key={ticket.id}>
                       <div><div className="ticketTitle">{ticket.name} - {money.format(ticket.price)}</div><div className="ticketMeta">{ticket.note}</div></div>
