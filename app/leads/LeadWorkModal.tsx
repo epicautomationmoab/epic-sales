@@ -99,10 +99,12 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
     if(mismatchedActivity&&!confirmMismatch){setStatus("Confirm that you intend to send an activity email different from the selected draft.");return;}
     setSendingActivity(true);setStatus("");
     try{
-      if(!lead.claimed_by_name&&!lead.assigned_rep_name){
+      if(lead.claimed_by_name!==profileName){
         const claim=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"claim",opportunity_id:lead.id})});
         const claimData=await claim.json().catch(()=>({}));
         if(!claim.ok)throw new Error(claimData?.error||"Unable to claim lead before sending.");
+        // Claiming is required even when a legacy assigned-rep label is displayed.
+        // That label does not establish ownership in the email sender.
       }
       const r=await fetch("/api/sales-activity-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         opportunity_id:lead.id,
