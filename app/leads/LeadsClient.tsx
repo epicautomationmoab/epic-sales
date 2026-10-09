@@ -212,6 +212,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       onClose={()=>setWorkLead(null)}
       onOpenIntroduction={()=>{const lead=workLead;setWorkLead(null);if(lead)openIntroduction(lead);}}
       onOpenCustomer360={()=>{const lead=workLead;setWorkLead(null);if(lead)setSelected(lead);}}
+      onLeadUpdated={()=>window.location.reload()}
     />:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
