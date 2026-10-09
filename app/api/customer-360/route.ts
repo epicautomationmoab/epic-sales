@@ -186,9 +186,16 @@ export async function GET(request: NextRequest) {
 
     // Inbox team-thread notes belong to the customer lifecycle, even after a sale closes the Inbox thread.
     let teamThreadNotes:any[]=[];
-    if(opportunityIds.length){
-      const results=await Promise.all(opportunityIds.map(id=>rpcNamed(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:`opp:${id}`}).catch(()=>[])));
-      teamThreadNotes=results.flatMap((rows:any)=>Array.isArray(rows)?rows:[]);
+    // Include notes filed under the actual inbound phone thread, even when no opportunity exists.
+    const noteThreadKeys=[...new Set([
+      ...opportunityIds.map((id:string)=>`opp:${id}`),
+      ...(identityPhone.length===10?[`phone:+1${identityPhone}`]:[]),
+    ])];
+    if(noteThreadKeys.length){
+      const results=await Promise.all(noteThreadKeys.map(key=>rpcNamed(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:key}).catch(()=>[])));
+      const unique=new Map<string,any>();
+      for(const row of results.flatMap((rows:any)=>Array.isArray(rows)?rows:[]))if(row?.id)unique.set(String(row.id),row);
+      teamThreadNotes=[...unique.values()].sort((a,b)=>new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime());
     }
 
     // Enrich existing authorized customer texts with the actual CallRail line used.
