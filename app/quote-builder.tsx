@@ -177,7 +177,7 @@ function buildExperiences(rows: SalesRateRow[]): Experience[] {
     }
     grouped.get(row.experience_id)!.tickets.push({
       id: row.ticket_type_id,
-      name: row.ticket_type_name,
+      name: row.effective_start?.startsWith("2027") ? row.ticket_type_name.replace(/2026/g, "2027") : row.ticket_type_name,
       price: row.unit_price_cents / 100,
       note: row.sales_help_text || row.quantity_label || "Sales rate",
     });
@@ -327,8 +327,7 @@ export default function QuoteBuilder() {
     "16190": "2027 Poison Spider pricing coming soon. We're building our 2027 Poison Spider calendar and will get back to the guest promptly."
   };
   const unavailable2027Options = [
-    {id:"16190", name:"Poison Spider Mesa Tour — 2027 pricing coming soon"},
-    {id:"13804", name:"Poison Spider Private — 2027 pricing coming soon"}
+    {id:"16190", name:"Poison Spider Mesa Tour — 2027 pricing coming soon"}
   ];
 
   function updateActivity(key: string, changes: Partial<QuoteActivity>) {
