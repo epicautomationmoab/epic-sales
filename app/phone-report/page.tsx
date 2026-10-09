@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 import EpicC360Sidebar from "../EpicC360Sidebar";
 import PhoneReportC360Link from "./PhoneReportC360Link";
+import PhoneLeadCorrection from "./PhoneLeadCorrection";
 import styles from "../missed-calls/MissedCalls.module.css";
 
 const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
@@ -30,6 +31,19 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   let report:Report={summary:{},agents:[],agent_events:[],outbound_events:[],pauses:[],missed:[]};
   let error="";
   try{report=await loadReport(token,params.date);}catch(e){error=e instanceof Error?e.message:"Unable to load report.";}
+  // Manual corrections are layered over automatic classification, never changing source CallRail/PBX records.
+  let overrides:Array<{call_session:string;extension:string;event_time:string;reason:string;changed_by_name:string;changed_at:string}>=[];
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/phone_sales_lead_overrides?select=call_session,extension,event_time,reason,changed_by_name,changed_at",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+token},cache:"no-store"});
+    if(r.ok)overrides=await r.json();
+  }catch{}
+  const overrideMap=new Map(overrides.map(o=>[o.call_session+"|"+o.extension+"|"+new Date(o.event_time).getTime(),o]));
+  const resolveOverride=(e:any)=>overrideMap.get(String(e.session||"")+"|"+String(e.extension||"")+"|"+new Date(e.event_time).getTime());
+  report.agent_events=(report.agent_events||[]).map((e:any)=>({
+    ...e,manual_override:resolveOverride(e)||null,
+    is_sales_opportunity:e.call_outcome==="booked"?true:(resolveOverride(e)?false:e.is_sales_opportunity),
+    call_outcome:e.call_outcome==="booked"?"booked":(resolveOverride(e)?"not_sales_lead":e.call_outcome)
+  }));
   const s=report.summary||{};
   const pauseTotals=new Map<string,{seconds:number,count:number}>();
   const selectedExtension=params.extension||"";
@@ -43,7 +57,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const money=(cents:any)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(Number(cents||0)/100);
   const statusLabel=(e:any)=>e.customer_status==="new_caller"?"NEW CALLER":e.customer_status==="existing_customer"?"EXISTING CUSTOMER":e.customer_status==="returning_caller"?"RETURNING CALLER":"CALLER";
   const purposeLabel=(e:any)=>e.call_purpose==="sales_inquiry"?"Sales Inquiry":e.call_purpose==="existing_reservation"?"Reservation Service":"Other";
-  const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`💫 Sale ${money(e.booking_revenue_cents)}`:e.call_outcome==="existing_reservation_handled"?"Reservation Service":e.call_outcome==="no_booking_yet"?"Sales Lead":"Other";
+  const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`💫 Sale ${money(e.booking_revenue_cents)}`:e.call_outcome==="existing_reservation_handled"?"Reservation Service":e.call_outcome==="no_booking_yet"?"Sales Lead":e.call_outcome==="not_sales_lead"?"Not a Sales Lead":"Other";
   const outboundPurposeLabel=(e:any)=>e.outbound_purpose==="courtesy_call"?"Courtesy Call":e.outbound_purpose==="voicemail_return"?"Returned Voicemail":e.outbound_purpose==="missed_call_recovery"?"Recovered Missed Call":e.outbound_purpose==="abandoned_cart"?"Abandoned Cart Lead":"";
   const selectedEvents=(selectedMetric==="outbound"?report.outbound_events||[]:report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
@@ -124,6 +138,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
               <span style={{color:"#56606d"}}>{time(e.event_time)}{selectedMetric==="answered"||selectedMetric==="outbound"?<div style={{fontSize:11,color:"#87919b",marginTop:2}}>{duration(e.billsec)}</div>:null}</span>
               <span style={{fontWeight:900,color:selectedMetric==="no-answer"?"#b9471f":(e.call_outcome==="booked"||e.is_sale)?"#25693b":"#56606d"}}>
                 {selectedMetric==="outbound"?(e.is_sale?`💫 Sale ${money(e.sale_revenue_cents)}`:e.disposition==="ANSWERED"?outboundPurposeLabel(e):`Attempt · ${String(e.disposition||"No answer").toLowerCase()}`):selectedMetric==="answered"?outcomeLabel(e):"No answer · rang "+duration(e.duration_seconds)}
+                {selectedMetric==="answered"&&e.disposition==="ANSWERED"&&e.call_outcome!=="booked"&&(e.is_sales_opportunity||e.manual_override)?<PhoneLeadCorrection session={String(e.session||"")} extension={String(e.extension||"")} eventTime={String(e.event_time||"")} override={e.manual_override} eligible={!!e.is_sales_opportunity}/>:null}
                 {selectedMetric==="outbound"&&e.is_missed_call_recovery?<div style={{fontSize:10,fontWeight:700,color:"#788290",marginTop:3}}>Recovered in {duration(e.missed_call_recovery_seconds)}</div>:null}
               </span>
             </div>):<div style={{padding:18,color:"#788290"}}>No matching events.</div>}
