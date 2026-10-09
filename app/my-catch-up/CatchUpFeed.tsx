@@ -3,8 +3,8 @@ import {useEffect,useMemo,useState} from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
 type Item={id:string;opportunityId:string;name:string;kind:string;description:string;at:string;dismissed:boolean;needsAttention?:boolean};
 export default function CatchUpFeed({profileId,profileName}:{profileId:string;profileName:string}){
- const accent=profileName==="Jennifer Johnson"?"#009C9B":profileName==="Lonnie Laidman"?"#7c3aed":"#7c3aed";
- const accentDark=profileName==="Jennifer Johnson"?"#00777A":"#6949a5";
+ const accent=profileName==="Jennifer Johnson"?"#009C9B":profileName==="Lonnie Laidman"?"#8427E8":profileName==="Price Baker"?"#800020":"#7c3aed";
+ const accentDark=profileName==="Jennifer Johnson"?"#00777A":profileName==="Lonnie Laidman"?"#6B17C6":profileName==="Price Baker"?"#610019":"#6949a5";
  const [items,setItems]=useState<Item[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[tab,setTab]=useState<"new"|"dismissed">("new");
  const [hidden,setHidden]=useState<string[]>([]);
  const [openOpportunity,setOpenOpportunity]=useState<string|null>(null);
