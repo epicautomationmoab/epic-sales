@@ -16,7 +16,7 @@ async function auth(request:NextRequest){
 export async function GET(request:NextRequest){
  const token=await auth(request);
  if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
- try {const items=await call(token,"epic_catchup_attributed",{});return NextResponse.json({items:Array.isArray(items)?items:[],lookbackDays:60});}
+ try {const items=await call(token,"epic_catchup_with_communications",{});return NextResponse.json({items:Array.isArray(items)?items:[],lookbackDays:60});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Catch-Up unavailable"},{status:500});}
 }
 export async function POST(request:NextRequest){
@@ -24,6 +24,6 @@ export async function POST(request:NextRequest){
  if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
  const body=await request.json().catch(()=>null);
  if(typeof body?.event_key!=="string"||body.event_key.length>160||typeof body?.dismissed!=="boolean")return NextResponse.json({error:"Invalid request"},{status:400});
- try {await call(token,"epic_catchup_set_dismissed",{p_event_key:body.event_key,p_dismissed:body.dismissed});return NextResponse.json({ok:true});}
+ try {await call(token,"epic_catchup_communication_dismiss",{p_event_key:body.event_key,p_dismissed:body.dismissed});return NextResponse.json({ok:true});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to update Catch-Up"},{status:500});}
 }
