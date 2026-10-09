@@ -293,7 +293,7 @@ export default function QuoteBuilder() {
     try {
       const rows = await getSalesRates(year);
       if (year === 2027 && !rows.length) {
-        setSaveMessage("2027 pricing has not been published in Epic C360. The quote remains on 2026 pricing; no 2026 rates will be substituted for 2027.");
+        setSaveMessage("2027 rates are available from TripWorks for select activities, but have not yet been loaded into Epic C360. Gateway, Moab Discovery and XP S / Pro S rental prices are documented; 2027 quoting remains unavailable until the import and saved totals are verified.");
         return;
       }
       const built = buildExperiences(rows);
