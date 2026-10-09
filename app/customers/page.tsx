@@ -23,7 +23,7 @@ export default async function CustomersPage({searchParams}:{searchParams:Promise
     />
     <section className={styles.main}>
       <header className={styles.header}><div><div className={styles.eyebrow}>EpicC360</div><h1>C360</h1></div></header>
-      <CustomersClient initialQuery={params.q||""} autoOpen={params.open==="1"}/>
+      <CustomersClient initialQuery={params.q||""} autoOpen={params.open==="1"} userId={profile.user_id||profile.id}/>
     </section>
   </main>;
 }
