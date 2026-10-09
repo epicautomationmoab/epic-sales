@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 import EpicC360Sidebar from "../EpicC360Sidebar";
+import sidebarStyles from "../leads/Leads.module.css";
 
 const examples = [
   { name:"Sarah Mitchell", state:"Needs reply", kind:"urgent", when:"Saturday · 2:14 PM", description:"Replied to your rental quote. She wants to change vehicles.", detail:"Customer replied · rental quote", initial:"SM" },
@@ -20,7 +21,7 @@ export default async function CatchUpPreviewPage(){
   if(!profile)redirect("/employee-login");
   const first=(profile.display_name||"there").split(" ")[0];
   return <main style={{display:"flex",minHeight:"100vh",background:"#f5f6f8",color:"#20232c",fontFamily:"Arial,sans-serif"}}>
-    <EpicC360Sidebar active="leads" profileName={profile.display_name} />
+    <EpicC360Sidebar active="leads" profileName={profile.display_name} className={sidebarStyles.sidebar} navClassName={sidebarStyles.nav} activeClassName={sidebarStyles.active} footerClassName={sidebarStyles.sidebarFooter} />
     <section style={{flex:1,minWidth:0,padding:"32px clamp(16px,4vw,52px)",maxWidth:1150,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"start",flexWrap:"wrap"}}>
         <div><div style={{letterSpacing:2,fontSize:11,fontWeight:800,color:"#8364ad"}}>EPIC C360 · MY CATCH-UP</div><h1 style={{fontSize:30,margin:"10px 0 7px"}}>Welcome back, {first}!</h1><p style={{color:"#666c79",margin:0}}>Here’s what happened with your claimed customers while you were away.</p></div>
