@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/, "");
+const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/[/]+$/, "");
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 function secondsToMoabMidnight() {
