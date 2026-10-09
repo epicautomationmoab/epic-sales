@@ -33,18 +33,21 @@ export default async function StaffBookingPage({searchParams}:{searchParams:Prom
   const addons=Array.isArray(row.addons)?row.addons:[];
   const products=Array.isArray(row.products)?row.products:[];
   const customerUrl=row.tripworks_customer_url||null;
+  const bookings=Array.isArray(row.bookings)?row.bookings:[];
+  const vehicleCount=bookings.length||Number(row.vehicle_count)||0;
 
   return <main className={styles.shell}><section className={styles.card}>
     <div className={styles.top}><div><div className={styles.eyebrow}>EpicC360 · Staff Booking</div><h1>Book It</h1><p className={styles.name}>{row.customer_name||"Customer"}</p></div><div className={styles.draft}>Draft {row.confirmation_code||"—"}</div></div>
     <div className={styles.warning}>Create a NEW TripWorks booking. Do not reserve the e-commerce draft.</div>
     <div className={styles.grid}>
-      <div><span>Activity / Vehicle</span><strong>{row.experience_name||"—"}</strong></div>
+      <div><span>Activity / Vehicle</span><strong>{vehicleCount>0?`${vehicleCount} × `:""}{row.experience_name||"—"}</strong></div>
       <div><span>Date</span><strong>{dateLabel(row.activity_date)}</strong></div>
       <div><span>Time</span><strong>{row.time_label||"—"}</strong></div>
       <div><span>Duration / Option</span><strong>{row.option_name||"—"}</strong></div>
     </div>
-    {addons.length?<section className={styles.section}><h2>Add-ons / Protection</h2>{addons.map((addon:any,index:number)=><div className={styles.line} key={index}><div><strong>{addon?.name||addon?.experience_addon?.title||"Add-on"}</strong>{addon?.experience_addon?.title&&addon.experience_addon.title!==addon.name?<span>{addon.experience_addon.title}</span>:null}</div><em>{typeof addon?.price==="number"?money.format(addon.price/100):""}</em></div>)}</section>:null}
-    {products.length?<section className={styles.section}><h2>Products</h2>{products.map((product:any,index:number)=><div className={styles.line} key={index}><div><strong>{product?.name||product?.product?.name||"Product"}</strong>{product?.quantity?<span>Qty {product.quantity}</span>:null}</div><em>{typeof product?.price==="number"?money.format(product.price/100):""}</em></div>)}</section>:null}
+    {bookings.length>1?<section className={styles.section}><h2>Vehicles / Bookings ({vehicleCount})</h2>{bookings.map((booking:any,index:number)=><div className={styles.line} key={index}><div><strong>Vehicle {index+1}: {booking.experience_name||row.experience_name||"Vehicle"}</strong><span>{booking.option_name||row.option_name||"—"}</span>{Array.isArray(booking.addons)&&booking.addons.length?<span>{booking.addons.map((a:any)=>a?.name||a?.experience_addon?.title||"Add-on").join(" · ")}</span>:null}</div></div>)}</section>:null}
+    {bookings.length>1?null:addons.length?<section className={styles.section}><h2>Add-ons / Protection</h2>{addons.map((addon:any,index:number)=><div className={styles.line} key={index}><div><strong>{addon?.name||addon?.experience_addon?.title||"Add-on"}</strong>{addon?.experience_addon?.title&&addon.experience_addon.title!==addon.name?<span>{addon.experience_addon.title}</span>:null}</div><em>{typeof addon?.price==="number"?money.format(addon.price/100):""}</em></div>)}</section>:null}
+    {bookings.length>1?null:products.length?<section className={styles.section}><h2>Products</h2>{products.map((product:any,index:number)=><div className={styles.line} key={index}><div><strong>{product?.name||product?.product?.name||"Product"}</strong>{product?.quantity?<span>Qty {product.quantity}</span>:null}</div><em>{typeof product?.price==="number"?money.format(product.price/100):""}</em></div>)}</section>:null}
     <div className={styles.total}><span>Draft Total</span><strong>{typeof row.value_cents==="number"?money.format(row.value_cents/100):"—"}</strong></div>
     <div className={styles.actions}>{customerUrl?<a className={styles.primary} href={customerUrl} target="_blank" rel="noreferrer">Open Customer in TripWorks</a>:null}</div>
   </section></main>;
