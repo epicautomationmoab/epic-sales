@@ -103,7 +103,7 @@ export default function CustomersClient({initialQuery="",autoOpen=false,userId}:
       <section className={styles.results}>{results.map(c=><button key={c.identity_key} className={styles.customerCard} onClick={()=>openCustomer(c)}>
         <div className={styles.cardTop}><div><div className={styles.name}>{c.customer_name||c.email||c.phone||"Unknown person"}</div><div className={styles.contact}>{[c.email,c.phone].filter(Boolean).join(" · ")||"No contact details"}</div></div><div className={styles.lastSeen}>{fmtDate(c.last_seen_at)}</div></div>
         <div className={styles.meta}>
-          {c.has_open_lead?<span className={styles.lead}>OPEN LEAD</span>:null}
+          {c.has_open_lead?<span className={styles.lead}>ACTIVE LEAD</span>:null}
           {c.reservation_count>0?<span>{c.reservation_count} reservation{c.reservation_count===1?"":"s"}</span>:null}
           {c.lifetime_spend_cents>0?<span>{money.format(c.lifetime_spend_cents/100)} known spend</span>:null}
           {c.confirmation_code?<span>{c.confirmation_code}</span>:null}
