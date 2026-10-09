@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/[/]+$/, "");
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 
 function secondsToMoabMidnight() {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
