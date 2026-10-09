@@ -323,12 +323,27 @@ export default function QuoteBuilder() {
 
     const q = detail.quote;
     const savedActivityTotal = Number((savedActivity as unknown as { total_cents?: number }).total_cents);
+    let twCustomerCode = "";
+    // Use the C360 identity match for this quote, never a similarly named customer.
+    if(q.opportunity_id){
+      try{
+        const response=await fetch(`/api/customer-360?opportunity=${encodeURIComponent(String(q.opportunity_id))}`,{cache:"no-store"});
+        if(response.ok){
+          const result=await response.json();
+          const identity=result?.customer?.identity;
+          const sameEmail=Boolean(q.customer_email)&&String(identity?.email||"").toLowerCase()===String(q.customer_email).toLowerCase();
+          const samePhone=Boolean(q.customer_phone_e164)&&String(identity?.phone||"").replace(/\D/g,"")===String(q.customer_phone_e164).replace(/\D/g,"");
+          if(sameEmail||samePhone)twCustomerCode=String(identity?.tripworks_customer_code||"");
+        }
+      }catch{ /* Still open the booking helper when identity lookup is unavailable. */ }
+    }
     const params = new URLSearchParams({
       source: "quote",
       quote: quoteId,
       customer: String(q.customer_name || ""),
       email: String(q.customer_email || ""),
       phone: String(q.customer_phone_e164 || ""),
+      twcustomer: twCustomerCode,
       experience: savedActivity.experience_name || booking.experienceName,
       date: booking.date,
       time: booking.time,
