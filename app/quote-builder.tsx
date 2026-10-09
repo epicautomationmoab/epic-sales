@@ -287,25 +287,30 @@ export default function QuoteBuilder() {
   }, []);
 
   async function changePricingYear(year: 2026 | 2027) {
-    if (year === pricingYear) return;
+    if (year === pricingYear || seasonLoading) return;
     setSeasonLoading(true);
     setSaveMessage("");
     try {
       const rows = await getSalesRates(year);
-      if (year === 2027 && !rows.length) {
-        setSaveMessage("2027 rates are available from TripWorks for select activities, but have not yet been loaded into Epic C360. Gateway, Moab Discovery and XP S / Pro S rental prices are documented; 2027 quoting remains unavailable until the import and saved totals are verified.");
-        return;
-      }
-      const built = buildExperiences(rows);
-      const existing = activities.some(a => Object.values(a.qty).some(q => q > 0));
-      if (existing) {
-        setActivities([blankActivity()]);
-        setAvailabilityByActivity({});
-        setSaveMessage("Pricing season changed. Re-select the activities and quantities to avoid retaining prices or ticket IDs from the previous season.");
-      }
-      setExperiences(built);
+      if (!rows.length) throw new Error(`No ${year} rates are available. The current quote has not been changed.`);
+      setExperiences(buildExperiences(rows));
       setPricingYear(year);
-      setSeasonReady(rows.length > 0);
+      setSeasonReady(true);
+      // Switching seasons starts a fresh quote. Never retain cross-season dates,
+      // quantities, availability, contact details or an old saved quote identifier.
+      setEditingQuoteId(null);
+      setActivities([blankActivity()]);
+      setVisitStart("");
+      setVisitEnd("");
+      setAvailabilityDates({});
+      setAvailabilityByActivity({});
+      setPendingBooking(null);
+      setName("");
+      setEmail("");
+      setPhone("");
+      setDetailsOpen(false);
+      setError("");
+      window.history.replaceState({}, "", window.location.pathname);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to load seasonal pricing.");
     } finally {
@@ -314,7 +319,7 @@ export default function QuoteBuilder() {
   }
 
   const dateSeasonMismatch = [visitStart, visitEnd, ...Object.values(availabilityDates)]
-    .filter(Boolean).some(date => /^20\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
+    .filter(Boolean).some(date => /^20\\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
 
   const pending2027: Record<string, string> = {
     "17327": "No Pro R rentals in 2027. Recommend the Polaris Pro S rental instead.",
