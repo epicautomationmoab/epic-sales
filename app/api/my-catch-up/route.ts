@@ -16,7 +16,7 @@ async function auth(request:NextRequest){
 export async function GET(request:NextRequest){
  const token=await auth(request);
  if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
- try {const items=await call(token,"epic_catchup_items",{});return NextResponse.json({items:Array.isArray(items)?items:[],lookbackDays:60});}
+ try {const items=await call(token,"epic_catchup_attributed",{});return NextResponse.json({items:Array.isArray(items)?items:[],lookbackDays:60});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Catch-Up unavailable"},{status:500});}
 }
 export async function POST(request:NextRequest){
