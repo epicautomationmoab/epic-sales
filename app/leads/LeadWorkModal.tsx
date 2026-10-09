@@ -9,6 +9,7 @@ type Props={
   onClose:()=>void;
   onOpenIntroduction:()=>void;
   onOpenCustomer360:()=>void;
+  onLeadUpdated:()=>void;
 };
 
 type ObjectionCode=
@@ -51,7 +52,7 @@ const outcomes=[
 function fmtDate(v:string|null){if(!v)return"—";const d=new Date(v.length===10?`${v}T12:00:00`:v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
 const money=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0});
 
-export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroduction,onOpenCustomer360}:Props){
+export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroduction,onOpenCustomer360,onLeadUpdated}:Props){
   const[objection,setObjection]=useState<ObjectionCode|null>(null);
   const[detail,setDetail]=useState("");
   const[resolution,setResolution]=useState("");
@@ -61,14 +62,26 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const[saving,setSaving]=useState(false);
   const[status,setStatus]=useState("");
   const[activityComposerOpen,setActivityComposerOpen]=useState(false);
-  const[activityKey,setActivityKey]=useState<(typeof activityEmails)[number]["key"]>("hells_revenge");
+  const[draftId,setDraftId]=useState<string>(lead.drafts?.[0]?.id||"");
+  const[activityOverride,setActivityOverride]=useState<string>("");
   const[activityNote,setActivityNote]=useState("");
   const[sendingActivity,setSendingActivity]=useState(false);
   const selected=useMemo(()=>objectionOptions.find(o=>o.code===objection)||null,[objection]);
-  const draft=lead.drafts?.[0];
-  const interest=lead.interest_label||draft?.experience_name||"Not specified";
+  const draft=lead.drafts?.find(d=>d.id===draftId)||lead.drafts?.[0];
+  const interest=draft?.experience_name||lead.interest_label||"Not specified";
+  const defaultActivityKey=useMemo(()=>{
+    const name=`${draft?.experience_name||""} ${draft?.option_name||""}`.toLowerCase();
+    if(name.includes("poison spider"))return "poison_spider";
+    if(name.includes("hell")||name.includes("fins"))return "hells_revenge";
+    if(name.includes("works")||name.includes("sampler"))return "works_sampler";
+    if(name.includes("xpedition"))return "xpedition";
+    if(name.includes("rzr")||name.includes("rental")||name.includes("pro r"))return "rental_rzr";
+    return "";
+  },[draft]);
+  const activityKey=activityOverride||defaultActivityKey;
   const phoneHref=lead.phone_e164?`tel:${lead.phone_e164}`:null;
-  const selectedActivity=activityEmails.find(a=>a.key===activityKey)||activityEmails[0];
+  const selectedActivity=activityEmails.find(a=>a.key===activityKey);
+
 
   async function sendActivityEmail(){
     setSendingActivity(true);setStatus("");
@@ -80,7 +93,8 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
       })});
       const p=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(p?.error||"Unable to send activity information.");
-      setStatus(`${selectedActivity.name} information sent.`);
+      setStatus(`${selectedActivity?.name||"Activity"} information sent.`);
+      onLeadUpdated();
       setActivityComposerOpen(false);
       setActivityNote("");
     }catch(e){setStatus(e instanceof Error?e.message:"Unable to send activity information.");}
@@ -89,6 +103,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
   async function save(){
     if(!objection||!outcome){setStatus("Choose the main objection and the call outcome first.");return;}
+    if(outcome==="do_not_contact"){setStatus("Do Not Contact requires a verified contact-suppression step before closing. Please use the existing suppression workflow.");return;}
     setSaving(true);setStatus("");
     try{
       const r=await fetch("/api/leads/call-workflow",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
@@ -102,7 +117,18 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
       })});
       const p=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(p?.error||"Unable to save call.");
-      setStatus("Call saved to the lead.");
+      if(nextAction.trim()){
+        const note=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"note",opportunity_id:lead.id,note_text:`Sales call next action / promise: ${nextAction.trim()}`})});
+        const noteBody=await note.json().catch(()=>({}));
+        if(!note.ok)throw new Error(noteBody?.error||"Call saved, but internal note could not be added.");
+      }
+      if(outcome==="lost"){
+        const close=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"mark_lost",opportunity_id:lead.id,reason:"sales_call",note_text:detail.trim()||resolution.trim()||"Closed after sales follow-up"})});
+        const closeBody=await close.json().catch(()=>({}));
+        if(!close.ok)throw new Error(closeBody?.error||"Call saved, but lead could not be closed.");
+      }
+      setStatus(outcome==="lost"?"Call saved; lead closed as lost.":"Call saved to the lead.");
+      onLeadUpdated();
     }catch(e){setStatus(e instanceof Error?e.message:"Unable to save call.");}
     finally{setSaving(false);}
   }
@@ -126,6 +152,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
           ].map(([label,value])=><div key={label} style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".07em",opacity:.55}}>{label}</div><div style={{marginTop:5,fontWeight:800}}>{value}</div></div>)}
         </div>
 
+        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"Most recently listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
         <section style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:14,padding:20}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}>
             <div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>START WITH THE CALL</div><h3 style={{margin:"4px 0 3px",fontSize:22}}>Find out what actually stopped them.</h3><div style={{color:"#606975",lineHeight:1.5}}>Do not start by pitching. Ask the question, listen, then solve the real objection.</div></div>
@@ -171,24 +198,24 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
         {activityComposerOpen?<section style={{background:"#fff",border:"2px solid #c6492d",borderRadius:14,padding:20,display:"grid",gap:14}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>ACTIVITY INFORMATION EMAIL</div><h3 style={{margin:"4px 0"}}>Preview before sending</h3><div style={{fontSize:13,color:"#6b7280"}}>Nothing sends until you click Send Email.</div></div><button type="button" onClick={()=>setActivityComposerOpen(false)} aria-label="Close activity email">×</button></div>
-          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>setActivityKey(e.target.value as (typeof activityEmails)[number]["key"])} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
+          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>setActivityOverride(e.target.value)} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}><option value="" disabled>Choose an activity</option>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
           <div style={{background:"#eeeae3",borderRadius:14,padding:14}}>
             <div style={{background:"#171717",color:"#fff",textAlign:"center",padding:16,fontWeight:900,borderRadius:"10px 10px 0 0"}}>EPIC 4X4 ADVENTURES</div>
             <div style={{height:4,background:"#c6492d"}}/>
             <div style={{background:"#fff",padding:24,borderRadius:"0 0 10px 10px",lineHeight:1.6}}>
               <div style={{fontSize:12,fontWeight:900,letterSpacing:".1em",color:"#b9432b"}}>A LITTLE MORE INFORMATION</div>
-              <h2 style={{margin:"5px 0 14px"}}>About {selectedActivity.name}</h2>
+              <h2 style={{margin:"5px 0 14px"}}>About {selectedActivity?.name||"your adventure"}</h2>
               <p>Hi {lead.customer_name?lead.customer_name.split(" ")[0]:"there"},</p>
-              <p>I thought I’d send a little more information about <strong>{selectedActivity.name}</strong> since it’s one of the options you’ve been considering.</p>
-              <p>{selectedActivity.overview}</p>
-              <p>{selectedActivity.guidance}</p>
+              <p>I thought I’d send a little more information about <strong>{selectedActivity?.name}</strong> since it’s one of the options you’ve been considering.</p>
+              <p>{selectedActivity?.overview||"Select an activity to preview its information."}</p>
+              <p>{selectedActivity?.guidance}</p>
               {activityNote.trim()?<p>{activityNote.trim()}</p>:null}
               <div style={{display:"inline-block",background:"#bf452d",color:"#fff",fontWeight:900,borderRadius:9,padding:"11px 16px"}}>Continue Your Booking</div>
               <div style={{marginTop:18,background:"#f6f3ee",borderRadius:10,padding:14,fontSize:14}}>Reply to this email or call 435-220-2700 and ask for {profileName.split(" ")[0]}. The email will include the rep’s current office hours and an unsubscribe link.</div>
             </div>
           </div>
           <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Personal Note <span style={{fontWeight:500,opacity:.6}}>(optional)</span><textarea rows={3} value={activityNote} onChange={e=>setActivityNote(e.target.value)} maxLength={4000} placeholder="Add anything specific from your conversation…" style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit",resize:"vertical"}}/></label>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity||!selectedActivity} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
         </section>:null}
 
         {status?<div style={{padding:"11px 13px",borderRadius:10,background:status.includes("saved")||status.includes("sent")?"#edf8f1":"#fff4e8",fontWeight:800}}>{status}</div>:null}
