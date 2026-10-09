@@ -7,6 +7,9 @@ export type SalesRateRow = {
   unit_price_cents: number;
   quantity_label: string | null;
   sales_help_text: string | null;
+  effective_start: string | null;
+  effective_end: string | null;
+  source: string | null;
 };
 
 export type SalesBookingLink = { experience_id: string; booking_url: string; };
@@ -81,9 +84,9 @@ const apiHeaders = {
   "Content-Type": "application/json",
 };
 
-export async function getSalesRates(): Promise<SalesRateRow[]> {
+export async function getSalesRates(year: 2026 | 2027 = 2026): Promise<SalesRateRow[]> {
   const params = new URLSearchParams({
-    select: "experience_id,experience_name,business_line,ticket_type_id,ticket_type_name,unit_price_cents,quantity_label,sales_help_text",
+    select: "experience_id,experience_name,business_line,ticket_type_id,ticket_type_name,unit_price_cents,quantity_label,sales_help_text,effective_start,effective_end,source",
     is_active: "eq.true",
     experience_id: "neq.17328",
     ticket_type_name: "not.in.(Guest,Adult Rider,Terms and Conditions)",
@@ -100,7 +103,13 @@ export async function getSalesRates(): Promise<SalesRateRow[]> {
     throw new Error(`Unable to load sales rates (${response.status})${detail ? `: ${detail}` : ""}`);
   }
 
-  return response.json() as Promise<SalesRateRow[]>;
+  const rows = await response.json() as SalesRateRow[];
+  // Un-dated legacy rate-sheet entries are the existing 2026 schedule only.
+  // Never fall back to them when a future season is selected.
+  const day = `${year}-07-01`;
+  return rows.filter(row => year === 2026
+    ? (!row.effective_start && !row.effective_end) || (!!row.effective_start && row.effective_start <= day && (!row.effective_end || row.effective_end >= day))
+    : !!row.effective_start && row.effective_start <= day && (!row.effective_end || row.effective_end >= day));
 }
 
 export async function getSalesBookingLinks(): Promise<SalesBookingLink[]> {
