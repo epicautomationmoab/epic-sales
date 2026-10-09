@@ -16,6 +16,6 @@ export default async function CatchUpPage(){
  <div><div style={{fontSize:11,letterSpacing:2,color:"#875ab6",fontWeight:800}}>EPIC C360 · MY CATCH-UP</div><h1 style={{fontSize:29,margin:"11px 0 5px"}}>Welcome back, {first}!</h1><p style={{color:"#697081",margin:0}}>What happened with your claimed people while you were away?</p></div>
  <a href="/inbox" style={{background:"white",padding:"10px 13px",borderRadius:8,border:"1px solid #e0e1e7",textDecoration:"none",color:"#565b66"}}>← Inbox</a>
  </header>
- <CatchUpFeed profileId={profile.id}/>
+ <CatchUpFeed profileId={profile.id} profileName={profile.display_name}/>
  </section></main>
 }
