@@ -776,10 +776,17 @@ export default function QuoteBuilder() {
               </div>
               <div className="card" style={{marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-                  <div><strong>Pricing season: {pricingYear}</strong><div className="ticketMeta">2026 is the default pricing season.</div></div>
-                  <button className="secondary" type="button" disabled={seasonLoading} onClick={() => void changePricingYear(pricingYear === 2026 ? 2027 : 2026)}>
-                    {seasonLoading ? "Loading rates..." : pricingYear === 2026 ? "Grab 2027 Rates" : "Grab 2026 Rates"}
-                  </button>
+                  <strong>Pricing season</strong>
+                  <div style={{display:"flex",gap:8}}>
+                    {([2026, 2027] as const).map(year => (
+                      <button key={year} type="button" disabled={seasonLoading}
+                        aria-pressed={pricingYear === year}
+                        className={pricingYear === year ? "primary" : "secondary"}
+                        onClick={() => void changePricingYear(year)}>
+                        {year} Rates
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 {dateSeasonMismatch && <div className="availabilityError">The activity or visit date does not match {pricingYear} pricing. Correct the year before saving or booking.</div>}
                 {pricingYear === 2027 && <div className="availabilityError">2027 quotes cannot be sent or booked until the seasonal rate schedule and saved totals are verified. Pro R rentals are discontinued; recommend Pro S. Poison Spider and the new Pro R Boost sand-dune tour are pending pricing.</div>}
