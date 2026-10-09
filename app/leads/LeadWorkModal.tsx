@@ -84,8 +84,14 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
 
   async function sendActivityEmail(){
+    if(!selectedActivity){setStatus("Choose an activity to send.");return;}
     setSendingActivity(true);setStatus("");
     try{
+      if(!lead.claimed_by_name&&!lead.assigned_rep_name){
+        const claim=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"claim",opportunity_id:lead.id})});
+        const claimData=await claim.json().catch(()=>({}));
+        if(!claim.ok)throw new Error(claimData?.error||"Unable to claim lead before sending.");
+      }
       const r=await fetch("/api/sales-activity-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         opportunity_id:lead.id,
         activity_key:activityKey,
@@ -94,7 +100,6 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
       const p=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(p?.error||"Unable to send activity information.");
       setStatus(`${selectedActivity?.name||"Activity"} information sent.`);
-      onLeadUpdated();
       setActivityComposerOpen(false);
       setActivityNote("");
     }catch(e){setStatus(e instanceof Error?e.message:"Unable to send activity information.");}
@@ -128,7 +133,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
         if(!close.ok)throw new Error(closeBody?.error||"Call saved, but lead could not be closed.");
       }
       setStatus(outcome==="lost"?"Call saved; lead closed as lost.":"Call saved to the lead.");
-      onLeadUpdated();
+      if(outcome==="lost")onLeadUpdated();
     }catch(e){setStatus(e instanceof Error?e.message:"Unable to save call.");}
     finally{setSaving(false);}
   }
@@ -152,7 +157,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
           ].map(([label,value])=><div key={label} style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".07em",opacity:.55}}>{label}</div><div style={{marginTop:5,fontWeight:800}}>{value}</div></div>)}
         </div>
 
-        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"Most recently listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
+        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"First listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
         <section style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:14,padding:20}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}>
             <div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>START WITH THE CALL</div><h3 style={{margin:"4px 0 3px",fontSize:22}}>Find out what actually stopped them.</h3><div style={{color:"#606975",lineHeight:1.5}}>Do not start by pitching. Ask the question, listen, then solve the real objection.</div></div>
