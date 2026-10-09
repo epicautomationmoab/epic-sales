@@ -323,21 +323,14 @@ export default function QuoteBuilder() {
     .filter(Boolean).some(date => /^20\\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
 
   const pending2027: Record<string, string> = {
-    "17327": "No Pro R rentals in 2027. Recommend the Polaris Pro S rental instead.",
-    "17328": "No Pro R rentals in 2027. Recommend the Polaris Pro S rental instead.",
-    "13804": "2027 pricing for Poison Spider Mesa has not been established. Tell the guest we are building our 2027 Poison Spider calendar now and will get back to them promptly.",
-    "16190": "2027 pricing for Poison Spider Mesa has not been established. Tell the guest we are building our 2027 Poison Spider calendar now and will get back to them promptly.",
-    "15783": "We will not run the Pro R Adult Hell's Revenge tour in 2027. Something exciting is coming soon: the Pro R Boost Sand Dune Tour — Moab's only sand dune tour, at Behind the Rocks Trail.",
-    "18197": "We will not run the Pro R Hell's Revenge tour in 2027. Something exciting is coming soon: the Pro R Boost Sand Dune Tour — Moab's only sand dune tour, at Behind the Rocks Trail."
+    "13804": "2027 Poison Spider pricing coming soon. We're building our 2027 Poison Spider calendar and will get back to the guest promptly.",
+    "16190": "2027 Poison Spider pricing coming soon. We're building our 2027 Poison Spider calendar and will get back to the guest promptly."
   };
   const unavailable2027Options = [
-    {id:"17327", name:"2-Seat Pro R Rental — discontinued"},
-    {id:"17328", name:"4-Seat Pro R Rental — discontinued"},
-    {id:"16190", name:"Poison Spider Mesa Tour — pricing pending"},
-    {id:"13804", name:"Poison Spider Private — pricing pending"},
-    {id:"15783", name:"Pro R Adult Hell's Revenge — discontinued"},
-    {id:"18197", name:"Private Pro R Hell's Revenge — discontinued"}
+    {id:"16190", name:"Poison Spider Mesa Tour — 2027 pricing coming soon"},
+    {id:"13804", name:"Poison Spider Private — 2027 pricing coming soon"}
   ];
+
   function updateActivity(key: string, changes: Partial<QuoteActivity>) {
     setActivities((current) => current.map((item) => item.key === key ? { ...item, ...changes } : item));
   }
