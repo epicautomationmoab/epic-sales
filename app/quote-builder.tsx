@@ -224,6 +224,7 @@ export default function QuoteBuilder() {
   const [pricingYear, setPricingYear] = useState<2026 | 2027>(2026);
   const [seasonReady, setSeasonReady] = useState(true);
   const [seasonLoading, setSeasonLoading] = useState(false);
+  const [pendingSeason, setPendingSeason] = useState<2026 | 2027 | null>(null);
   const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
   const [bookingLinks, setBookingLinks] = useState<Record<string, string>>({});
   const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
@@ -803,7 +804,7 @@ export default function QuoteBuilder() {
                       <button key={year} type="button" disabled={seasonLoading}
                         aria-pressed={pricingYear === year}
                         className={pricingYear === year ? "primary" : "secondary"}
-                        onClick={() => void changePricingYear(year)}>
+                        onClick={() => { if (year !== pricingYear) setPendingSeason(year); }}>
                         {year} Rates
                       </button>
                     ))}
@@ -999,6 +1000,19 @@ export default function QuoteBuilder() {
           </div>
         )}
       </section>
+
+      {pendingSeason !== null && (
+        <div className="modalBackdrop" onMouseDown={() => setPendingSeason(null)}>
+          <div className="modalCard" role="alertdialog" aria-modal="true" aria-labelledby="season-change-title" onMouseDown={(e) => e.stopPropagation()}>
+            <h2 id="season-change-title">Caution: Changing Seasons Refreshes Your Quote Builder.</h2>
+            <p>Unsaved quotes will be discarded.</p>
+            <div style={{display:"flex",justifyContent:"flex-end",gap:12,marginTop:24}}>
+              <button className="secondary" type="button" onClick={() => setPendingSeason(null)}>Cancel</button>
+              <button className="primary" type="button" onClick={() => { const next = pendingSeason; setPendingSeason(null); void changePricingYear(next); }}>Continue</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {detailsOpen && (
         <div className="modalBackdrop" onMouseDown={() => { setDetailsOpen(false); setPendingBooking(null); }}>
