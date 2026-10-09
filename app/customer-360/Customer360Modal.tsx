@@ -103,6 +103,19 @@ export default function Customer360Modal(props:Props){
     finally{setSending(false);}
   }
 
+  async function claimCustomerSalesLead(){
+    const contact=data?.identity?.contact_id;if(!contact)return;
+    setClaimingCustomer(true);setClaimCustomerError("");
+    try{
+      const response=await fetch("/api/claim-customer-lead",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:contact})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||"Unable to claim customer.");
+      const q=new URLSearchParams({contact});const refreshed=await fetch("/api/customer-360?"+q.toString(),{cache:"no-store"});
+      const result=await refreshed.json().catch(()=>({}));
+      if(refreshed.ok&&result.customer)setData(result.customer);
+    }catch(e){setClaimCustomerError(e instanceof Error?e.message:"Unable to claim customer.");}
+    finally{setClaimingCustomer(false);}
+  }
   if(!open)return null;
   const identity=data?.identity;
   const activeReservations=(data?.reservations||[]).filter(r=>!r.is_cancelled&&(!r.end_time||new Date(r.end_time).getTime()>=Date.now()-24*60*60*1000));
@@ -154,7 +167,8 @@ export default function Customer360Modal(props:Props){
   if(!badges.length)badges.push("New Customer");
 
   return <div className={styles.backdrop} onMouseDown={e=>{if(e.currentTarget===e.target)onClose();}}><section className={styles.modal} role="dialog" aria-modal="true" aria-label="EpicC360">
-    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<button className={styles.button} type="button" onClick={()=>{setComposeChannel("email");setSendStatus("");}}>Email</button>:null}{identity?.phone?<button className={styles.button} type="button" onClick={()=>{setFilter("text");setComposeChannel(null);setSendStatus("");}}>Text</button>:null}<a className={styles.buttonPrimary} href={quoteHref}>Build Quote</a>{futureDrafts.length?<button className={styles.button} type="button" onClick={openStaffBookingCard}>Book It</button>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
+    <header className={styles.header}><div className={styles.headerIdentity}><div className={styles.eyebrow}>EpicC360</div><h2>{identity?.name||"New / Unknown Customer"}</h2><div className={styles.sub}>{[identity?.email,identity?.phone].filter(Boolean).join(" · ")||"No customer identity captured yet"}</div>{data?<div className={styles.badges}>{badges.map(b=><span key={b}>{b}</span>)}</div>:null}</div><div className={styles.headerActions}>{identity?.email?<button className={styles.button} type="button" onClick={()=>{setComposeChannel("email");setSendStatus("");}}>Email</button>:null}{identity?.phone?<button className={styles.button} type="button" onClick={()=>{setFilter("text");setComposeChannel(null);setSendStatus("");}}>Text</button>:null}{data&&openLeads.length===0&&identity?.contact_id?<button className={styles.button} type="button" disabled={claimingCustomer} onClick={claimCustomerSalesLead}>{claimingCustomer?"Claiming…":"Claim Sales Lead"}</button>:null}<a className={styles.buttonPrimary} href={quoteHref}>Build Quote</a>{futureDrafts.length?<button className={styles.button} type="button" onClick={openStaffBookingCard}>Book It</button>:null}<button className={styles.close} aria-label="Close EpicC360" onClick={onClose}>×</button></div></header>
+    {claimCustomerError?<div role="alert" style={{padding:"10px 26px",color:"#b42318",background:"#fff1ee"}}>{claimCustomerError}</div>:null}
     {composeChannel&&data?<div style={{background:"#fff",borderBottom:"1px solid #e2e7ec",padding:"16px 26px",display:"grid",gap:10}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}><strong>{composeChannel==="email"?"Email":"Text"} {data.identity.name||"customer"}</strong><button className={styles.close} type="button" onClick={()=>setComposeChannel(null)}>×</button></div>{composeChannel==="email"?<input style={{width:"100%",boxSizing:"border-box",border:"1px solid #d9e0e6",borderRadius:9,padding:"10px 12px"}} value={composeSubject} onChange={e=>setComposeSubject(e.target.value)} placeholder="Subject"/>:null}<textarea style={{width:"100%",boxSizing:"border-box",border:"1px solid #d9e0e6",borderRadius:9,padding:"10px 12px",resize:"vertical"}} rows={5} value={composeBody} onChange={e=>setComposeBody(e.target.value)} placeholder={composeChannel==="email"?"Write email…":"Write text…"} maxLength={composeChannel==="text"?1600:20000}/><div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button className={styles.button} type="button" onClick={()=>setComposeChannel(null)}>Cancel</button><button className={styles.buttonPrimary} type="button" disabled={sending||!composeBody.trim()} onClick={()=>void sendCommunication()}>{sending?"Sending…":composeChannel==="email"?"Send Email":"Send Text"}</button></div></div>:null}
     {sendStatus?<div style={{background:"#edf8f1",padding:"9px 26px",fontSize:12,fontWeight:800}}>{sendStatus}</div>:null}
     {loading?<div className={styles.loading}>Loading EpicC360…</div>:error?<div className={styles.error}>{error}</div>:!data?<div className={styles.empty}>No customer record found.</div>:<div className={styles.body}>
