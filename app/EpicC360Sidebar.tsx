@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import PingBadge from "./PingBadge";
 type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping";
 
@@ -31,6 +34,19 @@ export default function EpicC360Sidebar({
   footerClassName,
   canManage = false,
 }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      if (!response.ok) throw new Error("Unable to log out.");
+      window.location.assign("/employee-login");
+    } catch {
+      setLoggingOut(false);
+      window.alert("Unable to log out. Please try again.");
+    }
+  }
   return (
     <aside className={className}>
       <div className="epicC360Brand">
@@ -48,7 +64,8 @@ export default function EpicC360Sidebar({
       </nav>
       <div className={footerClassName}>
         <div>Signed in as</div>
-        <strong>{profileName}</strong>
+        <button type="button" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} style={{background:"transparent",border:0,color:"inherit",cursor:"pointer",font:"inherit",fontWeight:800,padding:"5px 0",display:"flex",gap:8,alignItems:"center",textAlign:"left"}}>{profileName}<span aria-hidden="true">{menuOpen ? "▴" : "▾"}</span></button>
+        {menuOpen ? <button type="button" onClick={logout} disabled={loggingOut} style={{marginTop:6,padding:"9px 15px",background:"#293342",color:"#fff",border:"1px solid #566174",borderRadius:8,cursor:"pointer",fontWeight:700}}>{loggingOut ? "Logging out..." : "Log out"}</button> : null}
       </div>
     </aside>
   );
