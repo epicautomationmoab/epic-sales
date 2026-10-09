@@ -22,6 +22,8 @@ export type SaveQuoteActivity = {
   experienceId: string;
   tripSafe: boolean;
   premier: boolean;
+  priorEveningPickup: boolean;
+  nextMorningDropoff: boolean;
   tickets: Array<{ ticketTypeId: string; quantity: number }>;
 };
 
@@ -57,6 +59,8 @@ export type SalesQuoteDetail = {
     activity_order: number;
     tripsafe_selected: boolean;
     premier_selected: boolean;
+    prior_evening_pickup?: boolean;
+    next_morning_dropoff?: boolean;
     private_fee_cents?: number;
     rental_period_days?: number;
     items: Array<{
