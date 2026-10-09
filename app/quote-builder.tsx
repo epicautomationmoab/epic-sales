@@ -319,6 +319,7 @@ export default function QuoteBuilder() {
     }
   }
 
+  const effectiveVisitStart = visitStart || Object.values(availabilityDates).find(Boolean) || "";
   const dateSeasonMismatch = [visitStart, visitEnd, ...Object.values(availabilityDates)]
     .filter(Boolean).some(date => /^20\\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
 
@@ -625,7 +626,7 @@ export default function QuoteBuilder() {
   const hasAnyTicket = activities.some((activity) => Object.values(activity.qty).some((quantity) => quantity > 0));
 
   async function handleSave() {
-    if (seasonLoading || !seasonReady || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) {
+    if (seasonLoading || !seasonReady || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) {
       setSaveMessage("Set the matching 2027 visit date and select an activity with published pricing before saving.");
       return;
     }
@@ -684,7 +685,7 @@ export default function QuoteBuilder() {
   }
 
   async function handleSaveAndEmail() {
-    if (seasonLoading || !seasonReady || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) {
+    if (seasonLoading || !seasonReady || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) {
       setSaveMessage("Set the matching 2027 visit date and select an activity with published pricing before emailing.");
       return;
     }
@@ -694,7 +695,7 @@ export default function QuoteBuilder() {
     try {
       const result = await saveSalesQuote({
         quoteId: editingQuoteId, customerName: name, customerEmail: email, customerPhone: phone,
-        visitStart, visitEnd,
+        visitStart: effectiveVisitStart, visitEnd,
         activities: activities.map((activity) => ({
           experienceId: activity.experienceId, tripSafe: activity.tripSafe, premier: activity.premier,
           priorEveningPickup: activity.priorEveningPickup, nextMorningDropoff: activity.nextMorningDropoff,
@@ -935,7 +936,7 @@ export default function QuoteBuilder() {
                               <button
                                 className="secondary availabilityBookButton"
                                 type="button"
-                                onClick={() => { if (dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) { setSaveMessage("Correct and verify the pricing season before booking."); return; } beginBooking({
+                                onClick={() => { if (dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))) { setSaveMessage("Correct and verify the pricing season before booking."); return; } beginBooking({
                                   experienceId: experience.id,
                                   experienceName: experience.name,
                                   date: availabilityByActivity[activity.key]?.date || availabilityDates[activity.key] || visitStart,
@@ -993,8 +994,8 @@ export default function QuoteBuilder() {
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
               <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
-              <button className="primary" type="button" onClick={() => setDetailsOpen(true)} disabled={dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId])) || seasonLoading}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
-              {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
+              <button className="primary" type="button" onClick={() => setDetailsOpen(true)} disabled={dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId])) || seasonLoading}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
+              {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
             </section>
           </div>
@@ -1025,9 +1026,9 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
-            <button className="primary" type="button" onClick={handleSave} disabled={saving || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
-            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={beginQuoteBookingFromDetails} disabled={saving || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>Book It</button> : null}
-            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing || dateSeasonMismatch || (pricingYear === 2027 && !visitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
+            <button className="primary" type="button" onClick={handleSave} disabled={saving || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={beginQuoteBookingFromDetails} disabled={saving || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>Book It</button> : null}
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
           </div>
         </div>
       )}
