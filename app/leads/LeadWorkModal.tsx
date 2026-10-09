@@ -212,20 +212,10 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
         {activityComposerOpen?<section style={{background:"#fff",border:"2px solid #c6492d",borderRadius:14,padding:20,display:"grid",gap:14}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>ACTIVITY INFORMATION EMAIL</div><h3 style={{margin:"4px 0"}}>Preview before sending</h3><div style={{fontSize:13,color:"#6b7280"}}>Nothing sends until you click Send Email.</div></div><button type="button" onClick={()=>setActivityComposerOpen(false)} aria-label="Close activity email">×</button></div>
           <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>setActivityOverride(e.target.value)} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}><option value="" disabled>Choose an activity</option>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
-          <div style={{background:"#eeeae3",borderRadius:14,padding:14}}>
-            <div style={{background:"#171717",color:"#fff",textAlign:"center",padding:16,fontWeight:900,borderRadius:"10px 10px 0 0"}}>EPIC 4X4 ADVENTURES</div>
-            <div style={{height:4,background:"#c6492d"}}/>
-            <div style={{background:"#fff",padding:24,borderRadius:"0 0 10px 10px",lineHeight:1.6}}>
-              <div style={{fontSize:12,fontWeight:900,letterSpacing:".1em",color:"#b9432b"}}>A LITTLE MORE INFORMATION</div>
-              <h2 style={{margin:"5px 0 14px"}}>About {selectedActivity?.name||"your adventure"}</h2>
-              <p>Hi {lead.customer_name?lead.customer_name.split(" ")[0]:"there"},</p>
-              <p>I thought I’d send a little more information about <strong>{selectedActivity?.name}</strong> since it’s one of the options you’ve been considering.</p>
-              <p>{selectedActivity?.overview||"Select an activity to preview its information."}</p>
-              <p>{selectedActivity?.guidance}</p>
-              {activityNote.trim()?<p>{activityNote.trim()}</p>:null}
-              <div style={{display:"inline-block",background:"#bf452d",color:"#fff",fontWeight:900,borderRadius:9,padding:"11px 16px"}}>Continue Your Booking</div>
-              <div style={{marginTop:18,background:"#f6f3ee",borderRadius:10,padding:14,fontSize:14}}>Reply to this email or call 435-220-2700 and ask for {profileName.split(" ")[0]}. The email will include the rep’s current office hours and an unsubscribe link.</div>
-            </div>
+          <div style={{background:"#f6f3ee",borderRadius:12,padding:17,lineHeight:1.6}}>
+            <strong>{selectedActivity?.name||"Choose an activity"}</strong>
+            <p style={{margin:"8px 0"}}>This activity now uses its own fully branded Resend email template. The final email includes the approved activity description, the customer's selected TripWorks draft link, your personal note, and your representative signature.</p>
+            <p style={{margin:"8px 0 0",fontSize:13,color:"#606975"}}>You can review the finished design in Resend before sending. Nothing sends until you click Send Email.</p>
           </div>
           <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Personal Note <span style={{fontWeight:500,opacity:.6}}>(optional)</span><textarea rows={3} value={activityNote} onChange={e=>setActivityNote(e.target.value)} maxLength={4000} placeholder="Add anything specific from your conversation…" style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit",resize:"vertical"}}/></label>
           <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity||!selectedActivity} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
