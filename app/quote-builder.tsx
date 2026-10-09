@@ -221,6 +221,9 @@ function dateRange(quote: RecentSalesQuote) {
 export default function QuoteBuilder() {
   const [active, setActive] = useState<"leads" | "quotes">("quotes");
   const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [pricingYear, setPricingYear] = useState<2026 | 2027>(2026);
+  const [seasonReady, setSeasonReady] = useState(true);
+  const [seasonLoading, setSeasonLoading] = useState(false);
   const [experienceFees, setExperienceFees] = useState<SalesExperienceFee[]>([]);
   const [bookingLinks, setBookingLinks] = useState<Record<string, string>>({});
   const [activities, setActivities] = useState<QuoteActivity[]>([blankActivity()]);
@@ -268,7 +271,7 @@ export default function QuoteBuilder() {
         .catch((err) => setSaveMessage(err instanceof Error ? err.message : "Unable to load customer details."));
     }
 
-    Promise.all([getSalesRates(), getSalesExperienceFees(), getSalesBookingLinks()])
+    Promise.all([getSalesRates(2026), getSalesExperienceFees(), getSalesBookingLinks()])
       .then(([rows, fees, links]) => {
         const built = buildExperiences(rows);
         setExperiences(built);
@@ -282,6 +285,36 @@ export default function QuoteBuilder() {
 
     getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
   }, []);
+
+  async function changePricingYear(year: 2026 | 2027) {
+    if (year === pricingYear) return;
+    setSeasonLoading(true);
+    setSaveMessage("");
+    try {
+      const rows = await getSalesRates(year);
+      if (year === 2027 && !rows.length) {
+        setSaveMessage("2027 pricing has not been published in Epic C360. The quote remains on 2026 pricing; no 2026 rates will be substituted for 2027.");
+        return;
+      }
+      const built = buildExperiences(rows);
+      const existing = activities.some(a => Object.values(a.qty).some(q => q > 0));
+      if (existing) {
+        setActivities([blankActivity()]);
+        setAvailabilityByActivity({});
+        setSaveMessage("Pricing season changed. Re-select the activities and quantities to avoid retaining prices or ticket IDs from the previous season.");
+      }
+      setExperiences(built);
+      setPricingYear(year);
+      setSeasonReady(rows.length > 0);
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Unable to load seasonal pricing.");
+    } finally {
+      setSeasonLoading(false);
+    }
+  }
+
+  const dateSeasonMismatch = [visitStart, visitEnd, ...Object.values(availabilityDates)]
+    .filter(Boolean).some(date => /^20\d{2}-/.test(date) && Number(date.slice(0,4)) !== pricingYear);
 
   function updateActivity(key: string, changes: Partial<QuoteActivity>) {
     setActivities((current) => current.map((item) => item.key === key ? { ...item, ...changes } : item));
@@ -570,6 +603,10 @@ export default function QuoteBuilder() {
   const hasAnyTicket = activities.some((activity) => Object.values(activity.qty).some((quantity) => quantity > 0));
 
   async function handleSave() {
+    if (seasonLoading || !seasonReady || pricingYear !== 2026 || dateSeasonMismatch) {
+      setSaveMessage(pricingYear === 2027 ? "2027 quotes require verified rate persistence and TripWorks parity before saving. No quote was saved." : "Correct the pricing year/date mismatch before saving.");
+      return;
+    }
     if (!hasAnyTicket) {
       setSaveMessage("Add at least one ticket before saving the estimate.");
       return;
@@ -625,6 +662,10 @@ export default function QuoteBuilder() {
   }
 
   async function handleSaveAndEmail() {
+    if (seasonLoading || !seasonReady || pricingYear !== 2026 || dateSeasonMismatch) {
+      setSaveMessage(pricingYear === 2027 ? "2027 quotes are blocked until pricing and saved totals are verified." : "Correct the pricing year/date mismatch before emailing.");
+      return;
+    }
     if (!email.trim()) { setSaveMessage("Add a guest email before sending the quote."); return; }
     if (!hasAnyTicket) { setSaveMessage("Add at least one ticket before sending the quote."); return; }
     setEmailing(true); setSaveMessage("");
@@ -854,13 +895,13 @@ export default function QuoteBuilder() {
                               <button
                                 className="secondary availabilityBookButton"
                                 type="button"
-                                onClick={() => beginBooking({
+                                onClick={() => { if (pricingYear !== 2026 || dateSeasonMismatch) { setSaveMessage("Correct and verify the pricing season before booking."); return; } beginBooking({
                                   experienceId: experience.id,
                                   experienceName: experience.name,
                                   date: availabilityByActivity[activity.key]?.date || availabilityDates[activity.key] || visitStart,
                                   time: slot.time_label || slot.label || slot.full_label || slot.start_time || "",
                                   total,
-                                })}
+                                }); }}
                               >
                                 Book It
                               </button>
@@ -912,8 +953,8 @@ export default function QuoteBuilder() {
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
               <div className="summaryRow"><span>TripWorks booking fee (4%)</span><strong>{money.format(totals.twFee)}</strong></div>
               <div className="summaryRow total"><span>Estimated OTD</span><span>{money.format(totals.total)}</span></div>
-              <button className="primary" type="button" onClick={() => setDetailsOpen(true)}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
-              {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
+              <button className="primary" type="button" onClick={() => setDetailsOpen(true)} disabled={pricingYear !== 2026 || dateSeasonMismatch || seasonLoading}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
+              {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing || pricingYear !== 2026 || dateSeasonMismatch}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
             </section>
           </div>
@@ -931,9 +972,9 @@ export default function QuoteBuilder() {
               <div className="field"><label>Moab arrival / first activity</label><input type="date" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} /></div>
               <div className="field"><label>Moab departure / last activity</label><input type="date" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} /></div>
             </div>
-            <button className="primary" type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
-            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={beginQuoteBookingFromDetails} disabled={saving}>Book It</button> : null}
-            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
+            <button className="primary" type="button" onClick={handleSave} disabled={saving || pricingYear !== 2026 || dateSeasonMismatch}>{saving ? "Saving..." : pendingBooking ? (editingQuoteId ? "Update & Book It" : "Save & Book It") : editingQuoteId ? "Update & Open C360" : "Save & Open C360"}</button>
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={beginQuoteBookingFromDetails} disabled={saving || pricingYear !== 2026 || dateSeasonMismatch}>Book It</button> : null}
+            {!pendingBooking ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={!email || saving || emailing || pricingYear !== 2026 || dateSeasonMismatch}>{emailing ? "Saving & Emailing..." : "Save & Email Quote"}</button> : null}
           </div>
         </div>
       )}
