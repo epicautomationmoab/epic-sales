@@ -21,6 +21,8 @@ type QuoteActivity = {
   qty: Record<string, number>;
   tripSafe: boolean;
   premier: boolean;
+  priorEveningPickup: boolean;
+  nextMorningDropoff: boolean;
 };
 
 type TripWorksAvailabilityTicket = {
@@ -201,6 +203,8 @@ function blankActivity(experienceId = ""): QuoteActivity {
     qty: {},
     tripSafe: false,
     premier: false,
+    priorEveningPickup: false,
+    nextMorningDropoff: false,
   };
 }
 
@@ -284,7 +288,7 @@ export default function QuoteBuilder() {
   }
 
   function changeExperience(key: string, experienceId: string) {
-    updateActivity(key, { experienceId, qty: {}, tripSafe: false, premier: false });
+    updateActivity(key, { experienceId, qty: {}, tripSafe: false, premier: false, priorEveningPickup: false, nextMorningDropoff: false });
   }
 
   function changeQty(activityKey: string, ticketId: string, delta: number) {
@@ -334,6 +338,8 @@ export default function QuoteBuilder() {
         .map((item) => ({ name: item.ticket_type_name, quantity: item.quantity }))),
       tripsafe: savedActivity.tripsafe_selected ? "1" : "0",
       premier: savedActivity.premier_selected ? "1" : "0",
+      priorpickup: savedActivity.prior_evening_pickup ? "1" : "0",
+      nextdropoff: savedActivity.next_morning_dropoff ? "1" : "0",
     });
     const helperUrl = `/quote-booking-helper?${params.toString()}`;
 
@@ -479,6 +485,8 @@ export default function QuoteBuilder() {
         experienceId: activity.experience_id,
         tripSafe: activity.tripsafe_selected,
         premier: activity.premier_selected,
+        priorEveningPickup: Boolean(activity.prior_evening_pickup),
+        nextMorningDropoff: Boolean(activity.next_morning_dropoff),
         qty: Object.fromEntries(activity.items.map((item) => [item.ticket_type_id, item.quantity])),
       })));
       setAvailabilityDates(Object.fromEntries(detail.activities.map((activity) => [activity.id, String(q.visit_start_date || "")])));
@@ -496,7 +504,8 @@ export default function QuoteBuilder() {
     const privateFeeRule = experienceFees.find((fee) => fee.experience_id === activity.experienceId);
     const privateFee = privateFeeRule ? privateFeeRule.fee_cents / 100 : 0;
     const subtotal = experience ? experience.tickets.reduce((sum, ticket) => sum + ticket.price * (activity.qty[ticket.id] ?? 0), 0) : 0;
-    const pricingBase = subtotal + privateFee;
+    const overnightAmount = experience?.line === "rental" ? (Number(activity.priorEveningPickup) + Number(activity.nextMorningDropoff)) * 50 : 0;
+    const pricingBase = subtotal + privateFee + overnightAmount;
     const tripSafeAmount = activity.tripSafe ? pricingBase * 0.09 : 0;
     let rentalDays = 1;
     if (experience?.line === "rental") {
@@ -520,6 +529,7 @@ export default function QuoteBuilder() {
       experience,
       privateFeeRule,
       privateFee,
+      overnightAmount,
       subtotal,
       primaryTax,
       secondaryTax,
@@ -567,6 +577,8 @@ export default function QuoteBuilder() {
           experienceId: activity.experienceId,
           tripSafe: activity.tripSafe,
           premier: activity.premier,
+          priorEveningPickup: activity.priorEveningPickup,
+          nextMorningDropoff: activity.nextMorningDropoff,
           tickets: Object.entries(activity.qty)
             .filter(([, quantity]) => quantity > 0)
             .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })),
@@ -607,6 +619,7 @@ export default function QuoteBuilder() {
         visitStart, visitEnd,
         activities: activities.map((activity) => ({
           experienceId: activity.experienceId, tripSafe: activity.tripSafe, premier: activity.premier,
+          priorEveningPickup: activity.priorEveningPickup, nextMorningDropoff: activity.nextMorningDropoff,
           tickets: Object.entries(activity.qty).filter(([, quantity]) => quantity > 0)
             .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })),
         })),
@@ -624,6 +637,8 @@ export default function QuoteBuilder() {
         if (item.privateFee > 0) lines.push(`• ${item.privateFeeRule?.fee_label || "Private Tour Fee"} — ${money.format(item.privateFee)}`);
         if (item.activity.tripSafe) lines.push("• TripSafe selected");
         if (item.activity.premier) lines.push("• Premier Adventure Assure selected");
+        if (item.activity.priorEveningPickup) lines.push("• Prior Evening Pickup — $50.00");
+        if (item.activity.nextMorningDropoff) lines.push("• Next Morning Drop-off — $50.00");
         if (calculatedActivities.filter((activity) => activity.experience).length > 1) lines.push(`Estimated activity total: ${money.format(item.total)}`);
       }
       lines.push("", `Estimated Trip Total: ${money.format(totals.total)}`, "",
@@ -643,6 +658,8 @@ export default function QuoteBuilder() {
         if (item.privateFee > 0) detailRows.push(`<div style="padding:4px 0">• ${escapeHtml(item.privateFeeRule?.fee_label || "Private Tour Fee")} — ${money.format(item.privateFee)}</div>`);
         if (item.activity.tripSafe) detailRows.push(`<div style="padding:4px 0">• TripSafe — ${money.format(item.tripSafeAmount)}</div>`);
         if (item.activity.premier) detailRows.push(`<div style="padding:4px 0">• Premier Adventure Assure — ${money.format(item.premierAmount)}</div>`);
+        if (item.activity.priorEveningPickup) detailRows.push(`<div style="padding:4px 0">• Prior Evening Pickup — $50.00</div>`);
+        if (item.activity.nextMorningDropoff) detailRows.push(`<div style="padding:4px 0">• Next Morning Drop-off — $50.00</div>`);
         detailRows.push(`<div style="padding:4px 0">• Taxes &amp; Fees — ${money.format(item.primaryTax + item.secondaryTax + item.twFee)}</div>`);
         return `<div style="margin:18px 0;padding:18px 20px;border:1px solid #e5e7eb;border-left:4px solid #d9471c;border-radius:8px;background:#ffffff"><div style="font-size:17px;font-weight:700;margin-bottom:8px">${escapeHtml(item.experience!.name)}</div>${detailRows.join("")}<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-weight:700"><span>Estimated activity total:</span><span>${money.format(item.total)}</span></div></div>`;
       }).join("");
@@ -857,6 +874,10 @@ export default function QuoteBuilder() {
                       <input type="checkbox" checked={activity.premier} onChange={(e) => updateActivity(activity.key, { premier: e.target.checked })} />
                     </div>
                   )}
+                  {experience?.line === "rental" && <>
+                    <div className="toggleRow"><div><strong>Prior Evening Pickup</strong><div className="ticketMeta">$50 · subject to sales and rental tax</div></div><input type="checkbox" checked={activity.priorEveningPickup} onChange={(e) => updateActivity(activity.key, { priorEveningPickup: e.target.checked })}/></div>
+                    <div className="toggleRow"><div><strong>Next Morning Drop-off</strong><div className="ticketMeta">$50 · subject to sales and rental tax</div></div><input type="checkbox" checked={activity.nextMorningDropoff} onChange={(e) => updateActivity(activity.key, { nextMorningDropoff: e.target.checked })}/></div>
+                  </>}
                 </div>
               ))}
               {!loading && !error && <button className="addActivityFull" type="button" onClick={addActivity}>{activities.length ? "+ Add Another Activity" : "+ Add Activity"}</button>}
@@ -870,6 +891,7 @@ export default function QuoteBuilder() {
               ))}
               <div className="summaryRow"><span>Ticket subtotal</span><strong>{money.format(totals.subtotal)}</strong></div>
               {totals.privateFees > 0 && <div className="summaryRow"><span>Private Tour Fee{calculatedActivities.filter((item) => item.privateFee > 0).length > 1 ? "s" : ""}</span><strong>{money.format(totals.privateFees)}</strong></div>}
+              {calculatedActivities.some((item) => item.overnightAmount > 0) && <div className="summaryRow"><span>Overnight Add-ons</span><strong>{money.format(calculatedActivities.reduce((sum,item)=>sum+item.overnightAmount,0))}</strong></div>}
               <div className="summaryRow"><span>Taxes</span><strong>{money.format(totals.tax)}</strong></div>
               <div className="summaryRow"><span>TripSafe</span><strong>{money.format(totals.tripSafe)}</strong></div>
               {totals.premier > 0 && <div className="summaryRow"><span>Premier Adventure Assure</span><strong>{money.format(totals.premier)}</strong></div>}
