@@ -68,6 +68,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const[draftId,setDraftId]=useState<string>(lead.drafts?.[0]?.id||"");
   const[activityOverride,setActivityOverride]=useState<string>("");
   const[activityNote,setActivityNote]=useState("");
+  const[confirmMismatch,setConfirmMismatch]=useState(false);
   const[sendingActivity,setSendingActivity]=useState(false);
   const selected=useMemo(()=>objectionOptions.find(o=>o.code===objection)||null,[objection]);
   const draft=lead.drafts?.find(d=>d.id===draftId)||lead.drafts?.[0];
@@ -87,11 +88,14 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
   const activityKey=activityOverride||defaultActivityKey;
   const phoneHref=lead.phone_e164?`tel:${lead.phone_e164}`:null;
   const selectedActivity=activityEmails.find(a=>a.key===activityKey);
+  const mismatchedActivity=Boolean(selectedActivity&&defaultActivityKey&&activityKey!==defaultActivityKey);
+  const draftBookingUrl=draft?.confirmation_code&&draft.is_current_draft!==false&&!draft.converted_at&&draft.last_trip_status!=="converted"?`https://epic4x4.tripworks.com/widgets/tripBuilder?trip=${encodeURIComponent(draft.confirmation_code)}`:null;
 
 
   async function sendActivityEmail(){
     if(!selectedActivity){setStatus("Choose an activity to send.");return;}
-    if(!draft?.id){setStatus("Select a valid customer draft before sending.");return;}
+    if(!draft?.id||!draftBookingUrl){setStatus("Select a current, unconverted TripWorks draft with a booking link before sending.");return;}
+    if(mismatchedActivity&&!confirmMismatch){setStatus("Confirm that you intend to send an activity email different from the selected draft.");return;}
     setSendingActivity(true);setStatus("");
     try{
       if(!lead.claimed_by_name&&!lead.assigned_rep_name){
@@ -165,7 +169,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
           ].map(([label,value])=><div key={label} style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:12,padding:"14px 16px"}}><div style={{fontSize:11,fontWeight:900,textTransform:"uppercase",letterSpacing:".07em",opacity:.55}}>{label}</div><div style={{marginTop:5,fontWeight:800}}>{value}</div></div>)}
         </div>
 
-        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"First listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
+        {lead.drafts?.length>1?<label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Draft to work with<select value={draftId} onChange={e=>{setDraftId(e.target.value);setActivityOverride("");setConfirmMismatch(false);}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}>{lead.drafts.map((d,i)=><option key={d.id} value={d.id}>{i===0?"First listed · ":""}{d.experience_name||d.option_name||"Unnamed activity"}{d.activity_date?` · ${fmtDate(d.activity_date)}`:""}{d.confirmation_code?` · ${d.confirmation_code}`:""}</option>)}</select></label>:null}
         <section style={{background:"#fff",border:"1px solid #e2e7ec",borderRadius:14,padding:20}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}>
             <div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>START WITH THE CALL</div><h3 style={{margin:"4px 0 3px",fontSize:22}}>Find out what actually stopped them.</h3><div style={{color:"#606975",lineHeight:1.5}}>Do not start by pitching. Ask the question, listen, then solve the real objection.</div></div>
@@ -211,14 +215,21 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
         {activityComposerOpen?<section style={{background:"#fff",border:"2px solid #c6492d",borderRadius:14,padding:20,display:"grid",gap:14}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><div style={{fontSize:12,fontWeight:900,letterSpacing:".08em",color:"#b9432b"}}>ACTIVITY INFORMATION EMAIL</div><h3 style={{margin:"4px 0"}}>Preview before sending</h3><div style={{fontSize:13,color:"#6b7280"}}>Nothing sends until you click Send Email.</div></div><button type="button" onClick={()=>setActivityComposerOpen(false)} aria-label="Close activity email">×</button></div>
-          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>setActivityOverride(e.target.value)} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}><option value="" disabled>Choose an activity</option>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
+          <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Choose the information to send<select value={activityKey} onChange={e=>{setActivityOverride(e.target.value);setConfirmMismatch(false);}} style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit"}}><option value="" disabled>Choose an activity</option>{activityEmails.map(a=><option key={a.key} value={a.key}>{a.name}</option>)}</select></label>
           <div style={{background:"#f6f3ee",borderRadius:12,padding:17,lineHeight:1.6}}>
             <strong>{selectedActivity?.name||"Choose an activity"}</strong>
             <p style={{margin:"8px 0"}}>This activity now uses its own fully branded Resend email template. The final email includes the approved activity description, the customer's selected TripWorks draft link, your personal note, and your representative signature.</p>
             <p style={{margin:"8px 0 0",fontSize:13,color:"#606975"}}>You can review the finished design in Resend before sending. Nothing sends until you click Send Email.</p>
           </div>
           <label style={{display:"grid",gap:6,fontSize:13,fontWeight:800}}>Personal Note <span style={{fontWeight:500,opacity:.6}}>(optional)</span><textarea rows={3} value={activityNote} onChange={e=>setActivityNote(e.target.value)} maxLength={4000} placeholder="Add anything specific from your conversation…" style={{border:"1px solid #d6dde3",borderRadius:9,padding:11,font:"inherit",resize:"vertical"}}/></label>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity||!selectedActivity} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
+          <div style={{border:"1px solid #d6dde3",borderRadius:12,padding:16,background:"#f8fafc",display:"grid",gap:10}}>
+            <strong>Confirm before sending</strong>
+            <div><span style={{color:"#65717d"}}>Email template: </span><strong>{selectedActivity?.name||"Not selected"}</strong></div>
+            <div><span style={{color:"#65717d"}}>Selected draft: </span><strong>{draft?.experience_name||draft?.option_name||"Unknown activity"}</strong>{draft?.confirmation_code?` · ${draft.confirmation_code}`:""}</div>
+            <div><span style={{color:"#65717d"}}>Booking link: </span>{draftBookingUrl?<a href={draftBookingUrl} target="_blank" rel="noopener noreferrer">Open selected TripWorks draft ↗</a>:<strong style={{color:"#a32424"}}>No valid current draft link</strong>}</div>
+            {mismatchedActivity?<label style={{background:"#fff3df",border:"1px solid #e6ae53",padding:12,borderRadius:8,display:"flex",gap:9,alignItems:"flex-start",lineHeight:1.5}}><input type="checkbox" checked={confirmMismatch} onChange={e=>setConfirmMismatch(e.target.checked)} style={{marginTop:5}}/><span><strong>Different activity selected.</strong> The email describes {selectedActivity?.name}, but the booking button resumes {draft?.experience_name||"the selected draft"}. I have checked both and intend to send this combination.</span></label>:null}
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:9}}><button type="button" onClick={()=>setActivityComposerOpen(false)}>Cancel</button><button type="button" disabled={sendingActivity||!selectedActivity||!draftBookingUrl||(mismatchedActivity&&!confirmMismatch)} onClick={()=>void sendActivityEmail()} style={{background:"#171717",color:"#fff",border:0,borderRadius:9,padding:"10px 15px",fontWeight:900}}>{sendingActivity?"Sending…":"Send Email"}</button></div>
         </section>:null}
 
         {status?<div style={{padding:"11px 13px",borderRadius:10,background:status.includes("saved")||status.includes("sent")?"#edf8f1":"#fff4e8",fontWeight:800}}>{status}</div>:null}
