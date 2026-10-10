@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/, "");
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/, "");
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function proxy(request: NextRequest, method: "GET" | "POST") {
