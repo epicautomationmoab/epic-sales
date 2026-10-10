@@ -47,7 +47,7 @@ export default function IncomingCallPopup() {
   const phone=call.caller_phone||"Unknown number";
   const label=known?(call.route_label||call.caller_name||"Known customer"):(call.caller_name||"Unknown caller");
   const url=known?("/customers?q="+encodeURIComponent(call.caller_phone||call.confirmation_code||"")+"&open=1"):("/customers?q="+encodeURIComponent(call.caller_phone||""));
-  return <>{launch}{manualPanel}<aside aria-label="Incoming Call" role="status" style={{position:"fixed",bottom:20,right:20,zIndex:9000,width:"min(335px,calc(100vw - 30px))",boxSizing:"border-box",padding:16,borderRadius:12,border:"1px solid #d7d9dc",borderLeft:"4px solid #c92320",background:"#fff",color:"#171717",boxShadow:"0 8px 26px #0002"}}>
+  return <>{manualPanel}<aside aria-label="Incoming Call" role="status" style={{position:"fixed",bottom:20,right:20,zIndex:9000,width:"min(335px,calc(100vw - 30px))",boxSizing:"border-box",padding:16,borderRadius:12,border:"1px solid #d7d9dc",borderLeft:"4px solid #c92320",background:"#fff",color:"#171717",boxShadow:"0 8px 26px #0002"}}>
     <div style={{fontWeight:900,fontSize:11,letterSpacing:1,color:"#b52b25"}}>INCOMING CALL · {known?"RECOGNIZED":"UNKNOWN"}</div>
     <div style={{fontSize:17,fontWeight:800,marginTop:7}}>{label}</div>
     <div style={{fontSize:13,marginTop:3}}>{phone}</div>
