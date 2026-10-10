@@ -23,7 +23,7 @@ export async function POST(req:NextRequest){
  const actor=await session(req);if(!actor)return NextResponse.json({error:"Employee login required."},{status:401});
  try{const b=await req.json(),confirmation=String(b.confirmation_code||"").trim().toUpperCase(),text=String(b.note_text||"").trim();
  if(!/^[A-Z0-9-]{3,25}$/.test(confirmation)||!text||text.length>4000)return NextResponse.json({error:"Valid reservation and note required."},{status:400});
- const notes=await rpc<Note[]>(actor.token,"epic_unified_notes_add",{p_confirmation:confirmation,p_note_text:text,p_show_in_readiness:b.visible_in_readiness===true});
+ const notes=await rpc<Note[]>(actor.token,"epic_unified_notes_add",{p_confirmation:confirmation,p_note_text:text,p_show_in_readiness:b.visible_in_readiness===true,p_author:actor.profile.display_name});
  return NextResponse.json({ok:true,note:notes[0]});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to save note."},{status:500});}
 }
 export async function PATCH(req:NextRequest){
