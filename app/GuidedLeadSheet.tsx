@@ -9,6 +9,21 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  useEffect(()=>{try{setData(prev=>({...prev,...JSON.parse(localStorage.getItem(key)||"{}")}));}catch{}try{setServerId(localStorage.getItem(key+":server-id"));}catch{}setLoaded(true);},[key]);
  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key,loaded]);
  useEffect(()=>{if(!loaded)return;const timer=setTimeout(async()=>{setSaveStatus("Saving to C360...");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error();setServerId(result.rows[0].id);try{localStorage.setItem(key+":server-id",result.rows[0].id);}catch{}setSaveStatus("Saved to C360");}catch{setSaveStatus("C360 save unavailable - draft remains on this device");}},1200);return()=>clearTimeout(timer);},[data,loaded,serverId]);
+ const [savingFinal,setSavingFinal]=useState(false);
+ const [finalMessage,setFinalMessage]=useState("");
+ async function saveFinal(openCustomer:boolean){
+  setSavingFinal(true);setFinalMessage("");
+  try{
+   const response=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data,finalize:true})});
+   const payload=await response.json();
+   if(!response.ok||!payload.rows?.[0]?.id)throw Error("Couldn't save this Lead Sheet.");
+   const id=payload.rows[0].id;setServerId(id);
+   try{localStorage.setItem(key+":server-id",id);}catch{}
+   setSaveStatus("Lead Sheet saved to C360");setFinalMessage("Saved to C360 Lead Sheets. Customer profile linking is being completed.");
+   if(openCustomer){const q=(String(data.phone||"").trim()||String(data.name||"").trim());if(q)window.open("/customers?q="+encodeURIComponent(q)," _blank".trim());}
+  }catch(e){setFinalMessage(e instanceof Error?e.message:"Unable to save.");}
+  finally{setSavingFinal(false);}
+ }
  const set=(k:string,v:any)=>setData(d=>({...d,[k]:v}));
 
  const field:React.CSSProperties={width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:9,padding:"11px 12px",fontSize:14,background:"#fff",color:"#17202b",marginTop:6};
@@ -36,5 +51,5 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  <div style={card}>{section("03","Concerns & objections","Select an objection to see a helpful discovery question.")}<div style={grid}>{objections.map(([a,h])=><div key={a}>{check(a,"objection:"+a)}{data["objection:"+a]&&<p style={{fontSize:12,color:"#6f4a28",background:"#fff9ed",padding:10,borderRadius:7,margin:"5px 0 9px"}}>💡 {h}</p>}</div>)}</div><div style={{marginTop:13}}>{notes("Conversation notes","notes")}</div></div>
  <div style={card}>{section("04","Actions & next steps","Record everything done, then select one main disposition.")}<div style={grid}>{["Quote sent","Information sent","Follow-up scheduled","Guest will call back"].map(a=>check(a,"action:"+a))}</div>
  <label style={{...label,marginTop:15}}>Primary disposition<select style={field} value={data.disposition||""} onChange={e=>set("disposition",e.target.value)}>{["","Booked","Quote / information","Follow-up needed","Researching","Lost","Not a sales lead"].map(a=><option key={a} value={a}>{a||"Not decided yet"}</option>)}</select></label>{notes("Next action / promise","next")}{input("Follow-up date","followup","date")}</div>
- <p style={{fontSize:11,color:"#6c7786",textAlign:"center",margin:"12px 0"}}>All fields optional · {saveStatus}</p></div></section></div>;
+ <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16}}><button type="button" disabled={savingFinal} onClick={()=>void saveFinal(false)} style={{padding:"12px 16px",border:0,borderRadius:9,background:"#d71920",color:"white",fontWeight:800,cursor:"pointer"}}>{savingFinal?"Saving...":"Save Lead Sheet"}</button><button type="button" disabled={savingFinal} onClick={()=>void saveFinal(true)} style={{padding:"12px 16px",border:"1px solid #aeb7c4",borderRadius:9,background:"#fff",fontWeight:800,cursor:"pointer"}}>Save & Open C360</button></div>{finalMessage&&<p role="status" style={{fontSize:12,color:"#475569"}}>{finalMessage}</p>}<p style={{fontSize:11,color:"#6c7786",textAlign:"center",margin:"12px 0"}}>All fields optional · {saveStatus}</p></div></section></div>;
 }
