@@ -10,6 +10,7 @@ export default function IncomingCallPopup() {
   const [call,setCall]=useState<Call|null>(null);
   const [error,setError]=useState(false);
   const [sheet,setSheet]=useState<Call|null>(null);
+  const [manual,setManual]=useState(false);
   useEffect(()=>{
     try { const saved=sessionStorage.getItem(STORAGE); if(saved)setCall(JSON.parse(saved)); } catch {}
     let active=true,busy=false;
@@ -38,12 +39,14 @@ export default function IncomingCallPopup() {
     try{sessionStorage.removeItem(STORAGE);}catch{}
     try{await fetch("/api/live-calls",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({live_call_id:id})});}catch{}
   }
-  if(!call)return sheet?<GuidedLeadSheet phone={sheet.caller_phone||""} name={sheet.caller_name||""} onClose={()=>setSheet(null)}/>:null;
+  const manualPanel=manual?<GuidedLeadSheet phone="" name="" onClose={()=>setManual(false)}/>:null;
+  const launch=<button type="button" onClick={()=>setManual(true)} style={{position:"fixed",bottom:16,left:16,zIndex:8000,padding:"10px 14px",borderRadius:22,border:"1px solid #b52320",background:"#c92320",color:"#fff",fontWeight:800,cursor:"pointer",boxShadow:"0 3px 12px #0002"}}>+ New Lead Sheet</button>;
+  if(!call)return <>{launch}{manualPanel}{sheet?<GuidedLeadSheet phone={sheet.caller_phone||""} name={sheet.caller_name||""} onClose={()=>setSheet(null)}/>:null}</>;
   const known=Boolean(call.route_kind&&call.route_kind!=="new_lead");
   const phone=call.caller_phone||"Unknown number";
   const label=known?(call.route_label||call.caller_name||"Known customer"):(call.caller_name||"Unknown caller");
   const url=known?("/customers?q="+encodeURIComponent(call.caller_phone||call.confirmation_code||"")+"&open=1"):("/customers?q="+encodeURIComponent(call.caller_phone||""));
-  return <><aside aria-label="Incoming Call" role="status" style={{position:"fixed",bottom:20,right:20,zIndex:9000,width:"min(335px,calc(100vw - 30px))",boxSizing:"border-box",padding:16,borderRadius:12,border:"1px solid #d7d9dc",borderLeft:"4px solid #c92320",background:"#fff",color:"#171717",boxShadow:"0 8px 26px #0002"}}>
+  return <>{launch}{manualPanel}<aside aria-label="Incoming Call" role="status" style={{position:"fixed",bottom:20,right:20,zIndex:9000,width:"min(335px,calc(100vw - 30px))",boxSizing:"border-box",padding:16,borderRadius:12,border:"1px solid #d7d9dc",borderLeft:"4px solid #c92320",background:"#fff",color:"#171717",boxShadow:"0 8px 26px #0002"}}>
     <div style={{fontWeight:900,fontSize:11,letterSpacing:1,color:"#b52b25"}}>INCOMING CALL · {known?"RECOGNIZED":"UNKNOWN"}</div>
     <div style={{fontSize:17,fontWeight:800,marginTop:7}}>{label}</div>
     <div style={{fontSize:13,marginTop:3}}>{phone}</div>
