@@ -17,7 +17,7 @@ export default function IncomingCallPopup() {
     try { const saved=sessionStorage.getItem(STORAGE); if(saved)setCall(JSON.parse(saved)); } catch {}
     let active=true,busy=false;
     async function check(){
-      if(!active||busy||document.visibilityState!=="visible")return;
+      if(!active||busy)return;
       busy=true;
       try {
         const response=await fetch("/api/live-calls",{cache:"no-store"});
@@ -31,7 +31,8 @@ export default function IncomingCallPopup() {
     const timer=setInterval(()=>void check(),4000);
     const visible=()=>void check();
     document.addEventListener("visibilitychange",visible);
-    return()=>{active=false;clearInterval(timer);document.removeEventListener("visibilitychange",visible);};
+    window.addEventListener("focus",visible);
+    return()=>{active=false;clearInterval(timer);document.removeEventListener("visibilitychange",visible);window.removeEventListener("focus",visible);};
   },[]);
   useEffect(()=>{try{if(call)sessionStorage.setItem(STORAGE,JSON.stringify(call));else sessionStorage.removeItem(STORAGE);}catch{}},[call]);
   async function dismiss(){
