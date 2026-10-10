@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || "https://epic-tools-app.vercel.app").replace(/\/+$/, "");
+const PODIUM_TOOLS_PREVIEW = "https://epic-tools-app-git-feature-c36-83802a-automation-4515s-projects.vercel.app";
+const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || (process.env.VERCEL_GIT_COMMIT_REF === "feature/c360-podium-sms-2700" ? PODIUM_TOOLS_PREVIEW : "https://epic-tools-app.vercel.app")).replace(/\/+$/, "");
 
 async function proxy(request: NextRequest, method: "GET" | "POST") {
   const accessToken = request.cookies.get("epic_access_token")?.value;
