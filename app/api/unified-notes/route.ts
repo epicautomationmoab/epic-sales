@@ -1,47 +1,35 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
-const raw=process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co";
-const base=(/^https?:\/\//.test(raw)?raw:`https://${raw}`).replace(/\/+$/,"");
-async function authorize(request:NextRequest) {
- const profile=await getAuthenticatedTeamProfile(request.cookies.get("epic_access_token")?.value);
- return profile&&profile.role!=="workstation"?profile:null;
+
+const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
+const ANON_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
+async function session(req:NextRequest){
+ const token=req.cookies.get("epic_access_token")?.value;
+ const profile=await getAuthenticatedTeamProfile(token);
+ return token&&profile&&profile.active&&profile.role!=="workstation"?{token,profile}:null;
 }
-async function rest<T>(path:string,init?:RequestInit):Promise<T>{
- const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
- const token=init?.headers && (init.headers as Record<string,string>)["x-epic-access-token"];
- if(!token)throw Error("Employee session unavailable.");
- const result=await fetch(`${base}/rest/v1/${path}`,{...init,headers:{apikey:key,Authorization:`Bearer ${token}`,"Content-Type":"application/json"},cache:"no-store"});
- const text=await result.text();
- if(!result.ok)throw Error(text||`Supabase request failed: ${result.status}`);
- return text?JSON.parse(text) as T:undefined as T;
+async function rpc<T>(token:string,fn:string,params:Record<string,unknown>):Promise<T>{
+ const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:{apikey:ANON_KEY,Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(params),cache:"no-store"});
+ const t=await r.text();if(!r.ok)throw new Error(t||`Supabase request failed (${r.status})`);return t?JSON.parse(t) as T:[] as T;
 }
 type Note={note_id:string;confirmation_code:string|null;note_text:string;note_scope:string;source:string;visible_in_readiness:boolean;author_name:string|null;created_at:string};
-export async function GET(request:NextRequest) {
- if(!await authorize(request))return NextResponse.json({error:"Employee login required."},{status:401});
- const codes=Array.from(new Set((request.nextUrl.searchParams.get("confirmations")||"").split(",").map(v=>v.trim().toUpperCase()).filter(v=>/^[A-Z0-9-]{3,25}$/.test(v)))).slice(0,30);
- if(!codes.length)return NextResponse.json({ok:true,notes:[]});
- try {
- const notes=await rest<Note[]>("rpc/epic_unified_notes_for_reservations",{method:"POST",headers:{"x-epic-access-token":request.cookies.get("epic_access_token")?.value||""},body:JSON.stringify({p_confirmations:codes})});
- return NextResponse.json({ok:true,notes});
- }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to load notes."},{status:500});}
+export async function GET(req:NextRequest){
+ const actor=await session(req);if(!actor)return NextResponse.json({error:"Employee login required."},{status:401});
+ const confirmations=Array.from(new Set((req.nextUrl.searchParams.get("confirmations")||"").split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-Z0-9-]{3,25}$/.test(s)))).slice(0,30);
+ if(!confirmations.length)return NextResponse.json({ok:true,notes:[]});
+ try{return NextResponse.json({ok:true,notes:await rpc<Note[]>(actor.token,"epic_unified_notes_for_reservations",{p_confirmations:confirmations})});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to load notes."},{status:500});}
 }
-export async function POST(request:NextRequest) {
- const profile=await authorize(request);if(!profile)return NextResponse.json({error:"Employee login required."},{status:401});
- try {
- const body=await request.json();
- const code=String(body.confirmation_code||"").trim().toUpperCase(),text=String(body.note_text||"").trim();
- if(!/^[A-Z0-9-]{3,25}$/.test(code)||!text||text.length>4000)return NextResponse.json({error:"Valid reservation and note required."},{status:400});
- const rows=await rest<Note[]>("epic_unified_notes",{method:"POST",headers:{Prefer:"return=representation","x-epic-access-token":request.cookies.get("epic_access_token")?.value||""},body:JSON.stringify({confirmation_code:code,note_text:text,note_scope:"reservation",source:"c360",visible_in_readiness:body.visible_in_readiness===true,author_name:profile.display_name})});
- return NextResponse.json({ok:true,note:rows[0]});
- }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to save note."},{status:500});}
+export async function POST(req:NextRequest){
+ const actor=await session(req);if(!actor)return NextResponse.json({error:"Employee login required."},{status:401});
+ try{const b=await req.json(),confirmation=String(b.confirmation_code||"").trim().toUpperCase(),text=String(b.note_text||"").trim();
+ if(!/^[A-Z0-9-]{3,25}$/.test(confirmation)||!text||text.length>4000)return NextResponse.json({error:"Valid reservation and note required."},{status:400});
+ const notes=await rpc<Note[]>(actor.token,"epic_unified_notes_add",{p_confirmation:confirmation,p_note_text:text,p_show_in_readiness:b.visible_in_readiness===true});
+ return NextResponse.json({ok:true,note:notes[0]});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to save note."},{status:500});}
 }
-export async function PATCH(request:NextRequest) {
- if(!await authorize(request))return NextResponse.json({error:"Employee login required."},{status:401});
- try {
- const b=await request.json(),id=String(b.note_id||"");
- if(!/^[a-f0-9-]{36}$/i.test(id)||typeof b.visible_in_readiness!=="boolean")return NextResponse.json({error:"Note and readiness selection required."},{status:400});
- const rows=await rest<Note[]>(`epic_unified_notes?note_id=eq.${id}&note_scope=eq.reservation`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({visible_in_readiness:b.visible_in_readiness,updated_at:new Date().toISOString()})});
- if(!rows.length)return NextResponse.json({error:"Note unavailable."},{status:404});
- return NextResponse.json({ok:true,note:rows[0]});
- }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to update note."},{status:500});}
+export async function PATCH(req:NextRequest){
+ const actor=await session(req);if(!actor)return NextResponse.json({error:"Employee login required."},{status:401});
+ try{const b=await req.json(),id=String(b.note_id||"");if(!/^[a-f0-9-]{36}$/i.test(id)||typeof b.visible_in_readiness!=="boolean")return NextResponse.json({error:"Note and Readiness choice required."},{status:400});
+ const notes=await rpc<Note[]>(actor.token,"epic_unified_notes_set_readiness",{p_note_id:id,p_visible:b.visible_in_readiness});
+ if(!notes.length)return NextResponse.json({error:"Note unavailable or visibility locked."},{status:404});
+ return NextResponse.json({ok:true,note:notes[0]});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to update note."},{status:500});}
 }
