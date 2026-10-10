@@ -190,6 +190,9 @@ export async function GET(request: NextRequest) {
     const noteThreadKeys=[...new Set([
       ...opportunityIds.map((id:string)=>`opp:${id}`),
       ...(identityPhone.length===10?[`phone:+1${identityPhone}`]:[]),
+      ...(customer?.identity?.contact_id?[ `contact:${customer.identity.contact_id}` ]:[]),
+      ...(!identityPhone.length&&customer?.identity?.email?[ `email:${String(customer.identity.email).trim().toLowerCase()}` ]:[]),
+      ...(!identityPhone.length&&!customer?.identity?.contact_id&&!customer?.identity?.email&&customer?.reservations?.[0]?.id?[ `reservation:${customer.reservations[0].id}` ]:[]),
     ])];
     if(noteThreadKeys.length){
       const results=await Promise.all(noteThreadKeys.map(key=>rpcNamed(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:key}).catch(()=>[])));
