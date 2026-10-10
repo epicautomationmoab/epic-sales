@@ -7,9 +7,10 @@ async function authorize(request:NextRequest) {
  return profile&&profile.role!=="workstation"?profile:null;
 }
 async function rest<T>(path:string,init?:RequestInit):Promise<T>{
- const key=process.env.SUPABASE_SECRET_KEY?.trim();
- if(!key)throw Error("Supabase server credentials unavailable.");
- const result=await fetch(`${base}/rest/v1/${path}`,{...init,headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",...(init?.headers||{})},cache:"no-store"});
+ const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
+ const token=init?.headers && (init.headers as Record<string,string>)["x-epic-access-token"];
+ if(!token)throw Error("Employee session unavailable.");
+ const result=await fetch(`${base}/rest/v1/${path}`,{...init,headers:{apikey:key,Authorization:`Bearer ${token}`,"Content-Type":"application/json"},cache:"no-store"});
  const text=await result.text();
  if(!result.ok)throw Error(text||`Supabase request failed: ${result.status}`);
  return text?JSON.parse(text) as T:undefined as T;
@@ -21,7 +22,7 @@ export async function GET(request:NextRequest) {
  if(!codes.length)return NextResponse.json({ok:true,notes:[]});
  try {
  const params=new URLSearchParams({select:"note_id,confirmation_code,note_text,note_scope,source,visible_in_readiness,author_name,created_at",confirmation_code:`in.(${codes.join(",")})`,archived_at:"is.null",order:"created_at.desc",limit:"250"});
- return NextResponse.json({ok:true,notes:await rest<Note[]>(`epic_unified_notes?${params}`)});
+ return NextResponse.json({ok:true,notes:await rest<Note[]>(`epic_unified_notes?${params}`,{headers:{"x-epic-access-token":request.cookies.get("epic_access_token")?.value||""}})});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to load notes."},{status:500});}
 }
 export async function POST(request:NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request:NextRequest) {
  const body=await request.json();
  const code=String(body.confirmation_code||"").trim().toUpperCase(),text=String(body.note_text||"").trim();
  if(!/^[A-Z0-9-]{3,25}$/.test(code)||!text||text.length>4000)return NextResponse.json({error:"Valid reservation and note required."},{status:400});
- const rows=await rest<Note[]>("epic_unified_notes",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({confirmation_code:code,note_text:text,note_scope:"reservation",source:"c360",visible_in_readiness:body.visible_in_readiness===true,author_name:profile.display_name})});
+ const rows=await rest<Note[]>("epic_unified_notes",{method:"POST",headers:{Prefer:"return=representation","x-epic-access-token":request.cookies.get("epic_access_token")?.value||""},body:JSON.stringify({confirmation_code:code,note_text:text,note_scope:"reservation",source:"c360",visible_in_readiness:body.visible_in_readiness===true,author_name:profile.display_name})});
  return NextResponse.json({ok:true,note:rows[0]});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to save note."},{status:500});}
 }
