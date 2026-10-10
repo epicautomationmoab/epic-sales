@@ -108,7 +108,7 @@ export default function Customer360Modal(props:Props){
         message_text:composeBody.trim()
       })});
       const p=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(p?.error||"Unable to send message.");
+      if(!r.ok)throw new Error(typeof p?.error === "string" ? p.error : "Unable to send message. No confirmation was received.");
       const wasText=channel==="text";setComposeBody("");setSendStatus(wasText?(textTransport==="podium"?"Text sent via Podium 2700.":"Text sent via CallRail."):"Email sent.");setComposeChannel(null);
       if(wasText){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(opportunityId)q.set("opportunity",opportunityId);if(reservationId)q.set("reservation",reservationId);if(reservationConfirmation)q.set("confirmation",reservationConfirmation);if(phone)q.set("phone",phone);if(email)q.set("email",email);const refreshed=await fetch(`/api/customer-360?${q}`,{cache:"no-store"});if(refreshed.ok){const body=await refreshed.json();if(body.customer)setData(body.customer);}}
     }catch(e){setError(e instanceof Error?e.message:"Unable to send message.");}
