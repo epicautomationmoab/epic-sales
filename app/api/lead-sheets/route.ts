@@ -7,9 +7,10 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
  const profile=await getAuthenticatedTeamProfile(token);
  if(!token||!profile||profile.role==="workstation")return NextResponse.json({error:"Employee login required"},{status:401});
  const id=method==="GET"?request.nextUrl.searchParams.get("id"):null;
+ const phone=method==="GET"?request.nextUrl.searchParams.get("phone"):null;
  const body=method==="POST"?await request.json().catch(()=>null):null;
  if(method==="POST"&&(!body||typeof body!=="object"||!body.fields||typeof body.fields!=="object"))return NextResponse.json({error:"Invalid sheet"},{status:400});
- const p=method==="GET"?(id?`epicc360_lead_sheets?id=eq.${encodeURIComponent(id)}&select=id,fields,status&limit=1`:"epicc360_lead_sheets?select=id,customer_name,customer_phone,updated_at,status&order=updated_at.desc&limit=20"):"epicc360_lead_sheets?on_conflict=id";
+ const p=method==="GET"?(id?`epicc360_lead_sheets?id=eq.${encodeURIComponent(id)}&select=id,fields,status&limit=1`:phone?`epicc360_lead_sheets?customer_phone=eq.${encodeURIComponent(phone)}&status=eq.saved&select=id,customer_name,customer_phone,updated_at,status,fields&order=updated_at.desc&limit=30`:"epicc360_lead_sheets?select=id,customer_name,customer_phone,updated_at,status&order=updated_at.desc&limit=20"):"epicc360_lead_sheets?on_conflict=id";
  let matchedContactId:string|null=null;
  if(method==="POST"&&body.finalize===true){
    const digits=String(body.fields.phone||"").replace(/[^0-9]/g,"").slice(-10);
