@@ -48,6 +48,12 @@ export default function Customer360Modal(props:Props){
 
   useEffect(()=>{if(!open)return;const handler=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",handler);const previousOverflow=document.body.style.overflow;const previousOverscroll=document.body.style.overscrollBehavior;document.body.style.overflow="hidden";document.body.style.overscrollBehavior="none";return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=previousOverflow;document.body.style.overscrollBehavior=previousOverscroll;};},[open,onClose]);
 
+  const [pendingPodium,setPendingPodium]=useState<Text[]>([]);
+  const shownTexts=useMemo(()=>{
+    const remote=data?.texts||[];
+    const pending=pendingPodium.filter(local=>!remote.some(t=>(local.message_uid&&t.message_uid===local.message_uid)||(t.provider==="podium"&&t.direction==="outbound"&&t.body===local.body&&t.conversation_uid===local.conversation_uid&&Math.abs(new Date(t.at||0).getTime()-new Date(local.at||0).getTime())<120000)));
+    return [...remote,...pending];
+  },[data?.texts,pendingPodium]);
   const timeline=useMemo<EventItem[]>(()=>{if(!data)return[];const items:EventItem[]=[];
     for(const c of data.calls||[]){const isPbxInbound=c.direction==="inbound"&&Boolean(c.pbx_outcome);const title=c.direction==="outbound"?"Outbound call":c.answered===false?(c.voicemail&&c.pbx_voicemail_deposited===true?"Missed call — Voicemail":"Missed call"):"Inbound call — Answered";const answerLabel=c.pbx_answered_agent||c.pbx_answered_extension;const pbxMeta=isPbxInbound?[c.answered?(answerLabel?"Answered by "+answerLabel:"Answered"):"No human answer",c.pbx_ring_attempts!=null?c.pbx_ring_attempts+" ring attempt"+(c.pbx_ring_attempts===1?"":"s"):null,c.pbx_queue_wait_seconds!=null?c.pbx_queue_wait_seconds+"s queue wait":null]:[];items.push({id:`c-${c.id}`,kind:"call",at:c.at,title,meta:[...pbxMeta,c.lead_score!=null?`CallRail score ${c.lead_score}`:null,durationLabel(c.duration_seconds),c.source_name,c.campaign].filter(Boolean).join(" · "),body:c.summary||c.lead_explanation||null,href:c.recording_url||undefined,hrefLabel:"Listen to call",transcript:c.transcription});}
     for(const w of data.sales_call_workflows||[]){
@@ -83,12 +89,6 @@ export default function Customer360Modal(props:Props){
     for(const s of leadSheets){items.push({id:"ls-"+s.id,kind:"note",at:s.updated_at,title:"Guided Lead Sheet",meta:String(s.fields?.disposition||"Saved discovery"),body:[s.fields?.activity,s.fields?.notes,s.fields?.next].filter(Boolean).join(" · ")});}
   },[data,leadSheets,shownTexts]);
 
-  const [pendingPodium,setPendingPodium]=useState<Text[]>([]);
-  const shownTexts=useMemo(()=>{
-    const remote=data?.texts||[];
-    const pending=pendingPodium.filter(local=>!remote.some(t=>(local.message_uid&&t.message_uid===local.message_uid)||(t.provider==="podium"&&t.direction==="outbound"&&t.body===local.body&&t.conversation_uid===local.conversation_uid&&Math.abs(new Date(t.at||0).getTime()-new Date(local.at||0).getTime())<120000)));
-    return [...remote,...pending];
-  },[data?.texts,pendingPodium]);
   const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):filter==="call"?(item.kind==="call"||item.kind==="sales_call"):item.kind===filter),[timeline,filter]);
 
   async function sendTextInline(){await sendCommunication("text");}
