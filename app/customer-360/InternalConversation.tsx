@@ -3,8 +3,10 @@ import {useEffect,useMemo,useState} from "react";
 import QuickFollowUp from "./QuickFollowUp";
 type Note={id:string;entry_type?:"customer_note"|"reservation_note"|"team_message";note_text:string;author_name:string|null;created_at:string;mentions?:Array<{id:string;display_name:string;response_status?:string|null;responded_at?:string|null}>};
 type Member={id:string;display_name?:string|null;name?:string|null;full_name?:string|null};
-export default function InternalConversation({opportunityId}:{opportunityId:string}){
- const threadKey="opp:"+opportunityId;
+export default function InternalConversation({opportunityId,contactId,phone,email,reservationId}:{opportunityId?:string|null;contactId?:string|null;phone?:string|null;email?:string|null;reservationId?:string|null}){
+ // Use the existing inbox identity for unmatched callers; never manufacture a sales opportunity.
+ const digits=String(phone||"").replace(/\D/g,"").slice(-10);
+ const threadKey=opportunityId?"opp:"+opportunityId:digits.length===10?"phone:+1"+digits:contactId?"contact:"+contactId:email?.trim()?"email:"+email.trim().toLowerCase():reservationId?"reservation:"+reservationId:"";
  const [notes,setNotes]=useState<Note[]>([]);
  const [members,setMembers]=useState<Member[]>([]);
  const [draft,setDraft]=useState("");
@@ -22,6 +24,7 @@ export default function InternalConversation({opportunityId}:{opportunityId:stri
  async function respond(response:"acknowledged"|"dismissed"){setBusy(true);setError("");try{const r=await fetch("/api/inbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"respond_mention",thread_key:threadKey,response})});const p=await r.json().catch(()=>({}));if(!r.ok)throw Error(p.error||"Unable to update mention");const n=await fetch("/api/inbox?thread_key="+encodeURIComponent(threadKey),{cache:"no-store"});const result=await n.json();if(n.ok)setNotes(result.notes||[]);setStatus(response==="acknowledged"?"Mention acknowledged.":"Mention dismissed.");}catch(e){setError(e instanceof Error?e.message:"Unable to respond");}finally{setBusy(false);}}
  async function quickFollowUp(message:string){const r=await fetch("/api/inbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"note",thread_key:threadKey,note_text:message})});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error||"Unable to save follow-up.");const n=await fetch("/api/inbox?thread_key="+encodeURIComponent(threadKey),{cache:"no-store"});const np=await n.json();if(n.ok)setNotes(np.notes||[]);}
  async function send(){if(!draft.trim())return;setBusy(true);setError("");setStatus("");try{const r=await fetch("/api/inbox",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"note",entry_type:entryType,thread_key:threadKey,note_text:draft.trim()})});const p=await r.json().catch(()=>({}));if(!r.ok)throw Error(p.error||"Unable to post note");const n=await fetch("/api/inbox?thread_key="+encodeURIComponent(threadKey),{cache:"no-store"});const np=await n.json();if(n.ok)setNotes(np.notes||[]);setDraft("");setStatus("Note saved.");}catch(e){setError(e instanceof Error?e.message:"Unable to post");}finally{setBusy(false);}}
+ if(!threadKey)return null;
  return <section style={{border:"1px solid #dbe2ea",borderRadius:12,padding:13,background:"#fff",display:"grid",gap:10}}>
   <div><strong>Notes</strong><div style={{fontSize:11,color:"#627080"}}>Private to Epic employees · shared with Inbox</div></div>
   <QuickFollowUp onLog={quickFollowUp}/>
