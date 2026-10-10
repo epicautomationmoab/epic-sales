@@ -229,25 +229,26 @@ export async function GET(request: NextRequest) {
     let podiumTexts:any[] = [];
     if (identityPhone.length === 10) {
       try {
-        const response = await fetch(
-          `${TOOLS_BASE}/api/team/podium-conversation?phone=${encodeURIComponent("+1" + identityPhone)}`,
-          { headers: { Authorization: `Bearer ${session.accessToken}` }, cache: "no-store" },
-        );
-        if (response.ok) {
-          const result = await response.json();
-          podiumTexts = (Array.isArray(result.messages) ? result.messages : []).map((message:any) => ({
-            id: `podium:${message.event_key}`,
-            at: message.message_at || message.received_at,
-            direction: message.direction,
-            body: message.body,
-            agent_name: null,
-            status: message.event_type === "message.failed" ? "failed" : "sent",
-            epic_number: "2700",
-            customer_number: "+1" + identityPhone,
-            provider: "podium",
-            conversation_uid: message.conversation_uid,
-          }));
-        }
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/c360_podium_sms`, {
+          method: "POST",
+          headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_phone: "+1" + identityPhone }),
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error(`Podium SMS lookup failed: ${response.status}`);
+        const messages = await response.json();
+        podiumTexts = (Array.isArray(messages) ? messages : []).map((message:any) => ({
+          id: `podium:${message.event_key}`,
+          at: message.message_at || message.received_at,
+          direction: message.direction,
+          body: message.body,
+          agent_name: null,
+          status: message.event_type === "message.failed" ? "failed" : "sent",
+          epic_number: "2700",
+          customer_number: "+1" + identityPhone,
+          provider: "podium",
+          conversation_uid: message.conversation_uid,
+        }));
       } catch (error) {
         console.warn("Podium C360 enrichment unavailable", error);
       }
