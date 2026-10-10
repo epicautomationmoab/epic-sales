@@ -255,6 +255,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    let linkedSocial:any[]=[];
+    const verifiedContactId=customer?.identity?.contact_id;
+    if(verifiedContactId && /^[0-9a-f-]{36}$/i.test(String(verifiedContactId))){
+      try{
+        const res=await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_c360_linked_social_messages`,{
+          method:"POST",
+          headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`,"Content-Type":"application/json"},
+          body:JSON.stringify({p_contact_id:verifiedContactId}),cache:"no-store"
+        });
+        if(res.ok)linkedSocial=await res.json();
+      }catch(error){console.warn("Linked social history unavailable",error);}
+    }
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -271,6 +283,7 @@ export async function GET(request: NextRequest) {
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
+      social_messages:linkedSocial,
     } : customer;
 
     return NextResponse.json({ ok: true, customer: enriched });
