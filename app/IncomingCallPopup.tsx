@@ -11,6 +11,7 @@ export default function IncomingCallPopup() {
   const [error,setError]=useState(false);
   const [sheet,setSheet]=useState<Call|null>(null);
   const [manual,setManual]=useState(false);
+  const [manualId,setManualId]=useState("manual");
   useEffect(()=>{
     try { const saved=sessionStorage.getItem(STORAGE); if(saved)setCall(JSON.parse(saved)); } catch {}
     let active=true,busy=false;
@@ -39,8 +40,8 @@ export default function IncomingCallPopup() {
     try{sessionStorage.removeItem(STORAGE);}catch{}
     try{await fetch("/api/live-calls",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({live_call_id:id})});}catch{}
   }
-  const manualPanel=manual?<GuidedLeadSheet phone="" name="" onClose={()=>setManual(false)}/>:null;
-  const launch=<button type="button" onClick={()=>setManual(true)} style={{position:"fixed",bottom:16,left:16,zIndex:8000,padding:"10px 14px",borderRadius:22,border:"1px solid #b52320",background:"#c92320",color:"#fff",fontWeight:800,cursor:"pointer",boxShadow:"0 3px 12px #0002"}}>+ New Lead Sheet</button>;
+  const manualPanel=manual?<GuidedLeadSheet phone="" name="" draftId={manualId} onClose={()=>setManual(false)}/>:null;
+  const launch=<button type="button" onClick={()=>{setManualId("manual-"+Date.now().toString());setManual(true);}} style={{position:"fixed",bottom:16,left:16,zIndex:8000,padding:"10px 14px",borderRadius:22,border:"1px solid #b52320",background:"#c92320",color:"#fff",fontWeight:800,cursor:"pointer",boxShadow:"0 3px 12px #0002"}}>+ New Lead Sheet</button>;
   if(!call)return <>{launch}{manualPanel}{sheet?<GuidedLeadSheet phone={sheet.caller_phone||""} name={sheet.caller_name||""} onClose={()=>setSheet(null)}/>:null}</>;
   const known=Boolean(call.route_kind&&call.route_kind!=="new_lead");
   const phone=call.caller_phone||"Unknown number";
