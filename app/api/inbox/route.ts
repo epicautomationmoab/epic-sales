@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
       rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
+    const socialThreads = await rpc(session.accessToken, "get_c360_social_inbox", {});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
