@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
     if (threadKey) {
-      const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
+      const notes = threadKey.startsWith("podium:")
+        ? await rpc(session.accessToken, "get_podium_inbox_notes", { p_conversation_uid: threadKey.slice(7) })
+        : await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows, phoneReport, collaborators, mentions] = await Promise.all([
@@ -111,6 +113,15 @@ export async function POST(request: NextRequest) {
     if (body.action === "close" || body.action === "clean") {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
+    }
+    if (body.thread_key.startsWith("podium:") && (body.action==="note" || body.action==="route")) {
+      const result=await rpc(session.accessToken,"podium_inbox_action",{
+        p_conversation_uid:body.thread_key.slice(7),
+        p_action:body.action,
+        p_note_text:body.note_text||null,
+        p_lane:body.action==="route"?body.destination:null
+      });
+      return NextResponse.json(result || {ok:true});
     }
     if (body.action === "c360_note") {
       const entryType=(body as typeof body & { entry_type?: string })?.entry_type;
