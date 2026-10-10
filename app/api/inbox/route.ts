@@ -38,6 +38,13 @@ export async function GET(request: NextRequest) {
   const includeClosed = request.nextUrl.searchParams.get("cleaned") === "1" || request.nextUrl.searchParams.get("closed") === "1";
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
+    const socialDetail=request.nextUrl.searchParams.get("social_detail");
+    if(socialDetail){
+      const match=socialDetail.match(/^social:(instagram|facebook):(.+)$/);
+      if(!match)return NextResponse.json({error:"Invalid social conversation."},{status:400});
+      const detail=await rpc(session.accessToken,"c360_social_thread_detail",{p_platform:match[1],p_conversation_uid:match[2]});
+      return NextResponse.json({ok:true,detail});
+    }
     if (threadKey) {
       const social=threadKey.match(/^social:(instagram|facebook):(.+)$/);
       const notes=social
