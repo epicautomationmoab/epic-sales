@@ -39,9 +39,12 @@ export async function GET(request: NextRequest) {
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
     if (threadKey) {
-      const notes = threadKey.startsWith("podium:")
-        ? await rpc(session.accessToken, "get_podium_inbox_notes", { p_conversation_uid: threadKey.slice(7) })
-        : await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
+      const social=threadKey.match(/^social:(instagram|facebook):(.+)$/);
+      const notes=social
+        ? await rpc(session.accessToken,"get_c360_social_notes",{p_platform:social[1],p_conversation_uid:social[2]})
+        : threadKey.startsWith("podium:")
+          ? await rpc(session.accessToken,"get_podium_inbox_notes",{p_conversation_uid:threadKey.slice(7)})
+          : await rpc(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:threadKey});
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows, phoneReport, collaborators, mentions] = await Promise.all([
