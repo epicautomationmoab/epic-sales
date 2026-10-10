@@ -14,6 +14,16 @@ export default function IncomingCallPopup() {
   const [manualId,setManualId]=useState("manual");
   useEffect(()=>{const open=()=>{setManualId("manual-"+Date.now());setManual(true);};window.addEventListener("epicc360:new-lead-sheet",open);return()=>window.removeEventListener("epicc360:new-lead-sheet",open);},[]);
   useEffect(()=>{
+    const url=new URL(window.location.href);
+    if(!url.searchParams.has("lead_phone")&&!url.searchParams.has("lead_name"))return;
+    const phone=url.searchParams.get("lead_phone")||"";
+    const name=url.searchParams.get("lead_name")||"";
+    setSheet({id:"external-"+Date.now(),caller_phone:phone,caller_name:name,route_label:null,route_kind:"new_lead",confirmation_code:null});
+    url.searchParams.delete("lead_phone");
+    url.searchParams.delete("lead_name");
+    window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+  },[]);
+  useEffect(()=>{
     try { const saved=sessionStorage.getItem(STORAGE); if(saved)setCall(JSON.parse(saved)); } catch {}
     let active=true,busy=false;
     async function check(){
