@@ -22,12 +22,12 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
   const response=await fetch(URL+"/rest/v1/rpc/get_epic_known_customer_matches",{
    method:"POST",
    headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},
-   body:JSON.stringify({p_emails:[],p_phones:[digits.slice(-10)]}),
+   body:JSON.stringify({p_emails:[],p_phones:[digits.slice(-10),"1"+digits.slice(-10)]}),
    cache:"no-store"
   });
   const rows=await response.json().catch(()=>[]);
   if(!response.ok)return NextResponse.json({error:"Customer lookup failed"},{status:response.status});
-  const matches=(Array.isArray(rows)?rows:[]).filter((row:any)=>row.match_type==="phone"&&row.contact_id);
+  const matches=[...new Map((Array.isArray(rows)?rows:[]).filter((row:any)=>row.match_type==="phone"&&row.contact_id).map((row:any)=>[row.contact_id,row])).values()];
   return NextResponse.json({ok:true,match:matches.length===1?{id:matches[0].contact_id,display_name:matches[0].display_name,tripworks_customer_id:null}:null,ambiguous:matches.length>1},{headers:{"Cache-Control":"no-store"}});
  }
  if(method==="POST"&&body.finalize===true){
