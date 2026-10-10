@@ -4,7 +4,7 @@ import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/, "");
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 const EPIC_TIME_ZONE = "America/Denver";
-const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || "https://epic-tools-app.vercel.app").replace(/\\/+$/, "");
+const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || "https://epic-tools-app.vercel.app").replace(/\/+$/, "");
 
 async function auth(request: NextRequest) {
   const accessToken = request.cookies.get("epic_access_token")?.value;
