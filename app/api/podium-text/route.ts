@@ -15,6 +15,10 @@ async function proxy(request: NextRequest, method: "GET" | "POST") {
     cache: "no-store",
   });
   const body = await response.text();
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("application/json")) {
+    return NextResponse.json({error: "Podium reply service unavailable in this preview. No text was sent."}, {status:502});
+  }
   return new NextResponse(body, {
     status: response.status,
     headers: { "Content-Type": "application/json" },
