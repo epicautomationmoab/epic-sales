@@ -16,11 +16,11 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
   try{
    const response=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data,finalize:true})});
    const payload=await response.json();
-   if(!response.ok||!payload.rows?.[0]?.id)throw Error("Couldn't save this Lead Sheet.");
+   if(!response.ok||!payload.rows?.[0]?.id)throw Error(payload.error||"Couldn't save this Lead Sheet.");
    const id=payload.rows[0].id;setServerId(id);
    try{localStorage.setItem(key+":server-id",id);}catch{}
-   setSaveStatus("Lead Sheet saved to C360");setFinalMessage("Saved to C360 Lead Sheets. Customer profile linking is being completed.");
-   if(openCustomer){const q=(String(data.phone||"").trim()||String(data.name||"").trim());if(q)window.open("/customers?q="+encodeURIComponent(q)," _blank".trim());}
+   setSaveStatus("Lead Sheet saved to C360");setFinalMessage(payload.contactId?"Saved and linked to customer C360.":"Lead Sheet saved. No customer linked yet; enter a phone number to create or match a C360 customer.");
+   if(openCustomer&&payload.contactId){window.location.href="/customers?q="+encodeURIComponent(String(data.phone||""))+"&open=1";}else if(!openCustomer){onClose();}
   }catch(e){setFinalMessage(e instanceof Error?e.message:"Unable to save.");}
   finally{setSavingFinal(false);}
  }
