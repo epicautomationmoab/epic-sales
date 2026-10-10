@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
-export default function GuidedLeadSheet({phone,name,onClose}:{phone:string;name:string;onClose:()=>void}){
- const key="lead-sheet:"+phone;
+export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:string;name:string;onClose:()=>void;draftId?:string}){
+ const key="lead-sheet:"+(draftId||phone||"manual");
  const [data,setData]=useState<Record<string,any>>({phone,name});
  useEffect(()=>{try{setData(prev=>({...prev,...JSON.parse(localStorage.getItem(key)||"{}")}));}catch{}},[key]);
  useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key]);
