@@ -222,6 +222,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Podium SMS is fetched through the authenticated server route, not through public Supabase RLS.
+    // This is read-only enrichment: historical SMS must not create or reopen inbox tasks.
+    let podiumTexts:any[] = [];
+    if (identityPhone.length === 10) {
+      try {
+        const response = await fetch(
+          `${request.nextUrl.origin}/api/podium-text?phone=${encodeURIComponent("+1" + identityPhone)}`,
+          { headers: { Cookie: `epic_access_token=${session.accessToken}` }, cache: "no-store" },
+        );
+        if (response.ok) {
+          const result = await response.json();
+          podiumTexts = (Array.isArray(result.messages) ? result.messages : []).map((message:any) => ({
+            id: `podium:${message.event_key}`,
+            at: message.message_at || message.received_at,
+            direction: message.direction,
+            body: message.body,
+            agent_name: null,
+            status: message.event_type === "message.failed" ? "failed" : "sent",
+            epic_number: "2700",
+            customer_number: "+1" + identityPhone,
+            provider: "podium",
+            conversation_uid: message.conversation_uid,
+          }));
+        }
+      } catch (error) {
+        console.warn("Podium C360 enrichment unavailable", error);
+      }
+    }
+
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -234,7 +263,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
-      texts:(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),
+      texts:[...(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),...podiumTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
