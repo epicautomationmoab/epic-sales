@@ -8,23 +8,18 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
  if(!token||!profile||profile.role==="workstation")return NextResponse.json({error:"Employee login required"},{status:401});
  const id=method==="GET"?request.nextUrl.searchParams.get("id"):null;
  const phone=method==="GET"?request.nextUrl.searchParams.get("phone"):null;
+ const contact=method==="GET"?request.nextUrl.searchParams.get("contact"):null;
  const body=method==="POST"?await request.json().catch(()=>null):null;
  if(method==="POST"&&(!body||typeof body!=="object"||!body.fields||typeof body.fields!=="object"))return NextResponse.json({error:"Invalid sheet"},{status:400});
- const p=method==="GET"?(id?`epicc360_lead_sheets?id=eq.${encodeURIComponent(id)}&select=id,fields,status&limit=1`:phone?`epicc360_lead_sheets?customer_phone=eq.${encodeURIComponent(phone)}&status=eq.saved&select=id,customer_name,customer_phone,updated_at,status,fields&order=updated_at.desc&limit=30`:"epicc360_lead_sheets?select=id,customer_name,customer_phone,updated_at,status&order=updated_at.desc&limit=20"):"epicc360_lead_sheets?on_conflict=id";
- let matchedContactId:string|null=null;
- if(method==="POST"&&body.finalize===true){
-   const digits=String(body.fields.phone||"").replace(/[^0-9]/g,"").slice(-10);
-   if(digits.length===10){
-     const lookup=await fetch(URL+"/rest/v1/sales_contacts?select=id&canonical_phone=like.*"+digits+"&limit=3",{headers:{apikey:KEY,Authorization:"Bearer "+token},cache:"no-store"});
-     if(lookup.ok){
-       const matches=await lookup.json() as Array<{id:string}>;
-       if(matches.length===1)matchedContactId=matches[0].id;
-       if(matches.length>1)return NextResponse.json({error:"Several contacts match the phone number. Select the correct customer before linking."},{status:409});
-     }
-   }
- }
- const payload=method==="POST"?{...(body.id?{id:body.id}:{}),owner_user_id:profile.user_id||profile.id,customer_name:String(body.fields.name||"").slice(0,200),customer_phone:String(body.fields.phone||"").slice(0,50),fields:body.fields,...(matchedContactId?{contact_id:matchedContactId}:{}),status:body.finalize===true?"saved":"draft",updated_at:new Date().toISOString()}:null;
+ const p=method==="GET"?(id?`epicc360_lead_sheets?id=eq.${encodeURIComponent(id)}&select=id,fields,status&limit=1`:contact?`epicc360_lead_sheets?contact_id=eq.${encodeURIComponent(contact)}&status=eq.saved&select=id,customer_name,customer_phone,updated_at,status,fields&order=updated_at.desc&limit=30`:phone?`epicc360_lead_sheets?customer_phone=eq.${encodeURIComponent(phone)}&status=eq.saved&select=id,customer_name,customer_phone,updated_at,status,fields&order=updated_at.desc&limit=30`:"epicc360_lead_sheets?select=id,customer_name,customer_phone,updated_at,status&order=updated_at.desc&limit=20"):"epicc360_lead_sheets?on_conflict=id";
+ const payload=method==="POST"?{...(body.id?{id:body.id}:{}),owner_user_id:profile.user_id||profile.id,customer_name:String(body.fields.name||"").slice(0,200),customer_phone:String(body.fields.phone||"").slice(0,50),fields:body.fields,status:body.finalize===true?"saved":"draft",updated_at:new Date().toISOString()}:null;
  try{
+ if(method==="POST"&&body.finalize===true){
+  const response=await fetch(URL+"/rest/v1/rpc/finalize_epicc360_lead_sheet",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_id:body.id||null,p_fields:body.fields,p_contact_id:body.contactId||null}),cache:"no-store"});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)return NextResponse.json({error:result.message||"Unable to finish saving this Lead Sheet"},{status:response.status});
+  return NextResponse.json({ok:true,rows:[result],linked:result.linked,contactId:result.contact_id});
+ }
  const response=await fetch(`${URL}/rest/v1/${p}`,{method:method==="POST"?"POST":"GET",headers:{"apikey":KEY,"Authorization":`Bearer ${token}`,"Content-Type":"application/json",...(method==="POST"?{"Prefer":"resolution=merge-duplicates,return=representation"}:{})},body:payload?JSON.stringify(payload):undefined,cache:"no-store"});
  const result=await response.json().catch(()=>[]);
  if(!response.ok)return NextResponse.json({error:"Unable to save or read lead sheet"},{status:response.status});
