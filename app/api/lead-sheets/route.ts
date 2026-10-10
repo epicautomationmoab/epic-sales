@@ -10,7 +10,19 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
  const body=method==="POST"?await request.json().catch(()=>null):null;
  if(method==="POST"&&(!body||typeof body!=="object"||!body.fields||typeof body.fields!=="object"))return NextResponse.json({error:"Invalid sheet"},{status:400});
  const p=method==="GET"?(id?`epicc360_lead_sheets?id=eq.${encodeURIComponent(id)}&select=id,fields,status&limit=1`:"epicc360_lead_sheets?select=id,customer_name,customer_phone,updated_at,status&order=updated_at.desc&limit=20"):"epicc360_lead_sheets?on_conflict=id";
- const payload=method==="POST"?{...(body.id?{id:body.id}:{}),owner_user_id:profile.user_id||profile.id,customer_name:String(body.fields.name||"").slice(0,200),customer_phone:String(body.fields.phone||"").slice(0,50),fields:body.fields,status:body.finalize===true?"saved":"draft",updated_at:new Date().toISOString()}:null;
+ let matchedContactId:string|null=null;
+ if(method==="POST"&&body.finalize===true){
+   const digits=String(body.fields.phone||"").replace(/[^0-9]/g,"").slice(-10);
+   if(digits.length===10){
+     const lookup=await fetch(URL+"/rest/v1/sales_contacts?select=id&canonical_phone=like.*"+digits+"&limit=3",{headers:{apikey:KEY,Authorization:"Bearer "+token},cache:"no-store"});
+     if(lookup.ok){
+       const matches=await lookup.json() as Array<{id:string}>;
+       if(matches.length===1)matchedContactId=matches[0].id;
+       if(matches.length>1)return NextResponse.json({error:"Several contacts match the phone number. Select the correct customer before linking."},{status:409});
+     }
+   }
+ }
+ const payload=method==="POST"?{...(body.id?{id:body.id}:{}),owner_user_id:profile.user_id||profile.id,customer_name:String(body.fields.name||"").slice(0,200),customer_phone:String(body.fields.phone||"").slice(0,50),fields:body.fields,...(matchedContactId?{contact_id:matchedContactId}:{}),status:body.finalize===true?"saved":"draft",updated_at:new Date().toISOString()}:null;
  try{
  const response=await fetch(`${URL}/rest/v1/${p}`,{method:method==="POST"?"POST":"GET",headers:{"apikey":KEY,"Authorization":`Bearer ${token}`,"Content-Type":"application/json",...(method==="POST"?{"Prefer":"resolution=merge-duplicates,return=representation"}:{})},body:payload?JSON.stringify(payload):undefined,cache:"no-store"});
  const result=await response.json().catch(()=>[]);
