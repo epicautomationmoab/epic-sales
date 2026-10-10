@@ -7,10 +7,10 @@ async function proxy(request: NextRequest, method: "GET" | "POST") {
   const accessToken = request.cookies.get("epic_access_token")?.value;
   if (!accessToken) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
   if (method !== "POST") return NextResponse.json({error:"Method not supported."},{status:405});
-  if (!PUBLIC_KEY) return NextResponse.json({error:"Podium connection not configured."},{status:503});
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/podium-sms-send`, {
     method,
-    headers: { Authorization: `Bearer ${accessToken}`, apikey: PUBLIC_KEY, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${accessToken}`, ...(PUBLIC_KEY ? {apikey:PUBLIC_KEY} : {}), "Content-Type": "application/json" },
     ...(method === "POST" ? { body: await request.text() } : {}),
     cache: "no-store",
   });
