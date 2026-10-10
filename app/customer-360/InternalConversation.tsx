@@ -3,7 +3,7 @@ import {useEffect,useMemo,useState} from "react";
 import QuickFollowUp from "./QuickFollowUp";
 type Note={id:string;entry_type?:"customer_note"|"reservation_note"|"team_message";note_text:string;author_name:string|null;created_at:string;mentions?:Array<{id:string;display_name:string;response_status?:string|null;responded_at?:string|null}>};
 type Member={id:string;display_name?:string|null;name?:string|null;full_name?:string|null};
-export default function InternalConversation({opportunityId,contactId,phone,email,reservationId,reservationConfirmations=[]}:{opportunityId?:string|null;contactId?:string|null;phone?:string|null;email?:string|null;reservationId?:string|null;reservationConfirmations?:string[]}){
+export default function InternalConversation({opportunityId,contactId,phone,email,reservationId,reservationConfirmations=[],reservationOptions=[]}:{opportunityId?:string|null;contactId?:string|null;phone?:string|null;email?:string|null;reservationId?:string|null;reservationConfirmations?:string[];reservationOptions?:Array<{code:string;label:string}>}){
  // Use the existing inbox identity for unmatched callers; never manufacture a sales opportunity.
  const digits=String(phone||"").replace(/\D/g,"").slice(-10);
  const threadKey=opportunityId?"opp:"+opportunityId:digits.length===10?"phone:+1"+digits:contactId?"contact:"+contactId:email?.trim()?"email:"+email.trim().toLowerCase():reservationId?"reservation:"+reservationId:"";
@@ -11,6 +11,7 @@ export default function InternalConversation({opportunityId,contactId,phone,emai
  const [sharedNotes,setSharedNotes]=useState<Array<{note_id:string;confirmation_code:string;note_text:string;note_scope:string;source:string;visible_in_readiness:boolean;author_name:string|null;created_at:string}>>([]);
  const [reservationMode,setReservationMode]=useState(false);
  const [chosenConfirmation,setChosenConfirmation]=useState("");
+ const [reservationQuery,setReservationQuery]=useState("");
  const [showInReadiness,setShowInReadiness]=useState(false);
  const confirmations=reservationConfirmations.filter(Boolean).join(",");
  async function refreshShared(){if(!confirmations)return;const response=await fetch("/api/unified-notes?confirmations="+encodeURIComponent(confirmations),{cache:"no-store"});if(response.ok){const p=await response.json();setSharedNotes(p.notes||[]);}}
@@ -43,7 +44,20 @@ export default function InternalConversation({opportunityId,contactId,phone,emai
 
   <div style={{fontSize:11,color:"#647080"}}>{"Type @ to mention a teammate in your notes."}</div>
   {reservationConfirmations.length?<div style={{display:"flex",gap:12,fontSize:12}}><label><input type="radio" checked={!reservationMode} onChange={()=>setReservationMode(false)}/> Customer Note</label><label><input type="radio" checked={reservationMode} onChange={()=>setReservationMode(true)}/> Reservation Note</label></div>:null}
-  {reservationMode&&reservationConfirmations.length>1?<label style={{fontSize:12}}>Reservation <select value={chosenConfirmation} onChange={e=>setChosenConfirmation(e.target.value)}><option value="">Select reservation</option>{reservationConfirmations.map(code=><option key={code} value={code}>{code}</option>)}</select></label>:null}
+  {reservationMode&&reservationConfirmations.length>1?<div style={{display:"grid",gap:6,fontSize:12,maxWidth:420}}>
+    <strong>Reservation</strong>
+    {chosenConfirmation?<div style={{display:"flex",alignItems:"center",gap:8,padding:8,border:"1px solid #d8dee5",borderRadius:8}}>
+      <span style={{flex:1}}>{reservationOptions.find(o=>o.code===chosenConfirmation)?.label||chosenConfirmation}</span>
+      <button type="button" onClick={()=>{setChosenConfirmation("");setReservationQuery("")}} style={{border:0,background:"transparent",cursor:"pointer",textDecoration:"underline"}}>Change</button>
+    </div>:<>
+      <input type="search" value={reservationQuery} onChange={e=>setReservationQuery(e.target.value)} placeholder="Search date, activity, or confirmation" aria-label="Find reservation" style={{width:"100%",border:"1px solid #cbd5df",borderRadius:8,padding:"9px 10px",font:"inherit"}}/>
+      <div style={{display:"grid",gap:3,maxHeight:220,overflowY:"auto",border:"1px solid #dbe2ea",borderRadius:8,padding:5}}>
+       {(reservationOptions.length?reservationOptions:reservationConfirmations.map(code=>({code,label:code}))).filter(o=>(o.label+" "+o.code).toLowerCase().includes(reservationQuery.toLowerCase())).slice(0,6).map(o=><button key={o.code} type="button" onClick={()=>setChosenConfirmation(o.code)} style={{textAlign:"left",border:0,borderRadius:6,padding:"8px 10px",background:"#f5f7fa",cursor:"pointer",font:"inherit"}}>{o.label}</button>)}
+       {!(reservationOptions.length?reservationOptions:reservationConfirmations.map(code=>({code,label:code}))).some(o=>(o.label+" "+o.code).toLowerCase().includes(reservationQuery.toLowerCase()))?<span style={{padding:8,color:"#647080"}}>No matching reservations</span>:null}
+      </div>
+      <span style={{color:"#647080",fontSize:11}}>Showing up to 6 matches. Type to narrow the list.</span>
+    </>}
+  </div>:null}
   {reservationMode?<label style={{fontSize:12}}><input type="checkbox" checked={showInReadiness} onChange={e=>setShowInReadiness(e.target.checked)}/> Show in Readiness</label>:null}
   <textarea aria-label="Internal team message" rows={3} value={draft} onChange={e=>setDraft(e.target.value)} placeholder={"Add a note about the guest… Type @ to tag a teammate."} style={{width:"100%",boxSizing:"border-box",border:"1px solid #cbd5df",borderRadius:9,padding:10,font:"inherit",fontSize:13}}/>
   {candidates.length?<div role="listbox" style={{display:"grid",border:"1px solid #dbe2ea",borderRadius:9,padding:4}}>{candidates.map(m=><button type="button" key={m.id} onClick={()=>tag(m)} style={{border:0,background:"white",textAlign:"left",padding:7,cursor:"pointer"}}>@{m.display_name||m.full_name||m.name}</button>)}</div>:null}
