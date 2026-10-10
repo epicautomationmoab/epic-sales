@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 
 export const dynamic = "force-dynamic";
-const SOURCE = "https://epic-tools-app-automation-4515s-projects.vercel.app/api/team/live-calls";
+const SOURCE = "https://team.myepicreservation.com/api/team/live-calls";
 
 async function relay(request: NextRequest, method: "GET" | "POST") {
   const token = request.cookies.get("epic_access_token")?.value;
@@ -19,7 +19,10 @@ async function relay(request: NextRequest, method: "GET" | "POST") {
       redirect: "manual",
       signal: AbortSignal.timeout(6000),
     });
-    if (!response.ok) return NextResponse.json({ error: "Live-call service unavailable" }, { status: 502 });
+    if (!response.ok) {
+      console.warn("[c360-live-calls] Upstream failed", { method, status: response.status });
+      return NextResponse.json({ error: "Live-call service unavailable" }, { status: 502 });
+    }
     return NextResponse.json(await response.json(), { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Live-call service unavailable" }, { status: 502 });
