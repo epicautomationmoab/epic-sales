@@ -21,8 +21,8 @@ export async function GET(request:NextRequest) {
  const codes=Array.from(new Set((request.nextUrl.searchParams.get("confirmations")||"").split(",").map(v=>v.trim().toUpperCase()).filter(v=>/^[A-Z0-9-]{3,25}$/.test(v)))).slice(0,30);
  if(!codes.length)return NextResponse.json({ok:true,notes:[]});
  try {
- const params=new URLSearchParams({select:"note_id,confirmation_code,note_text,note_scope,source,visible_in_readiness,author_name,created_at",confirmation_code:`in.(${codes.join(",")})`,archived_at:"is.null",order:"created_at.desc",limit:"250"});
- return NextResponse.json({ok:true,notes:await rest<Note[]>(`epic_unified_notes?${params}`,{headers:{"x-epic-access-token":request.cookies.get("epic_access_token")?.value||""}})});
+ const notes=await rest<Note[]>("rpc/epic_unified_notes_for_reservations",{method:"POST",headers:{"x-epic-access-token":request.cookies.get("epic_access_token")?.value||""},body:JSON.stringify({p_confirmations:codes})});
+ return NextResponse.json({ok:true,notes});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to load notes."},{status:500});}
 }
 export async function POST(request:NextRequest) {
