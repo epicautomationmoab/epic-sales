@@ -56,7 +56,7 @@ export default function EpicC360Sidebar({
         <div className="epicC360Tagline">Every customer. One complete history.</div>
       </div>
       <nav className={navClassName}>
-        {items.map((item) => (
+        {items.map((item) => item.key === "customers" ? (<>\n          <button key="new-lead-sheet" type="button" onClick={() => window.dispatchEvent(new Event("epicc360:new-lead-sheet"))} style={{display:"block",width:"calc(100% - 22px)",margin:"7px 11px 12px",padding:"11px 12px",border:"1px solid #e33732",borderRadius:24,background:"#c92320",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",textAlign:"center"}}>+ New Lead Sheet</button>\n          <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>{item.label}</a>\n        </>) : (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
             {item.label}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
           </a>
