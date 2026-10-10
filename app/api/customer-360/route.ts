@@ -4,6 +4,7 @@ import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/, "");
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 const EPIC_TIME_ZONE = "America/Denver";
+const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || "https://epic-tools-app.vercel.app").replace(/\\/+$/, "");
 
 async function auth(request: NextRequest) {
   const accessToken = request.cookies.get("epic_access_token")?.value;
@@ -228,8 +229,8 @@ export async function GET(request: NextRequest) {
     if (identityPhone.length === 10) {
       try {
         const response = await fetch(
-          `${request.nextUrl.origin}/api/podium-text?phone=${encodeURIComponent("+1" + identityPhone)}`,
-          { headers: { Cookie: `epic_access_token=${session.accessToken}` }, cache: "no-store" },
+          `${TOOLS_BASE}/api/team/podium-conversation?phone=${encodeURIComponent("+1" + identityPhone)}`,
+          { headers: { Authorization: `Bearer ${session.accessToken}` }, cache: "no-store" },
         );
         if (response.ok) {
           const result = await response.json();
