@@ -110,6 +110,18 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
+    if (body.thread_key.startsWith("social:")) {
+      const match=body.thread_key.match(/^social:(instagram|facebook):(.+)$/);
+      if(!match)return NextResponse.json({error:"Invalid social thread"},{status:400});
+      if(!["close","clean","route","note","link","unlink"].includes(body.action||""))return NextResponse.json({error:"Unsupported social action"},{status:400});
+      const result=await rpc(session.accessToken,"c360_social_action",{
+        p_platform:match[1],p_conversation_uid:match[2],
+        p_action:body.action==="clean"?"close":body.action,
+        p_note_text:body.note_text||null,p_lane:body.destination||null,
+        p_contact_id:(body as typeof body & {contact_id?:string}).contact_id||null
+      });
+      return NextResponse.json(result||{ok:true});
+    }
     if (body.thread_key.startsWith("podium:") && (body.action === "close" || body.action === "clean")) { const ok = await rpc(session.accessToken, "close_c360_podium_inbox", { p_conversation_uid: body.thread_key.slice(7) }); return NextResponse.json({ok}); }
     if (body.action === "close" || body.action === "clean") {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
