@@ -63,7 +63,7 @@ export default function IncomingCallPopup() {
     <div style={{fontSize:17,fontWeight:800,marginTop:7}}>{label}</div>
     <div style={{fontSize:13,marginTop:3}}>{phone}</div>
     <div style={{display:"flex",gap:8,marginTop:13}}>
-      <a href={url} onClick={e=>{if(!known){e.preventDefault();setSheet(call);}void dismiss();}} style={{flex:1,padding:"9px 10px",borderRadius:7,background:"#c92320",color:"#fff",textAlign:"center",textDecoration:"none",fontSize:12,fontWeight:800}}>{known?"Open C360":"Look Up / Start Lead"}</a>
+      <a href={url} onClick={e=>{if(!known){e.preventDefault();setSheet(call);}void dismiss();}} style={{flex:1,padding:"9px 10px",borderRadius:7,background:"#c92320",color:"#fff",textAlign:"center",textDecoration:"none",fontSize:12,fontWeight:800}}>{known?"Open C360":"Open Lead Sheet"}</a>
       <button type="button" onClick={()=>void dismiss()} style={{borderRadius:7,border:"1px solid #d6d6d6",background:"#fff",padding:"9px 10px",fontSize:12,cursor:"pointer"}}>Dismiss</button>
     </div>
     {error&&<div style={{fontSize:11,color:"#a33",marginTop:8}}>Call feed temporarily unavailable</div>}
