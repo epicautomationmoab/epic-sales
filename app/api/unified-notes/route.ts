@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
+import {previewUnifiedNotes} from "../../../lib/preview-unified-notes";
 
 const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 const ANON_KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
@@ -9,6 +10,7 @@ async function session(req:NextRequest){
  return token&&profile&&profile.active&&profile.role!=="workstation"?{token,profile}:null;
 }
 async function rpc<T>(token:string,fn:string,params:Record<string,unknown>):Promise<T>{
+ const isolated=await previewUnifiedNotes<T>(fn,params);if(isolated!==null)return isolated;
  const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:{apikey:ANON_KEY,Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(params),cache:"no-store"});
  const t=await r.text();if(!r.ok)throw new Error(t||`Supabase request failed (${r.status})`);return t?JSON.parse(t) as T:[] as T;
 }
