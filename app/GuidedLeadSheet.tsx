@@ -6,9 +6,9 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  const [saveStatus,setSaveStatus]=useState("Preparing C360 draft");
  const [loaded,setLoaded]=useState(false);
  const [data,setData]=useState<Record<string,any>>({phone,name});
- useEffect(()=>{try{setData(prev=>({...prev,...JSON.parse(localStorage.getItem(key)||"{}")}));}catch{}setLoaded(true);},[key]);
- useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key]);
- useEffect(()=>{if(!loaded)return;const timer=setTimeout(async()=>{setSaveStatus("Saving to C360...");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error();setServerId(result.rows[0].id);setSaveStatus("Saved to C360");}catch{setSaveStatus("C360 save unavailable - draft remains on this device");}},1200);return()=>clearTimeout(timer);},[data,loaded,serverId]);
+ useEffect(()=>{try{setData(prev=>({...prev,...JSON.parse(localStorage.getItem(key)||"{}")}));}catch{}try{setServerId(localStorage.getItem(key+":server-id"));}catch{}setLoaded(true);},[key]);
+ useEffect(()=>{if(!loaded)return;try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key,loaded]);
+ useEffect(()=>{if(!loaded)return;const timer=setTimeout(async()=>{setSaveStatus("Saving to C360...");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error();setServerId(result.rows[0].id);try{localStorage.setItem(key+":server-id",result.rows[0].id);}catch{}setSaveStatus("Saved to C360");}catch{setSaveStatus("C360 save unavailable - draft remains on this device");}},1200);return()=>clearTimeout(timer);},[data,loaded,serverId]);
  const set=(k:string,v:any)=>setData(d=>({...d,[k]:v}));
  const input=(label:string,k:string,type="text")=><label style={{display:"block",margin:"10px 0"}}>{label}<input type={type} value={data[k]||""} onChange={e=>set(k,e.target.value)} style={{display:"block",width:"95%",padding:8}}/></label>;
  const check=(label:string,k:string)=><label style={{display:"inline-flex",gap:6,margin:8}}><input type="checkbox" checked={!!data[k]} onChange={e=>set(k,e.target.checked)}/>{label}</label>;
