@@ -8,6 +8,7 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  const [loaded,setLoaded]=useState(false);
  const [matchedCustomer,setMatchedCustomer]=useState<{id:string;display_name:string|null;tripworks_customer_id:number|null}|null>(null);
  const [matchPending,setMatchPending]=useState(false);
+ const [matchError,setMatchError]=useState(false);
  const [data,setData]=useState<Record<string,any>>({phone,name});
  useEffect(()=>{let active=true;(async()=>{try{if(draftId&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(draftId)){const r=await fetch("/api/lead-sheets?id="+encodeURIComponent(draftId),{cache:"no-store"});const p=await r.json();if(r.ok&&p.rows?.[0]&&active){setData(p.rows[0].fields);setServerId(draftId);setSaveStatus(p.rows[0].status==="saved"?"Saved Lead Sheet loaded":"Draft loaded");setLoaded(true);return;}}const stored=localStorage.getItem(key);if(stored)setData(prev=>({...prev,...JSON.parse(stored)}));setServerId(localStorage.getItem(key+":server-id"));}catch{}if(active)setLoaded(true);})();return()=>{active=false};},[key,draftId]);
  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key,loaded]);
@@ -15,10 +16,11 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
   if(!loaded)return;
   let active=true;
   setMatchedCustomer(null);
+  setMatchError(false);
   const digits=String(data.phone||"").replace(/\D/g,"");
   if(!(digits.length===10||(digits.length===11&&digits.startsWith("1")))){setMatchPending(false);return;}
   setMatchPending(true);
-  const timer=setTimeout(async()=>{try{const response=await fetch("/api/lead-sheets?match_phone="+encodeURIComponent(String(data.phone||"")),{cache:"no-store"});const body=await response.json();if(active)setMatchedCustomer(response.ok&&!body.ambiguous?body.match||null:null);}catch{if(active)setMatchedCustomer(null);}finally{if(active)setMatchPending(false);}},350);
+  const timer=setTimeout(async()=>{try{const response=await fetch("/api/lead-sheets?match_phone="+encodeURIComponent(String(data.phone||"")),{cache:"no-store"});const body=await response.json();if(active){setMatchedCustomer(response.ok&&!body.ambiguous?body.match||null:null);setMatchError(!response.ok); }}catch{if(active){setMatchedCustomer(null);setMatchError(true);}}finally{if(active)setMatchPending(false);}},350);
   return()=>{active=false;clearTimeout(timer)};
  },[data.phone,loaded]);
  useEffect(()=>{if(!loaded||!touched)return;const timer=setTimeout(async()=>{setSaveStatus("Saving draft…");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error(result.error||"Save returned no record");setServerId(result.rows[0].id);try{localStorage.setItem(key+":server-id",result.rows[0].id);}catch{}setSaveStatus("Draft autosaved");}catch(e){setSaveStatus("C360 autosave failed: "+(e instanceof Error?e.message:"Network error"));}},1200);return()=>clearTimeout(timer);},[data,loaded,touched]);
@@ -53,7 +55,7 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  return <div role="dialog" aria-modal="true" aria-label="Guided lead sheet" style={{position:"fixed",inset:0,zIndex:12000,background:"#10182699",display:"flex",justifyContent:"flex-end"}}>
  <section style={{background:"#f3f5f8",color:"#202936",width:"min(720px,100vw)",height:"100%",overflowY:"auto",boxSizing:"border-box",boxShadow:"-10px 0 40px #0003"}}>
  <div style={{position:"sticky",top:0,zIndex:1,background:"#131b28",color:"#fff",padding:"18px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
- <div><div style={{fontSize:10,letterSpacing:1.7,fontWeight:900,color:"#ff7774"}}>EPIC C360 / SALES DISCOVERY</div><h2 style={{fontSize:22,margin:"5px 0 2px"}}>Guided Lead Sheet</h2><div style={{fontSize:11,color:"#ccd5df",marginTop:5}}>{saveStatus}</div>{matchedCustomer?<div style={{fontSize:12,color:"#b7f3c5",fontWeight:800,marginTop:5}}>✅ Known customer: {matchedCustomer.display_name||"C360 customer"} · {matchedCustomer.tripworks_customer_id?"TW #"+matchedCustomer.tripworks_customer_id:"C360 #"+matchedCustomer.id.slice(0,8)}</div>:matchPending?<div style={{fontSize:11,color:"#ccd5df",marginTop:5}}>Checking C360 customer match…</div>:null}</div>
+ <div><div style={{fontSize:10,letterSpacing:1.7,fontWeight:900,color:"#ff7774"}}>EPIC C360 / SALES DISCOVERY</div><h2 style={{fontSize:22,margin:"5px 0 2px"}}>Guided Lead Sheet</h2><div style={{fontSize:11,color:"#ccd5df",marginTop:5}}>{saveStatus}</div>{matchedCustomer?<div style={{fontSize:12,color:"#b7f3c5",fontWeight:800,marginTop:5}}>✅ Known customer: {matchedCustomer.display_name||"C360 customer"} · {matchedCustomer.tripworks_customer_id?"TW #"+matchedCustomer.tripworks_customer_id:"C360 #"+matchedCustomer.id.slice(0,8)}</div>:matchPending?<div style={{fontSize:11,color:"#ccd5df",marginTop:5}}>Checking C360 customer match…</div>:matchError?<div style={{fontSize:11,color:"#ffb4ab",marginTop:5}}>Customer lookup unavailable — match not verified</div>:null}</div>
  <button onClick={onClose} type="button" style={{border:"1px solid #5c6778",borderRadius:9,background:"#293343",color:"#fff",padding:"9px 13px",fontWeight:700,cursor:"pointer"}}>Close ✕</button></div>
  <div style={{padding:"19px 18px 34px"}}>
  <div style={card}>{section("01","Guest identity","Prefilled when available. Confirm details conversationally.")}<div style={grid}>{input("Name","name")}{input("Phone","phone")}</div>{check("Confirmed name with guest","confirmed")}</div>
