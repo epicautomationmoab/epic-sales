@@ -13,7 +13,7 @@ type Opportunity={id:string;status:string|null;customer_name:string|null;email:s
 type Draft={id:string;confirmation_code:string|null;experience_name:string|null;option_name:string|null;activity_date:string|null;value_cents:number|null;is_current_draft:boolean|null;converted_at:string|null;last_seen_at:string|null};
 type Quote={id:string;opportunity_id:string|null;status:string|null;experience_name:string|null;total_cents:number|null;created_by_name:string|null;emailed_at:string|null;created_at:string|null;visit_start_date:string|null;visit_end_date:string|null};
 type Call={id:string;at:string|null;direction:string|null;answered:boolean|null;voicemail:boolean|null;duration_seconds:number|null;recording_url:string|null;summary:string|null;transcription:string|null;lead_score:number|null;lead_explanation:string|null;source_name:string|null;campaign:string|null;matched_reservation_id:string|null;matched_opportunity_id:string|null;pbx_outcome?:string|null;pbx_answered_extension?:string|null;pbx_answered_agent?:string|null;pbx_queue_wait_seconds?:number|null;pbx_ring_attempts?:number|null;pbx_extensions_rung?:string[]|null;pbx_touched_voicemail?:boolean|null;pbx_voicemail_deposited?:boolean|null;pbx_talk_seconds?:number|null};
-type Text={id:string;at:string|null;direction:string|null;body:string|null;agent_name:string|null;status:string|null;epic_number?:string|null;customer_number?:string|null};
+type Text={message_uid?:string|null;id:string;at:string|null;direction:string|null;body:string|null;agent_name:string|null;status:string|null;epic_number?:string|null;customer_number?:string|null;provider?:"podium"|"callrail";conversation_uid?:string|null};
 type Email={id:string;at:string|null;direction:string|null;subject:string|null;body:string|null;from_email:string|null;to_emails:string[]|null};
 type Note={id:string;opportunity_id:string|null;author_name:string|null;note_text:string|null;created_at:string|null};
 type CancellationAgreement={id:string;confirmation_code:string|null;status:string|null;sent_at:string|null;opened_at:string|null;accepted_at:string|null;created_at:string|null;policy_title:string|null;customer_name:string|null;signer_name:string|null};
@@ -35,13 +35,25 @@ const outcomeLabels:Record<string,string>={booked:"Booked on the call",quote:"Se
 
 export default function Customer360Modal(props:Props){
   const{open,onClose,contactId,opportunityId,reservationId,reservationConfirmation,phone,email}=props;
-  const[data,setData]=useState<Customer360|null>(null);const[leadSheets,setLeadSheets]=useState<Array<{id:string;fields:Record<string,any>;updated_at:string}>>([]);const[editSheet,setEditSheet]=useState<string|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");
+  const[data,setData]=useState<Customer360|null>(null);const[leadSheets,setLeadSheets]=useState<Array<{id:string;fields:Record<string,any>;updated_at:string}>>([]);const[editSheet,setEditSheet]=useState<string|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");const[textTransport,setTextTransport]=useState<"callrail"|"podium">("callrail");
+  useEffect(()=>{
+    const mostRecent=[...(data?.texts||[])].sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())[0];
+    setTextTransport(mostRecent?.provider==="podium"?"podium":"callrail");
+  },[data?.texts]);
+
+  useEffect(()=>{if(!open)return;const id=setInterval(()=>{if(document.visibilityState==="visible"&&!sending){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(phone)q.set("phone",phone);if(email)q.set("email",email);fetch("/api/customer-360?"+q,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(p=>{if(p?.customer)setData(p.customer);}).catch(()=>{});}},12000);return()=>clearInterval(id);},[open,sending,contactId,phone,email]);
   useEffect(()=>{if(!open||(!data?.identity?.contact_id&&!data?.identity?.phone))return;let active=true;fetch("/api/lead-sheets?"+(data.identity.contact_id?"contact="+encodeURIComponent(data.identity.contact_id):"phone="+encodeURIComponent(data.identity.phone||"")),{cache:"no-store"}).then(r=>r.json()).then(p=>{if(active)setLeadSheets(p.rows||[])}).catch(()=>{});return()=>{active=false}},[open,data?.identity?.phone]);
 
   useEffect(()=>{if(!open)return;const controller=new AbortController();setFilter("all");(async()=>{setLoading(true);setError("");try{const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(opportunityId)q.set("opportunity",opportunityId);if(reservationId)q.set("reservation",reservationId);if(reservationConfirmation)q.set("confirmation",reservationConfirmation);if(phone)q.set("phone",phone);if(email)q.set("email",email);const r=await fetch(`/api/customer-360?${q.toString()}`,{cache:"no-store",signal:controller.signal});const p=await r.json();if(!r.ok)throw new Error(p?.error||"Unable to load Customer 360.");setData(p.customer||null);}catch(e){if((e as Error).name!=="AbortError")setError(e instanceof Error?e.message:"Unable to load Customer 360.");}finally{setLoading(false);}})();return()=>controller.abort();},[open,contactId,opportunityId,reservationId,reservationConfirmation,phone,email]);
 
   useEffect(()=>{if(!open)return;const handler=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",handler);const previousOverflow=document.body.style.overflow;const previousOverscroll=document.body.style.overscrollBehavior;document.body.style.overflow="hidden";document.body.style.overscrollBehavior="none";return()=>{window.removeEventListener("keydown",handler);document.body.style.overflow=previousOverflow;document.body.style.overscrollBehavior=previousOverscroll;};},[open,onClose]);
 
+  const [pendingPodium,setPendingPodium]=useState<Text[]>([]);
+  const shownTexts=useMemo(()=>{
+    const remote=data?.texts||[];
+    const pending=pendingPodium.filter(local=>!remote.some(t=>(local.message_uid&&t.message_uid===local.message_uid)||(t.provider==="podium"&&t.direction==="outbound"&&t.body===local.body&&t.conversation_uid===local.conversation_uid&&Math.abs(new Date(t.at||0).getTime()-new Date(local.at||0).getTime())<120000)));
+    return [...remote,...pending];
+  },[data?.texts,pendingPodium]);
   const timeline=useMemo<EventItem[]>(()=>{if(!data)return[];const items:EventItem[]=[];
     for(const c of data.calls||[]){const isPbxInbound=c.direction==="inbound"&&Boolean(c.pbx_outcome);const title=c.direction==="outbound"?"Outbound call":c.answered===false?(c.voicemail&&c.pbx_voicemail_deposited===true?"Missed call — Voicemail":"Missed call"):"Inbound call — Answered";const answerLabel=c.pbx_answered_agent||c.pbx_answered_extension;const pbxMeta=isPbxInbound?[c.answered?(answerLabel?"Answered by "+answerLabel:"Answered"):"No human answer",c.pbx_ring_attempts!=null?c.pbx_ring_attempts+" ring attempt"+(c.pbx_ring_attempts===1?"":"s"):null,c.pbx_queue_wait_seconds!=null?c.pbx_queue_wait_seconds+"s queue wait":null]:[];items.push({id:`c-${c.id}`,kind:"call",at:c.at,title,meta:[...pbxMeta,c.lead_score!=null?`CallRail score ${c.lead_score}`:null,durationLabel(c.duration_seconds),c.source_name,c.campaign].filter(Boolean).join(" · "),body:c.summary||c.lead_explanation||null,href:c.recording_url||undefined,hrefLabel:"Listen to call",transcript:c.transcription});}
     for(const w of data.sales_call_workflows||[]){
@@ -61,7 +73,7 @@ export default function Customer360Modal(props:Props){
         body:details||null,
       });
     }
-    for(const t of data.texts||[])items.push({id:`t-${t.id}`,kind:"text",at:t.at,title:t.direction==="outbound"?"Text sent":"Text received",meta:[t.agent_name,t.status].filter(Boolean).join(" · "),body:t.body});
+    for(const t of shownTexts)items.push({id:`t-${t.id}`,kind:"text",at:t.at,title:t.direction==="outbound"?"Text sent":"Text received",meta:[t.agent_name,t.status].filter(Boolean).join(" · "),body:t.body});
     for(const e of data.emails||[])items.push({id:`e-${e.id}`,kind:"email",at:e.at,title:e.direction==="outbound"?`Email sent${e.subject?`: ${e.subject}`:""}`:`Email received${e.subject?`: ${e.subject}`:""}`,meta:e.direction==="inbound"?(e.from_email?`From ${e.from_email}`:null):(e.to_emails?.length?`To ${e.to_emails.join(", ")}`:null),body:e.body});
     for(const r of data.reservations||[])items.push({id:`r-${r.id}`,kind:"reservation",at:r.created_at||r.updated_at||r.start_time,title:`${r.is_cancelled?"Cancelled reservation":"Reservation"}: ${r.experience_name||r.confirmation_code||"TripWorks booking"}`,meta:[r.business_line,r.trip_status,r.total_amount_cents!=null?money.format(r.total_amount_cents/100):null].filter(Boolean).join(" · "),body:r.start_time?`${fmtDateTime(r.start_time)}${r.people_count?` · ${r.people_count} guests`:""}`:null,href:r.tripworks_booking_url||twReservationUrl(r.confirmation_code)||undefined,hrefLabel:r.confirmation_code?`TripWorks ${r.confirmation_code}`:"Open reservation in TripWorks",secondaryHref:r.mpwr_reservation_url||undefined,secondaryHrefLabel:r.mpwr_confirmation_number?`MPWR ${r.mpwr_confirmation_number}`:"Open MPWR"});
     for(const o of data.opportunities||[])items.push({id:`o-${o.id}`,kind:"lead",at:o.shopping_last_activity_at||o.updated_at,title:o.status==="booked"?"Lead booked":o.status==="open"?"Active lead":`Lead ${o.status||""}`.trim(),meta:[o.interest_label,o.lead_value_cents!=null?money.format(o.lead_value_cents/100):null,o.claimed_by_name||o.assigned_rep_name].filter(Boolean).join(" · "),body:o.activity_window_start?`Visit window ${fmtDate(o.activity_window_start)}${o.activity_window_end&&o.activity_window_end!==o.activity_window_start?` – ${fmtDate(o.activity_window_end)}`:""}`:null});
@@ -75,7 +87,7 @@ export default function Customer360Modal(props:Props){
     for(const a of data.cancellation_agreements||[]){const status=(a.status||"created").toLowerCase();const at=a.accepted_at||a.opened_at||a.sent_at||a.created_at;items.push({id:`a-${a.id}`,kind:"agreement",at,title:`Cancellation Policy Acknowledgement — ${status.charAt(0).toUpperCase()+status.slice(1)}`,meta:[a.confirmation_code,a.signer_name?`Signed by ${a.signer_name}`:null].filter(Boolean).join(" · "),body:a.policy_title||null,href:twReservationUrl(a.confirmation_code)||undefined,hrefLabel:a.confirmation_code?`TripWorks ${a.confirmation_code}`:"Open reservation"});}
     return items.sort((a,b)=>(b.at?new Date(b.at).getTime():0)-(a.at?new Date(a.at).getTime():0));
     for(const s of leadSheets){items.push({id:"ls-"+s.id,kind:"note",at:s.updated_at,title:"Guided Lead Sheet",meta:String(s.fields?.disposition||"Saved discovery"),body:[s.fields?.activity,s.fields?.notes,s.fields?.next].filter(Boolean).join(" · ")});}
-  },[data,leadSheets]);
+  },[data,leadSheets,shownTexts]);
 
   const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):filter==="call"?(item.kind==="call"||item.kind==="sales_call"):item.kind===filter),[timeline,filter]);
 
@@ -87,7 +99,11 @@ export default function Customer360Modal(props:Props){
     try{
       const reservation=(data.reservations||[]).find(r=>!r.is_cancelled)||(data.reservations||[])[0]||null;
       const opportunity=(data.opportunities||[]).find(o=>o.status==="open")||(data.opportunities||[])[0]||null;
-      const r=await fetch("/api/customer-communications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      const podiumConversation=[...(data.texts||[])].filter(t=>t.provider==="podium"&&t.conversation_uid).sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())[0]?.conversation_uid;
+      if(channel==="text"&&textTransport==="podium"&&!podiumConversation)throw new Error("No verified Podium conversation to reply to.");
+      const target=channel==="text"&&textTransport==="podium"?"/api/podium-text":"/api/customer-communications";
+      const r=await fetch(target,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        ...(channel==="text"&&textTransport==="podium"?{conversation_uid:podiumConversation}:{}),
         channel,
         confirmation:reservation?.confirmation_code||reservationConfirmation||null,
         opportunity_id:opportunity?.id||opportunityId||null,
@@ -99,8 +115,18 @@ export default function Customer360Modal(props:Props){
         message_text:composeBody.trim()
       })});
       const p=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(p?.error||"Unable to send message.");
-      const wasText=channel==="text";setComposeBody("");setSendStatus(wasText?"Text sent.":"Email sent.");setComposeChannel(null);
+      if(!r.ok)throw new Error(typeof p?.error === "string" ? p.error : "Unable to send message. No confirmation was received.");
+      if(channel==="text"&&textTransport==="podium"){
+        const outgoing=composeBody.trim();
+        setPendingPodium(current=>[...current,{
+          id:"podium-local:"+String(p.message_uid||Date.now()),
+          message_uid:typeof p.message_uid==="string"?p.message_uid:null,
+          at:new Date().toISOString(),direction:"outbound",body:outgoing,
+          agent_name:"Epic team",status:"accepted",epic_number:"2700",
+          customer_number:data.identity.phone,provider:"podium",conversation_uid:podiumConversation
+        }]);
+      }
+      const wasText=channel==="text";setComposeBody("");setSendStatus(wasText?(textTransport==="podium"?"Text sent via Podium 2700.":"Text sent via CallRail."):"Email sent.");setComposeChannel(null);
       if(wasText){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(opportunityId)q.set("opportunity",opportunityId);if(reservationId)q.set("reservation",reservationId);if(reservationConfirmation)q.set("confirmation",reservationConfirmation);if(phone)q.set("phone",phone);if(email)q.set("email",email);const refreshed=await fetch(`/api/customer-360?${q}`,{cache:"no-store"});if(refreshed.ok){const body=await refreshed.json();if(body.customer)setData(body.customer);}}
     }catch(e){setError(e instanceof Error?e.message:"Unable to send message.");}
     finally{setSending(false);}
@@ -166,19 +192,20 @@ export default function Customer360Modal(props:Props){
           <strong>Text conversation</strong><span style={{fontSize:12,color:"#5d6776"}}>Customer: {identity?.phone||"Unknown"}</span>
         </div>
         <div style={{display:"grid",gap:10,maxHeight:460,overflowY:"auto",padding:"12px",background:"#f7f8fa",borderRadius:12}}>
-          {[...(data.texts||[])].sort((a,b)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()).map(t=>{
+          {[...shownTexts].sort((a,b)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()).map(t=>{
             const outbound=t.direction==="outbound";
             return <div key={t.id} style={{display:"flex",justifyContent:outbound?"flex-end":"flex-start"}}>
               <div style={{maxWidth:"83%",padding:"11px 13px",borderRadius:12,background:outbound?"#dbecff":"#fff",border:"1px solid #dfe5eb",overflowWrap:"anywhere"}}>
                 <div style={{whiteSpace:"pre-wrap",fontSize:14}}>{t.body}</div>
                 <div style={{fontSize:11,color:"#677486",marginTop:7}}>{outbound?(t.agent_name||"Epic team"):(identity?.name||"Customer")} · {fmtDateTime(t.at)}{t.status?" · "+t.status:""}</div>
-                <div style={{fontSize:11,color:"#677486",marginTop:3}}>Epic SMS: {t.epic_number||"Number unavailable"}</div>
+                <div style={{fontSize:11,color:"#677486",marginTop:3}}>Epic SMS: {t.epic_number||"Number unavailable"}{t.provider==="podium"?" · Podium":""}</div>
               </div>
             </div>;
           })}
         </div>
         <div style={{display:"grid",gap:8}}>
-          <div style={{fontSize:12,color:"#5d6776"}}>Reply to {identity?.phone||"customer"} · Last known Epic SMS number: {(data.texts||[]).find(t=>t.epic_number)?.epic_number||"Unavailable"} (sending line determined by SMS service)</div>
+          <label style={{fontSize:12,fontWeight:750}}>Send reply using <select aria-label="Text reply provider" value={textTransport} onChange={e=>setTextTransport(e.target.value as "callrail"|"podium")} style={{marginLeft:8,padding:7,borderRadius:7}}><option value="callrail">CallRail (existing texting)</option>{(data.texts||[]).some(t=>t.provider==="podium"&&t.conversation_uid)?<option value="podium">Podium — 2700</option>:null}</select></label>
+          <div style={{fontSize:12,color:"#5d6776"}}>Reply to {identity?.phone||"customer"} using {textTransport==="podium"?"Podium 2700":"the existing CallRail texting service"}. Select Podium when replying to a 2700 conversation.</div>
           <textarea aria-label="Reply to customer by text" rows={3} maxLength={1600} value={composeBody} onChange={e=>setComposeBody(e.target.value)} placeholder="Reply in this conversation…" style={{width:"100%",boxSizing:"border-box",padding:12,borderRadius:10,border:"1px solid #cbd5df",resize:"vertical"}}/>
           <div style={{display:"flex",justifyContent:"flex-end"}}><button type="button" className={styles.buttonPrimary} disabled={sending||!composeBody.trim()||!identity?.phone} onClick={()=>void sendTextInline()}>{sending?"Sending…":"Send Text"}</button></div>
         </div>

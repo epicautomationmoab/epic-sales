@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
     if (threadKey) {
-      const notes = await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
+      const notes = threadKey.startsWith("podium:")
+        ? await rpc(session.accessToken, "get_podium_inbox_notes", { p_conversation_uid: threadKey.slice(7) })
+        : await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows, phoneReport, collaborators, mentions] = await Promise.all([
@@ -49,8 +51,9 @@ export async function GET(request: NextRequest) {
       rpc(session.accessToken, "get_epic_inbox_collaborators", {}),
       rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
+    const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = (Array.isArray(threads) ? threads : []).filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
@@ -106,9 +109,19 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
+    if (body.thread_key.startsWith("podium:") && (body.action === "close" || body.action === "clean")) { const ok = await rpc(session.accessToken, "close_c360_podium_inbox", { p_conversation_uid: body.thread_key.slice(7) }); return NextResponse.json({ok}); }
     if (body.action === "close" || body.action === "clean") {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
+    }
+    if (body.thread_key.startsWith("podium:") && (body.action==="note" || body.action==="route")) {
+      const result=await rpc(session.accessToken,"podium_inbox_action",{
+        p_conversation_uid:body.thread_key.slice(7),
+        p_action:body.action,
+        p_note_text:body.note_text||null,
+        p_lane:body.action==="route"?body.destination:null
+      });
+      return NextResponse.json(result || {ok:true});
     }
     if (body.action === "c360_note") {
       const entryType=(body as typeof body & { entry_type?: string })?.entry_type;

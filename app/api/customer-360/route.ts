@@ -4,6 +4,8 @@ import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/, "");
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 const EPIC_TIME_ZONE = "America/Denver";
+const PODIUM_TOOLS_PREVIEW = "https://epic-tools-app-git-feature-c36-83802a-automation-4515s-projects.vercel.app";
+const TOOLS_BASE = (process.env.EPIC_TOOLS_API_BASE_URL || (process.env.VERCEL_GIT_COMMIT_REF === "feature/c360-podium-sms-2700" ? PODIUM_TOOLS_PREVIEW : "https://epic-tools-app.vercel.app")).replace(/\/+$/, "");
 
 async function auth(request: NextRequest) {
   const accessToken = request.cookies.get("epic_access_token")?.value;
@@ -222,6 +224,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Podium SMS is fetched through the authenticated server route, not through public Supabase RLS.
+    // This is read-only enrichment: historical SMS must not create or reopen inbox tasks.
+    let podiumTexts:any[] = [];
+    if (identityPhone.length === 10) {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/c360_podium_sms`, {
+          method: "POST",
+          headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_phone: "+1" + identityPhone }),
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error(`Podium SMS lookup failed: ${response.status}`);
+        const messages = await response.json();
+        podiumTexts = (Array.isArray(messages) ? messages : []).map((message:any) => ({
+          id: `podium:${message.event_key}`,
+          message_uid: message.message_uid,
+          at: message.message_at || message.received_at,
+          direction: message.direction,
+          body: message.body,
+          agent_name: null,
+          status: message.event_type === "message.failed" ? "failed" : "sent",
+          epic_number: "2700",
+          customer_number: "+1" + identityPhone,
+          provider: "podium",
+          conversation_uid: message.conversation_uid,
+        }));
+      } catch (error) {
+        console.warn("Podium C360 enrichment unavailable", error);
+      }
+    }
+
     const enriched = customer ? {
       ...customer,
       reservations:(customer.reservations||[]).map((reservation:any)=>{
@@ -234,7 +267,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
-      texts:(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),
+      texts:[...(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),...podiumTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
