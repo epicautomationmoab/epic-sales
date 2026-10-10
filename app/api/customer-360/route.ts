@@ -239,6 +239,7 @@ export async function GET(request: NextRequest) {
         const messages = await response.json();
         podiumTexts = (Array.isArray(messages) ? messages : []).map((message:any) => ({
           id: `podium:${message.event_key}`,
+          message_uid: message.message_uid,
           at: message.message_at || message.received_at,
           direction: message.direction,
           body: message.body,
