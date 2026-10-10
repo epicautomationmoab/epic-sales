@@ -3,12 +3,13 @@ import {useEffect,useState} from "react";
 export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:string;name:string;onClose:()=>void;draftId?:string}){
  const key="lead-sheet:"+(draftId||phone||"manual");
  const [serverId,setServerId]=useState<string|null>(null);
- const [saveStatus,setSaveStatus]=useState("Preparing C360 draft");
+ const [saveStatus,setSaveStatus]=useState("Start entering details");
+ const [touched,setTouched]=useState(false);
  const [loaded,setLoaded]=useState(false);
  const [data,setData]=useState<Record<string,any>>({phone,name});
- useEffect(()=>{let active=true;(async()=>{try{if(draftId&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(draftId)){const r=await fetch("/api/lead-sheets?id="+encodeURIComponent(draftId),{cache:"no-store"});const p=await r.json();if(r.ok&&p.rows?.[0]&&active){setData(p.rows[0].fields);setServerId(draftId);setLoaded(true);return;}}const stored=localStorage.getItem(key);if(stored)setData(prev=>({...prev,...JSON.parse(stored)}));setServerId(localStorage.getItem(key+":server-id"));}catch{}if(active)setLoaded(true);})();return()=>{active=false};},[key,draftId]);
+ useEffect(()=>{let active=true;(async()=>{try{if(draftId&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(draftId)){const r=await fetch("/api/lead-sheets?id="+encodeURIComponent(draftId),{cache:"no-store"});const p=await r.json();if(r.ok&&p.rows?.[0]&&active){setData(p.rows[0].fields);setServerId(draftId);setSaveStatus(p.rows[0].status==="saved"?"Saved Lead Sheet loaded":"Draft loaded");setLoaded(true);return;}}const stored=localStorage.getItem(key);if(stored)setData(prev=>({...prev,...JSON.parse(stored)}));setServerId(localStorage.getItem(key+":server-id"));}catch{}if(active)setLoaded(true);})();return()=>{active=false};},[key,draftId]);
  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(key,JSON.stringify(data));}catch{}},[data,key,loaded]);
- useEffect(()=>{if(!loaded)return;const timer=setTimeout(async()=>{setSaveStatus("Saving to C360...");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error(result.error||"Save returned no record");setServerId(result.rows[0].id);try{localStorage.setItem(key+":server-id",result.rows[0].id);}catch{}setSaveStatus("Saved to C360");}catch(e){setSaveStatus("C360 autosave failed: "+(e instanceof Error?e.message:"Network error"));}},1200);return()=>clearTimeout(timer);},[data,loaded,serverId]);
+ useEffect(()=>{if(!loaded||!touched)return;const timer=setTimeout(async()=>{setSaveStatus("Saving draft…");try{const res=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data})});const result=await res.json();if(!res.ok||!result.rows?.[0]?.id)throw Error(result.error||"Save returned no record");setServerId(result.rows[0].id);try{localStorage.setItem(key+":server-id",result.rows[0].id);}catch{}setSaveStatus("Draft autosaved");}catch(e){setSaveStatus("C360 autosave failed: "+(e instanceof Error?e.message:"Network error"));}},1200);return()=>clearTimeout(timer);},[data,loaded,touched]);
  const [savingFinal,setSavingFinal]=useState(false);
  const [finalMessage,setFinalMessage]=useState("");
  async function saveFinal(openCustomer:boolean){
@@ -19,12 +20,12 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
    if(!response.ok||!payload.rows?.[0]?.id)throw Error(payload.error||"Couldn't save this Lead Sheet.");
    const id=payload.rows[0].id;setServerId(id);
    try{localStorage.setItem(key+":server-id",id);}catch{}
-   setSaveStatus("Lead Sheet saved to C360");setFinalMessage(payload.contactId?"Saved and linked to customer C360.":"Lead Sheet saved. No customer linked yet; enter a phone number to create or match a C360 customer.");
+   setSaveStatus(payload.contactId?"Saved to customer C360":"Lead Sheet saved — customer not yet linked");setFinalMessage(payload.contactId?"Saved and linked to customer C360.":"Lead Sheet saved. No customer linked yet; enter a phone number to create or match a C360 customer.");
    if(openCustomer&&payload.contactId){window.location.href="/customers?q="+encodeURIComponent(String(data.phone||""))+"&open=1";}else if(!openCustomer){onClose();}
   }catch(e){setFinalMessage(e instanceof Error?e.message:"Unable to save.");}
   finally{setSavingFinal(false);}
  }
- const set=(k:string,v:any)=>setData(d=>({...d,[k]:v}));
+ const set=(k:string,v:any)=>{setTouched(true);setData(d=>({...d,[k]:v}));};
 
  const field:React.CSSProperties={width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:9,padding:"11px 12px",fontSize:14,background:"#fff",color:"#17202b",marginTop:6};
  const label:React.CSSProperties={fontSize:12,fontWeight:800,color:"#485467",display:"block",marginBottom:12};
