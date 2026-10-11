@@ -2,7 +2,7 @@ import Link from "next/link";
 import PhoneReportC360Link from "./PhoneReportC360Link";
 
 type Report={date?:string;summary?:Record<string,number|null>;agents?:Array<Record<string,any>>;agent_events?:Array<Record<string,any>>;outbound_events?:Array<Record<string,any>>;missed?:Array<Record<string,any>>};
-const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
+const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(new RegExp("/+$"),"");
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 const fmt=(n:number)=>new Intl.NumberFormat("en-US").format(n);
 const dollars=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n/100);
