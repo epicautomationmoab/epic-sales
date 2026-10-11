@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
     if(body.thread_key.startsWith("meta:facebook:")&&(body.action==="link"||body.action==="unlink")){
-      const result=await rpc(session.accessToken,"c360_meta_link",{p_sender_id:body.thread_key.slice("meta:facebook:".length),p_contact_id:body.action==="link"?body.contact_id:null,p_unlink:body.action==="unlink"});
+      const result=await rpc(session.accessToken,"c360_meta_link",{p_sender_id:body.thread_key.slice("meta:facebook:".length),p_contact_id:body.action==="link"?(body as typeof body & {contact_id?:string}).contact_id||null:null,p_unlink:body.action==="unlink"});
       return NextResponse.json(result);
     }
     if (body.thread_key.startsWith("social:")) {
