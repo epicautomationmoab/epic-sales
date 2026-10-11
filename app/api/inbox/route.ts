@@ -40,12 +40,15 @@ export async function GET(request: NextRequest) {
   try {
     const socialDetail=request.nextUrl.searchParams.get("social_detail");
     if(socialDetail){
+      const metaMatch=socialDetail.match(/^meta:facebook:([0-9]+)$/);
+      if(metaMatch){const detail=await rpc(session.accessToken,"c360_meta_thread_detail",{p_sender_id:metaMatch[1]});return NextResponse.json({ok:true,detail});}
       const match=socialDetail.match(/^social:(instagram|facebook):(.+)$/);
       if(!match)return NextResponse.json({error:"Invalid social conversation."},{status:400});
       const detail=await rpc(session.accessToken,"c360_social_thread_detail",{p_platform:match[1],p_conversation_uid:match[2]});
       return NextResponse.json({ok:true,detail});
     }
     if (threadKey) {
+      if(threadKey.startsWith("meta:facebook:"))return NextResponse.json({ok:true,notes:[]});
       const social=threadKey.match(/^social:(instagram|facebook):(.+)$/);
       const notes=social
         ? await rpc(session.accessToken,"get_c360_social_notes",{p_platform:social[1],p_conversation_uid:social[2]})
@@ -63,8 +66,9 @@ export async function GET(request: NextRequest) {
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
     const socialThreads = await rpc(session.accessToken, "get_c360_social_inbox", {});
+    const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
