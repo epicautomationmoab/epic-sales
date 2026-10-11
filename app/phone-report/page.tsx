@@ -51,14 +51,34 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const selectedMetric=params.metric||"";
   const selectedSession=params.session||"";
   const answeredEvents=(report.agent_events||[]).filter((e:any)=>String(e.extension||"")===selectedExtension&&e.disposition==="ANSWERED"&&Number(e.billsec||0)>0);
-  const salesOpportunities=answeredEvents.filter((e:any)=>e.is_sales_opportunity);
-  const bookedSales=salesOpportunities.filter((e:any)=>e.call_outcome==="booked");
+  // Keep every phone interaction visible, but count closely spaced repeat calls
+  // to the same extension from the same number as one sales opportunity.
+  // Only group sales inquiries; never combine calls across extensions or days.
+  const salesCalls=answeredEvents.filter((e:any)=>e.is_sales_opportunity)
+    .sort((a:any,b:any)=>new Date(a.event_time).getTime()-new Date(b.event_time).getTime());
+  const opportunityGroups:Array<Array<any>>=[];
+  const callGroup=new Map<string,Array<any>>();
+  const normalizedPhone=(v:any)=>String(v||"").replace(/\\D/g,"").slice(-10);
+  for(const e of salesCalls){
+    const number=normalizedPhone(e.caller_phone);
+    const at=new Date(e.event_time).getTime();
+    const existing=number.length===10?opportunityGroups.find(g=>{
+      const last=g[g.length-1];
+      return normalizedPhone(last.caller_phone)===number &&
+        at-new Date(last.event_time).getTime()<=90*60*1000 &&
+        at>=new Date(last.event_time).getTime();
+    }):undefined;
+    if(existing){existing.push(e);callGroup.set(String(e.session),existing);}
+    else {const group=[e];opportunityGroups.push(group);callGroup.set(String(e.session),group);}
+  }
+  const salesOpportunities=opportunityGroups.map(g=>g.find(e=>e.call_outcome==="booked")||g[0]);
+  const bookedSales=opportunityGroups.map(g=>g.find(e=>e.call_outcome==="booked")).filter(Boolean);
   const attributedRevenue=bookedSales.reduce((sum:number,e:any)=>sum+Number(e.booking_revenue_cents||0),0);
   const conversionRate=salesOpportunities.length?Math.round((bookedSales.length/salesOpportunities.length)*100):0;
   const money=(cents:any)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(Number(cents||0)/100);
   const statusLabel=(e:any)=>e.customer_status==="new_caller"?"NEW CALLER":e.customer_status==="existing_customer"?"EXISTING CUSTOMER":e.customer_status==="returning_caller"?"RETURNING CALLER":"CALLER";
   const purposeLabel=(e:any)=>e.call_purpose==="sales_inquiry"?"Sales Inquiry":e.call_purpose==="existing_reservation"?"Reservation Service":"Other";
-  const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`💫 Sale ${money(e.booking_revenue_cents)}`:e.call_outcome==="existing_reservation_handled"?"Reservation Service":e.call_outcome==="no_booking_yet"?"Sales Lead":e.call_outcome==="not_sales_lead"?"Not a Sales Lead":"Other";
+  const outcomeLabel=(e:any)=>e.call_outcome==="booked"?`💫 Sale ${money(e.booking_revenue_cents)}`:callGroup.get(String(e.session))?.some((other:any)=>other.call_outcome==="booked")?"Converted on return call":e.call_outcome==="existing_reservation_handled"?"Reservation Service":e.call_outcome==="no_booking_yet"?"Sales Lead":e.call_outcome==="not_sales_lead"?"Not a Sales Lead":"Other";
   const outboundPurposeLabel=(e:any)=>e.outbound_purpose==="courtesy_call"?"Courtesy Call":e.outbound_purpose==="voicemail_return"?"Returned Voicemail":e.outbound_purpose==="missed_call_recovery"?"Recovered Missed Call":e.outbound_purpose==="abandoned_cart"?"Abandoned Cart Lead":"";
   const selectedEvents=(selectedMetric==="outbound"?report.outbound_events||[]:report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
