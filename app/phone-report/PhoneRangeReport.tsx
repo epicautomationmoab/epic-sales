@@ -27,9 +27,12 @@ function summarize(r:Report,overrides:Set<string>){
   });
   return events;
 }
-export default async function PhoneRangeReport({period,token}:{period:string;token:string}){
+export default async function PhoneRangeReport({period,token,from,to}:{period:string;token:string;from?:string;to?:string}){
   const today=localDate();
-  const dates=datesFor(period,today);
+  const valid=(value?:string)=>!!value && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value+"T12:00:00Z")) && new Date(value+"T12:00:00Z").toISOString().slice(0,10)===value;
+  const days=period==="custom"&&valid(from)&&valid(to)?Math.round((Date.parse(to+"T12:00:00Z")-Date.parse(from+"T12:00:00Z"))/86400000)+1:0;
+  if(period==="custom"&&(days<1||days>31||to!>today))return <div style={{padding:20,background:"#fff",borderRadius:12}}>Choose a valid date range of 1–31 days, ending no later than today.</div>;
+  const dates=period==="custom"?Array.from({length:days},(_,i)=>daysBefore(to!,days-1-i)):datesFor(period,today);
   const reports:Report[]=[];
   try {
     // Bounded fan-out avoids hammering the same reporting RPC with 30 simultaneous calls.
@@ -79,10 +82,10 @@ export default async function PhoneRangeReport({period,token}:{period:string;tok
   const totalBooked=[...agents.values()].reduce((s,a)=>s+a.booked,0);
   const totalRevenue=[...agents.values()].reduce((s,a)=>s+a.revenue,0);
   const secs=[...agents.values()].reduce((s,a)=>s+a.seconds,0);
-  const label=period==="week"?"This Week":period==="7days"?"Last 7 Days":period==="30days"?"Last 30 Days":"This Month";
+  const label=period==="custom"?"Custom Range":period==="week"?"This Week":period==="7days"?"Last 7 Days":period==="30days"?"Last 30 Days":"This Month";
   const card=(title:string,value:string)=> <div style={{background:"white",border:"1px solid #e1e6eb",borderRadius:11,padding:15}}><div style={{fontSize:11,fontWeight:800,color:"#6a7684",textTransform:"uppercase"}}>{title}</div><div style={{fontWeight:900,fontSize:24,marginTop:7}}>{value}</div></div>;
   return <div style={{paddingTop:16}}>
-    <div style={{marginBottom:15}}><h2 style={{margin:0}}>{label}</h2><p style={{color:"#697586",marginTop:5}}>{dates[0]} through {today} · Moab time · {dates.length} calendar days</p></div>
+    <div style={{marginBottom:15}}><h2 style={{margin:0}}>{label}</h2><p style={{color:"#697586",marginTop:5}}>{dates[0]} through {dates[dates.length-1]} · Moab time · {dates.length} calendar days</p></div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:16}}>
       {card("Answered Calls",fmt(totalCalls))}{card("Missed Calls",fmt(missed))}{card("Sales Opportunities",fmt(totalOpp))}{card("Booked",fmt(totalBooked))}{card("Attributed Revenue",dollars(totalRevenue))}{card("Conversion",totalOpp?Math.round(100*totalBooked/totalOpp)+"%":"—")}{card("Inbound Talk",Math.round(secs/60)+" min")}
     </div>
