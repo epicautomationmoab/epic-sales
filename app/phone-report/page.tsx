@@ -58,7 +58,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
     .sort((a:any,b:any)=>new Date(a.event_time).getTime()-new Date(b.event_time).getTime());
   const opportunityGroups:Array<Array<any>>=[];
   const callGroup=new Map<string,Array<any>>();
-  const normalizedPhone=(v:any)=>String(v||"").replace(/\\D/g,"").slice(-10);
+  const normalizedPhone=(v:any)=>String(v||"").replace(/\D/g,"").slice(-10);
   for(const e of salesCalls){
     const number=normalizedPhone(e.caller_phone);
     const at=new Date(e.event_time).getTime();
