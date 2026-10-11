@@ -4,6 +4,7 @@ import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 import EpicC360Sidebar from "../EpicC360Sidebar";
 import PhoneReportC360Link from "./PhoneReportC360Link";
 import PhoneLeadCorrection from "./PhoneLeadCorrection";
+import PhoneRangeReport from "./PhoneRangeReport";
 import styles from "../missed-calls/MissedCalls.module.css";
 
 const SUPABASE_URL=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
@@ -21,13 +22,15 @@ async function loadReport(token:string,date?:string){
   return await r.json() as Report;
 }
 
-export default async function PhoneReportPage({searchParams}:{searchParams:Promise<{date?:string;extension?:string;metric?:string;session?:string}>}){
+export default async function PhoneReportPage({searchParams}:{searchParams:Promise<{date?:string;extension?:string;metric?:string;session?:string;period?:string}>}){
   const params=await searchParams;
   const store=await cookies();
   const token=store.get("epic_access_token")?.value;
   const profile=await getAuthenticatedTeamProfile(token);
   if(!profile||!token||profile.role==="workstation")redirect("/employee-login");
 
+  const period=["week","7days","30days","month"].includes(params.period||"")?String(params.period):"";
+  if(period)return <main className={styles.shell}><EpicC360Sidebar active="phone-report" profileName={profile.display_name} className={styles.sidebar} navClassName={styles.nav} activeClassName={styles.active} footerClassName={styles.sidebarFooter}/><section className={styles.main}><header className={styles.header}><div><div className={styles.eyebrow}>EpicC360 · Phone Operations</div><h1>Phone Report</h1></div></header><nav style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>{[["Today","/phone-report"],["Yesterday","/phone-report?date="+new Intl.DateTimeFormat("en-CA",{timeZone:"America/Denver",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(Date.now()-86400000))],["This Week","/phone-report?period=week"],["Last 7 Days","/phone-report?period=7days"],["Last 30 Days","/phone-report?period=30days"],["This Month","/phone-report?period=month"]].map(([label,url])=><a key={url} href={url} style={{padding:"10px 13px",borderRadius:9,background:url.endsWith("period="+period)?"#263d52":"#fff",color:url.endsWith("period="+period)?"#fff":"#263d52",textDecoration:"none",border:"1px solid #dde4ec",fontSize:12,fontWeight:800}}>{label}</a>)}</nav><PhoneRangeReport period={period} token={token}/></section></main>;
   let report:Report={summary:{},agents:[],agent_events:[],outbound_events:[],pauses:[],missed:[]};
   let error="";
   try{report=await loadReport(token,params.date);}catch(e){error=e instanceof Error?e.message:"Unable to load report.";}
@@ -140,7 +143,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
     <section className={styles.main}>
       <header className={styles.header}>
         <div><div className={styles.eyebrow}>EpicC360 · Phone Operations</div><h1>Phone Report</h1><p>Grandstream PBX performance and queue activity.</p></div>
-        <form style={{display:"flex",gap:8}}><input type="date" name="date" defaultValue={String(report.date||params.date||"")} style={{height:40,border:"1px solid #d6dde5",borderRadius:9,padding:"0 10px"}}/><button className={styles.quoteButton} type="submit">View Date</button></form>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>{[["Today","/phone-report"],["Yesterday","/phone-report?date="+new Intl.DateTimeFormat("en-CA",{timeZone:"America/Denver",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(Date.now()-86400000))],["This Week","/phone-report?period=week"],["Last 7 Days","/phone-report?period=7days"],["Last 30 Days","/phone-report?period=30days"],["This Month","/phone-report?period=month"]].map(([label,url])=><a key={url} href={url} style={{fontSize:12,padding:"9px 10px",background:"#fff",border:"1px solid #d6dde5",borderRadius:8,color:"#263d52",fontWeight:800,textDecoration:"none"}}>{label}</a>)}<form style={{display:"flex",gap:8}}><input type="date" name="date" defaultValue={String(report.date||params.date||"")} style={{height:40,border:"1px solid #d6dde5",borderRadius:9,padding:"0 10px"}}/><button className={styles.quoteButton} type="submit">View Date</button></form></div>
       </header>
       {error?<div className={styles.error}>{error}</div>:<>
         <section style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:12,marginBottom:18}}>
