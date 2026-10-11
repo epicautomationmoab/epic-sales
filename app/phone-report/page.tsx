@@ -50,11 +50,11 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const missedResolution=new Map<string,{label:string;detail:string}>();
   const missedRows=report.missed||[];
   const reportDay=String(report.date||params.date||"");
-  if(missedRows.length && /^\\d{4}-\\d{2}-\\d{2}$/.test(reportDay)){
+  if(missedRows.length && /^\d{4}-\d{2}-\d{2}$/.test(reportDay)){
     const headers={apikey:SUPABASE_KEY,Authorization:"Bearer "+token};
     const from=new Date(reportDay+"T00:00:00-06:00");
     const through=new Date(from.getTime()+72*3600*1000);
-    const phones=[...new Set(missedRows.map((m:any)=>String(m.customer_phone||"").replace(/\\D/g,"").slice(-10)).filter((p:string)=>p.length===10))];
+    const phones=[...new Set(missedRows.map((m:any)=>String(m.customer_phone||"").replace(/\D/g,"").slice(-10)).filter((p:string)=>p.length===10))];
     // Query only relevant customer phone numbers and a bounded follow-up period.
     const [smsResults,workResults]=await Promise.all([
       Promise.all(phones.map(async p=>{
@@ -67,9 +67,9 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
     const allTexts=smsResults.flat();
     const bySession=new Map<string,any>((Array.isArray(workResults)?workResults:[]).map((w:any)=>[String(w.source_record_id),w]));
     for(const m of missedRows){
-      const p=String(m.customer_phone||"").replace(/\\D/g,"").slice(-10);
+      const p=String(m.customer_phone||"").replace(/\D/g,"").slice(-10);
       const started=new Date(String(m.started_at)).getTime();
-      const texts=allTexts.filter((t:any)=>String(t.normalized_customer_phone||"").replace(/\\D/g,"").slice(-10)===p && new Date(t.sent_at).getTime()>=started && new Date(t.sent_at).getTime()<=through.getTime());
+      const texts=allTexts.filter((t:any)=>String(t.normalized_customer_phone||"").replace(/\D/g,"").slice(-10)===p && new Date(t.sent_at).getTime()>=started && new Date(t.sent_at).getTime()<=through.getTime());
       const inbound=texts.find((t:any)=>String(t.direction||"").toLowerCase()==="inbound");
       const outbound=texts.find((t:any)=>String(t.direction||"").toLowerCase()==="outbound");
       const closed=bySession.get(String(m.session||""));
