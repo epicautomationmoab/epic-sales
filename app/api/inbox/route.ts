@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
   const includeClosed = request.nextUrl.searchParams.get("cleaned") === "1" || request.nextUrl.searchParams.get("closed") === "1";
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
+    const lookup=request.nextUrl.searchParams.get("meta_lookup");
+    if(lookup){const matches=await rpc(session.accessToken,"c360_meta_contact_lookup",{p_query:lookup});return NextResponse.json({ok:true,matches});}
     const socialDetail=request.nextUrl.searchParams.get("social_detail");
     if(socialDetail){
       const metaMatch=socialDetail.match(/^meta:facebook:([0-9]+)$/);
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
       rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
-    const socialThreads = await rpc(session.accessToken, "get_c360_social_inbox", {});
+    const socialThreads: any[] = []; // Podium social disabled; direct Meta is authoritative.
     const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
     const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
@@ -124,6 +126,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
+    if(body.thread_key.startsWith("meta:facebook:")&&(body.action==="link"||body.action==="unlink")){
+      const result=await rpc(session.accessToken,"c360_meta_link",{p_sender_id:body.thread_key.slice("meta:facebook:".length),p_contact_id:body.action==="link"?body.contact_id:null,p_unlink:body.action==="unlink"});
+      return NextResponse.json(result);
+    }
     if (body.thread_key.startsWith("social:")) {
       const match=body.thread_key.match(/^social:(instagram|facebook):(.+)$/);
       if(!match)return NextResponse.json({error:"Invalid social thread"},{status:400});
