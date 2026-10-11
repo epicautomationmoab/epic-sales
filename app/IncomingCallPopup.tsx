@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import GuidedLeadSheet from "./GuidedLeadSheet";
 
-type Call = { id:string; caller_phone:string|null; caller_name:string|null; route_label:string|null; route_kind:string|null; confirmation_code:string|null };
+type Call = { id:string; caller_phone:string|null; caller_name:string|null; route_label:string|null; route_kind:string|null; confirmation_code:string|null; received_at?:string|null };
 const STORAGE="epicc360-pending-incoming-call";
 
 export default function IncomingCallPopup() {
@@ -57,11 +57,15 @@ export default function IncomingCallPopup() {
   const known=Boolean(call.route_kind&&call.route_kind!=="new_lead");
   const phone=call.caller_phone||"Unknown number";
   const label=known?(call.route_label||call.caller_name||"Known customer"):(call.caller_name||"Unknown caller");
+  const callTime=call.received_at&&Number.isFinite(new Date(call.received_at).getTime())?new Date(call.received_at):null;
+  const moabDate=(date:Date)=>new Intl.DateTimeFormat("en-US",{timeZone:"America/Denver",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
+  const callTimeLabel=callTime?`${moabDate(callTime)===moabDate(new Date())?"Today":new Intl.DateTimeFormat("en-US",{timeZone:"America/Denver",month:"short",day:"numeric"}).format(callTime)} at ${new Intl.DateTimeFormat("en-US",{timeZone:"America/Denver",hour:"numeric",minute:"2-digit",hour12:true}).format(callTime)}`:null;
   const url=known?("/customers?q="+encodeURIComponent(call.caller_phone||call.confirmation_code||"")+"&open=1"):("/customers?q="+encodeURIComponent(call.caller_phone||""));
   return <>{manualPanel}<aside aria-label="Incoming Call" role="status" style={{position:"fixed",bottom:20,right:20,zIndex:9000,width:"min(335px,calc(100vw - 30px))",boxSizing:"border-box",padding:16,borderRadius:12,border:"1px solid #d7d9dc",borderLeft:"4px solid #c92320",background:"#fff",color:"#171717",boxShadow:"0 8px 26px #0002"}}>
     <div style={{fontWeight:900,fontSize:11,letterSpacing:1,color:"#b52b25"}}>INCOMING CALL · {known?"RECOGNIZED":"UNKNOWN"}</div>
     <div style={{fontSize:17,fontWeight:800,marginTop:7}}>{label}</div>
     <div style={{fontSize:13,marginTop:3}}>{phone}</div>
+    {callTimeLabel&&<div style={{fontSize:11,marginTop:5,color:"#6b7280"}}>{callTimeLabel}</div>}
     <div style={{display:"flex",gap:8,marginTop:13}}>
       <a href={url} onClick={e=>{if(!known){e.preventDefault();setSheet(call);}void dismiss();}} style={{flex:1,padding:"9px 10px",borderRadius:7,background:"#c92320",color:"#fff",textAlign:"center",textDecoration:"none",fontSize:12,fontWeight:800}}>{known?"Open C360":"Open Lead Sheet"}</a>
       <button type="button" onClick={()=>void dismiss()} style={{borderRadius:7,border:"1px solid #d6d6d6",background:"#fff",padding:"9px 10px",fontSize:12,cursor:"pointer"}}>Dismiss</button>
