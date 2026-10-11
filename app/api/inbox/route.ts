@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
     if(lookup){const matches=await rpc(session.accessToken,"c360_meta_contact_lookup",{p_query:lookup});return NextResponse.json({ok:true,matches});}
     const socialDetail=request.nextUrl.searchParams.get("social_detail");
     if(socialDetail){
+      const igMatch=socialDetail.match(/^meta:instagram:([0-9]+)$/);
+      if(igMatch){const detail=await rpc(session.accessToken,"c360_instagram_thread_detail",{p_sender_id:igMatch[1]});return NextResponse.json({ok:true,detail});}
       const metaMatch=socialDetail.match(/^meta:facebook:([0-9]+)$/);
       if(metaMatch){const detail=await rpc(session.accessToken,"c360_meta_thread_detail",{p_sender_id:metaMatch[1]});return NextResponse.json({ok:true,detail});}
       const match=socialDetail.match(/^social:(instagram|facebook):(.+)$/);
@@ -69,8 +71,9 @@ export async function GET(request: NextRequest) {
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
     const socialThreads: any[] = []; // Podium social disabled; direct Meta is authoritative.
     const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
+    const instagramThreads = await rpc(session.accessToken,"get_c360_instagram_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : []),...(Array.isArray(instagramThreads) ? instagramThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
