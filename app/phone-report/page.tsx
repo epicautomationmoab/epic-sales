@@ -52,7 +52,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   // No fixed callback deadline: overnight calls may be resolved the next business day.
   const missedResolution=new Map<string,{label:string;detail:string}>();
   const missedRows=report.missed||[];
-  const reportDay=String(report.date||params.date||"");
+  const reportDay=String(report.date||params.date||new Intl.DateTimeFormat("en-CA",{timeZone:"America/Denver",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
   if(missedRows.length && /^\d{4}-\d{2}-\d{2}$/.test(reportDay)){
     const headers={apikey:SUPABASE_KEY,Authorization:"Bearer "+token};
     const from=new Date(reportDay+"T00:00:00-06:00");
