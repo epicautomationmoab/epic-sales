@@ -38,10 +38,25 @@ export async function GET(request: NextRequest) {
   const includeClosed = request.nextUrl.searchParams.get("cleaned") === "1" || request.nextUrl.searchParams.get("closed") === "1";
   const threadKey = request.nextUrl.searchParams.get("thread_key");
   try {
+    const lookup=request.nextUrl.searchParams.get("meta_lookup");
+    if(lookup){const matches=await rpc(session.accessToken,"c360_meta_contact_lookup",{p_query:lookup});return NextResponse.json({ok:true,matches});}
+    const socialDetail=request.nextUrl.searchParams.get("social_detail");
+    if(socialDetail){
+      const metaMatch=socialDetail.match(/^meta:facebook:([0-9]+)$/);
+      if(metaMatch){const detail=await rpc(session.accessToken,"c360_meta_thread_detail",{p_sender_id:metaMatch[1]});return NextResponse.json({ok:true,detail});}
+      const match=socialDetail.match(/^social:(instagram|facebook):(.+)$/);
+      if(!match)return NextResponse.json({error:"Invalid social conversation."},{status:400});
+      const detail=await rpc(session.accessToken,"c360_social_thread_detail",{p_platform:match[1],p_conversation_uid:match[2]});
+      return NextResponse.json({ok:true,detail});
+    }
     if (threadKey) {
-      const notes = threadKey.startsWith("podium:")
-        ? await rpc(session.accessToken, "get_podium_inbox_notes", { p_conversation_uid: threadKey.slice(7) })
-        : await rpc(session.accessToken, "get_epic_inbox_thread_notes", { p_thread_key: threadKey });
+      if(threadKey.startsWith("meta:facebook:"))return NextResponse.json({ok:true,notes:[]});
+      const social=threadKey.match(/^social:(instagram|facebook):(.+)$/);
+      const notes=social
+        ? await rpc(session.accessToken,"get_c360_social_notes",{p_platform:social[1],p_conversation_uid:social[2]})
+        : threadKey.startsWith("podium:")
+          ? await rpc(session.accessToken,"get_podium_inbox_notes",{p_conversation_uid:threadKey.slice(7)})
+          : await rpc(session.accessToken,"get_epic_inbox_thread_notes",{p_thread_key:threadKey});
       return NextResponse.json({ ok: true, notes: notes || [] });
     }
     const [threads, blockedRows, phoneReport, collaborators, mentions] = await Promise.all([
@@ -52,8 +67,10 @@ export async function GET(request: NextRequest) {
       rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
+    const socialThreads: any[] = []; // Podium social disabled; direct Meta is authoritative.
+    const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
@@ -109,6 +126,22 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
+    if(body.thread_key.startsWith("meta:facebook:")&&(body.action==="link"||body.action==="unlink")){
+      const result=await rpc(session.accessToken,"c360_meta_link",{p_sender_id:body.thread_key.slice("meta:facebook:".length),p_contact_id:body.action==="link"?(body as typeof body & {contact_id?:string}).contact_id||null:null,p_unlink:body.action==="unlink"});
+      return NextResponse.json(result);
+    }
+    if (body.thread_key.startsWith("social:")) {
+      const match=body.thread_key.match(/^social:(instagram|facebook):(.+)$/);
+      if(!match)return NextResponse.json({error:"Invalid social thread"},{status:400});
+      if(!["close","clean","route","note","link","unlink"].includes(body.action||""))return NextResponse.json({error:"Unsupported social action"},{status:400});
+      const result=await rpc(session.accessToken,"c360_social_action",{
+        p_platform:match[1],p_conversation_uid:match[2],
+        p_action:body.action==="clean"?"close":body.action,
+        p_note_text:body.note_text||null,p_lane:body.destination||null,
+        p_contact_id:(body as typeof body & {contact_id?:string}).contact_id||null
+      });
+      return NextResponse.json(result||{ok:true});
+    }
     if (body.thread_key.startsWith("podium:") && (body.action === "close" || body.action === "clean")) { const ok = await rpc(session.accessToken, "close_c360_podium_inbox", { p_conversation_uid: body.thread_key.slice(7) }); return NextResponse.json({ok}); }
     if (body.action === "close" || body.action === "clean") {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
