@@ -45,6 +45,40 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
     is_sales_opportunity:e.call_outcome==="booked"?true:(resolveOverride(e)?false:e.is_sales_opportunity),
     call_outcome:e.call_outcome==="booked"?"booked":(resolveOverride(e)?"not_sales_lead":e.call_outcome)
   }));
+  // Resolve missed-call outcomes against subsequent customer contact and employee disposition.
+  // No fixed callback deadline: overnight calls may be resolved the next business day.
+  const missedResolution=new Map<string,{label:string;detail:string}>();
+  const missedRows=report.missed||[];
+  const reportDay=String(report.date||params.date||"");
+  if(missedRows.length && /^\\d{4}-\\d{2}-\\d{2}$/.test(reportDay)){
+    const headers={apikey:SUPABASE_KEY,Authorization:"Bearer "+token};
+    const from=new Date(reportDay+"T00:00:00-06:00");
+    const through=new Date(from.getTime()+72*3600*1000);
+    const phones=[...new Set(missedRows.map((m:any)=>String(m.customer_phone||"").replace(/\\D/g,"").slice(-10)).filter((p:string)=>p.length===10))];
+    // Query only relevant customer phone numbers and a bounded follow-up period.
+    const [smsResults,workResults]=await Promise.all([
+      Promise.all(phones.map(async p=>{
+        const query=new URLSearchParams({select:"normalized_customer_phone,direction,sent_at",normalized_customer_phone:"ilike.*"+p,sent_at:"gte."+from.toISOString(),order:"sent_at.asc",limit:"300"});
+        const res=await fetch(SUPABASE_URL+"/rest/v1/callrail_text_messages?"+query,{headers,cache:"no-store"});
+        return res.ok?await res.json():[];
+      })),
+      fetch(SUPABASE_URL+"/rest/v1/customer_work_items?"+new URLSearchParams({select:"source_record_id,status,work_type,closed_at,metadata",source:"eq.grandstream_missed_call",created_at:"gte."+from.toISOString(),limit:"500"}),{headers,cache:"no-store"}).then(r=>r.ok?r.json():[])
+    ]);
+    const allTexts=smsResults.flat();
+    const bySession=new Map<string,any>((Array.isArray(workResults)?workResults:[]).map((w:any)=>[String(w.source_record_id),w]));
+    for(const m of missedRows){
+      const p=String(m.customer_phone||"").replace(/\\D/g,"").slice(-10);
+      const started=new Date(String(m.started_at)).getTime();
+      const texts=allTexts.filter((t:any)=>String(t.normalized_customer_phone||"").replace(/\\D/g,"").slice(-10)===p && new Date(t.sent_at).getTime()>=started && new Date(t.sent_at).getTime()<=through.getTime());
+      const inbound=texts.find((t:any)=>String(t.direction||"").toLowerCase()==="inbound");
+      const outbound=texts.find((t:any)=>String(t.direction||"").toLowerCase()==="outbound");
+      const closed=bySession.get(String(m.session||""));
+      if(m.recovered_at)missedResolution.set(String(m.session),{label:"Recovered by phone",detail:"Connected callback"});
+      else if(inbound&&outbound)missedResolution.set(String(m.session),{label:"Recovered by text",detail:"Two-way customer conversation"});
+      else if(closed?.status==="closed")missedResolution.set(String(m.session),{label:"Handled / Closed",detail:"Closed as "+String(closed.metadata?.classification||closed.work_type||"other")+(closed.metadata?.classified_by?" by "+closed.metadata.classified_by:"")});
+      else if(outbound)missedResolution.set(String(m.session),{label:"Text sent · awaiting reply",detail:"Outbound message recorded"});
+    }
+  }
   const s=report.summary||{};
   const pauseTotals=new Map<string,{seconds:number,count:number}>();
   const selectedExtension=params.extension||"";
@@ -185,7 +219,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
           </div>
           <div style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:14,padding:16}}>
             <h2 style={{marginTop:0}}>Missed Calls</h2>
-            {(report.missed||[]).length?(report.missed||[]).map((m:any)=><div key={String(m.session)} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,padding:"10px 0",borderBottom:"1px solid #edf0f3"}}><div><strong>{phone(m.customer_phone)}</strong><div style={{fontSize:12,color:"#788290"}}>{time(m.started_at)} · waited {duration(m.queue_wait_seconds)} · {m.ring_attempts||0} queue rings</div>{m.voicemail_left?<div style={{fontSize:12,fontWeight:800,color:"#6b4a00",marginTop:3}}>Voicemail left{m.voicemail_transcription?" · transcription available":""}</div>:<div style={{fontSize:12,color:"#8a93a0",marginTop:3}}>No voicemail left</div>}</div><b>{m.recovered_at?"Recovered "+time(m.recovered_at):"Unrecovered"}</b></div>):<div>No missed queue calls.</div>}
+            {(report.missed||[]).length?(report.missed||[]).map((m:any)=><div key={String(m.session)} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,padding:"10px 0",borderBottom:"1px solid #edf0f3"}}><div><strong>{phone(m.customer_phone)}</strong><div style={{fontSize:12,color:"#788290"}}>{time(m.started_at)} · waited {duration(m.queue_wait_seconds)} · {m.ring_attempts||0} queue rings</div>{m.voicemail_left?<div style={{fontSize:12,fontWeight:800,color:"#6b4a00",marginTop:3}}>Voicemail left{m.voicemail_transcription?" · transcription available":""}</div>:<div style={{fontSize:12,color:"#8a93a0",marginTop:3}}>No voicemail left</div>}</div><div style={{textAlign:"right"}}><b>{missedResolution.get(String(m.session))?.label||(m.recovered_at?"Recovered "+time(m.recovered_at):"Unrecovered")}</b>{missedResolution.get(String(m.session))?.detail?<div style={{fontSize:11,color:"#788290",marginTop:3}}>{missedResolution.get(String(m.session))?.detail}</div>:null}</div></div>):<div>No missed queue calls.</div>}
           </div>
         </section>
       </>}
