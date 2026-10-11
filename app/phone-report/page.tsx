@@ -59,8 +59,14 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
     const [smsResults,workResults]=await Promise.all([
       Promise.all(phones.map(async p=>{
         const query=new URLSearchParams({select:"normalized_customer_phone,direction,sent_at",normalized_customer_phone:"ilike.*"+p,sent_at:"gte."+from.toISOString(),order:"sent_at.asc",limit:"300"});
-        const res=await fetch(SUPABASE_URL+"/rest/v1/callrail_text_messages?"+query,{headers,cache:"no-store"});
-        return res.ok?await res.json():[];
+        const podiumQuery=new URLSearchParams({select:"customer_phone,direction,message_at",customer_phone:"ilike.*"+p,message_at:"gte."+from.toISOString(),order:"message_at.asc",limit:"300"});
+        const [callrail,podium]=await Promise.all([
+          fetch(SUPABASE_URL+"/rest/v1/callrail_text_messages?"+query,{headers,cache:"no-store"}),
+          fetch(SUPABASE_URL+"/rest/v1/podium_sms_messages?"+podiumQuery,{headers,cache:"no-store"})
+        ]);
+        const cr=callrail.ok?await callrail.json():[];
+        const pd=podium.ok?await podium.json():[];
+        return [...cr,...pd.map((t:any)=>({normalized_customer_phone:t.customer_phone,direction:t.direction,sent_at:t.message_at}))];
       })),
       fetch(SUPABASE_URL+"/rest/v1/customer_work_items?"+new URLSearchParams({select:"source_record_id,status,work_type,closed_at,metadata",source:"eq.grandstream_missed_call",created_at:"gte."+from.toISOString(),limit:"500"}),{headers,cache:"no-store"}).then(r=>r.ok?r.json():[])
     ]);
