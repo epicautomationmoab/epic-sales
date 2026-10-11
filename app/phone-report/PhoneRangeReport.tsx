@@ -21,7 +21,7 @@ async function loadDay(token:string,date:string):Promise<Report>{
 }
 function normalize(p:unknown){return String(p||"").replace(/\D/g,"").slice(-10);}
 function summarize(r:Report,overrides:Set<string>){
-  const events=(r.agent_events||[]).filter(e=>e.disposition==="ANSWERED"&&Number(e.billsec||0)>0).map(e=>{
+  const events:any[]=(r.agent_events||[]).filter(e=>e.disposition==="ANSWERED"&&Number(e.billsec||0)>0).map(e=>{
     const k=String(e.session||"")+"|"+String(e.extension||"")+"|"+new Date(e.event_time).getTime();
     return {...e,is_sales_opportunity:e.call_outcome==="booked"?true:(!overrides.has(k)&&e.is_sales_opportunity)};
   });
