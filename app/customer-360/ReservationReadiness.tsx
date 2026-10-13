@@ -14,7 +14,7 @@ export default function ReservationReadiness({confirmation}:{confirmation:string
   setLoading(true);setError("");
   try{
    const response=await fetch("/api/customer-readiness?confirmation="+encodeURIComponent(confirmation),{cache:"no-store"});
-   if(!response.ok)throw new Error("Readiness unavailable");
+   if(!response.ok){const detail=await response.json().catch(()=>({}));throw new Error(typeof detail.error==="string"?detail.error:"Request failed ("+response.status+")");}
    const result=await response.json() as {rows:Status[];certificates?:Certificate[];documents?:Docs[]};
    setCertificates(result.certificates||[]);
    setDocuments(result.documents||[]);
@@ -30,7 +30,7 @@ export default function ReservationReadiness({confirmation}:{confirmation:string
   <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}><button type="button" onClick={()=>setExpanded(!expanded)}>{expanded?"Hide Documents":"View Documents"}</button><a target="_blank" rel="noreferrer" href={destination}>Open Full Readiness ↗</a></div>
   {expanded?<div role="dialog" aria-modal="true" aria-label="Reservation documents" style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(12,20,30,.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}><div style={{background:"white",color:"#172033",borderRadius:16,padding:22,width:"min(650px,100%)",maxHeight:"85vh",overflowY:"auto"}}>
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><strong style={{fontSize:18}}>Reservation Documents · {confirmation}</strong><button type="button" onClick={()=>setExpanded(false)}>Close ✕</button></div>
-   {error?<p role="alert">Unable to load documents.</p>:!documents.length?<p>No Readiness document detail available.</p>:documents.map((d,i)=><div key={d.readinessId||i}>
+   {error?<p role="alert">Readiness error: {error}</p>:!documents.length?<p>No Readiness document detail available.</p>:documents.map((d,i)=><div key={d.readinessId||i}>
     <section style={{background:"#f0f9f2",borderRadius:12,padding:14,marginTop:16}}><h3 style={{color:"#176639",margin:"0 0 10px"}}>Epic Documents · {d.epicReceived}/{d.epicExpected}</h3>{d.epic.length?d.epic.map((p,j)=><div key={j} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"9px 0",borderTop:"1px solid #d6e5da"}}><span><strong>{p.name}</strong><small style={{display:"block"}}>{p.role}</small></span>{p.url?<a href={p.url} target="_blank" rel="noreferrer">Open Waiver ↗</a>:<span>Link unavailable</span>}</div>):<p>No signed Epic documents found.</p>}</section>
     <section style={{background:"#f0f5fc",borderRadius:12,padding:14,marginTop:14}}><h3 style={{color:"#285b87",margin:"0 0 10px"}}>MPWR Waivers · {d.mpwrReceived}/{d.mpwrExpected}</h3>{d.polaris.length?d.polaris.map((p,j)=><div key={j} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"9px 0",borderTop:"1px solid #d6dfec"}}><span><strong>{p.name}</strong><small style={{display:"block"}}>{p.role}</small></span>{p.url?<a href={p.url} target="_blank" rel="noreferrer">Open Waiver ↗</a>:<span>Link unavailable</span>}</div>):<p>No MPWR waivers found.</p>}</section>
    </div>)}
