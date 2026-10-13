@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
 const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
-const KEY=process.env.SUPABASE_SECRET_KEY||"";
+const KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
 type Rec=Record<string,unknown>;
 const respond=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
 export async function GET(req:NextRequest){
@@ -10,7 +10,7 @@ export async function GET(req:NextRequest){
  if(!token||!profile||profile.role==="workstation")return respond({error:"Employee login required"},401);
  const confirmation=(req.nextUrl.searchParams.get("confirmation")||"").trim().toUpperCase();
  if(!/^[A-Z0-9-]{3,25}$/.test(confirmation))return respond({error:"Invalid reservation"},400);
- const headers={apikey:KEY,Authorization:"Bearer "+KEY};
+ const headers={apikey:KEY,Authorization:"Bearer "+token};
  async function read(view:string,params:URLSearchParams):Promise<Rec[]>{
   const response=await fetch(BASE+"/rest/v1/"+view+"?"+params.toString(),{headers,cache:"no-store"});
   if(!response.ok)throw new Error(view+" request failed: "+response.status);
