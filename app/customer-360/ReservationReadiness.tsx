@@ -19,7 +19,7 @@ export default function ReservationReadiness({confirmation}:{confirmation:string
    setCertificates(result.certificates||[]);
    setDocuments(result.documents||[]);
    setRow(result.rows[0]||null);
-  }catch{setError("Unable to load readiness details.");}finally{setLoading(false);}
+  }catch(e){setError(e instanceof Error?e.message:"Unable to load readiness details.");}finally{setLoading(false);}
  }
  useEffect(()=>{void refresh();},[confirmation]);
  const destination="https://epic-tools-app.vercel.app/team/readiness?confirmation="+encodeURIComponent(confirmation);
