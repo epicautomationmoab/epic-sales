@@ -1,44 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
-
-const URL_BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"").replace(/\/+$/,"");
-const ANON=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
-const SECRET=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY||"";
-const json=(value:unknown,status=200)=>NextResponse.json(value,{status,headers:{"Cache-Control":"no-store"}});
-const safeCode=(value:string)=>/^[A-Z0-9-]{3,25}$/.test(value);
-
+import {NextRequest,NextResponse} from "next/server";
+import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
+const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"").replace(/\/+$/,"");
+const KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
+type Rec=Record<string,unknown>;
+const respond=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
 export async function GET(req:NextRequest){
  const token=req.cookies.get("epic_access_token")?.value;
- const employee=await getAuthenticatedTeamProfile(token);
- if(!employee||employee.role==="workstation"||!token)return json({error:"Employee login required"},401);
- const code=(req.nextUrl.searchParams.get("confirmation")||"").trim().toUpperCase();
- if(!safeCode(code))return json({error:"Invalid confirmation"},400);
- if(!URL_BASE||!ANON)return json({error:"Readiness configuration unavailable"},503);
- const headers={apikey:ANON,Authorization:"Bearer "+token};
- const params=new URLSearchParams({confirmation_code:"eq."+code,select:"readiness_id,confirmation_code,visit_start_time,business_line,ohv_required,ohv_certificate_uploaded,mpwr_document_received_count,mpwr_document_expected_count,handoff_status",order:"visit_start_time.desc",limit:"15"});
- const res=await fetch(URL_BASE+"/rest/v1/guest_readiness_operational?"+params,{headers,cache:"no-store"});
- if(!res.ok)return json({error:"Readiness status unavailable"},502);
- const rows=await res.json() as Array<Record<string,unknown>>;
- // Service-role document lookup is permitted only AFTER an authenticated team lookup
- // has returned this reservation through the employee's own RLS permissions.
- const ids=rows.map(r=>String(r.readiness_id||"")).filter(Boolean);
- let certificates:Array<{readinessId:string;driverName:string;filename:string;uploadedAt:string;viewUrl:string|null}>=[];
- if(ids.length&&SECRET){
-   const filter="in.("+ids.map(id=>'"'+id.replace(/["\\]/g,"")+'"').join(",")+")";
-   const q=new URLSearchParams({readiness_id:filter,select:"readiness_id,driver_name,original_filename,storage_path,uploaded_at",order:"uploaded_at.desc",limit:"100"});
-   const sh={apikey:SECRET,Authorization:"Bearer "+SECRET};
-   const response=await fetch(URL_BASE+"/rest/v1/ohv_certificate_uploads?"+q,{headers:sh,cache:"no-store"});
-   if(response.ok){
-     const uploads=await response.json() as Array<{readiness_id:string;driver_name:string;original_filename:string;storage_path:string;uploaded_at:string}>;
-     certificates=await Promise.all(uploads.map(async u=>{
-       let viewUrl:string|null=null;
-       if(u.storage_path&&!u.storage_path.includes("..")){
-         const signed=await fetch(URL_BASE+"/storage/v1/object/sign/ohv-certificates/"+u.storage_path.split("/").map(encodeURIComponent).join("/"),{method:"POST",headers:{...sh,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:300}),cache:"no-store"});
-         if(signed.ok){const data=await signed.json();const path=data.signedURL||data.signedUrl;if(typeof path==="string")viewUrl=path.startsWith("http")?path:URL_BASE+"/storage/v1"+path;}
-       }
-       return {readinessId:u.readiness_id,driverName:u.driver_name,filename:u.original_filename,uploadedAt:u.uploaded_at,viewUrl};
-     }));
-   }
+ const profile=await getAuthenticatedTeamProfile(token);
+ if(!token||!profile||profile.role==="workstation")return respond({error:"Employee login required"},401);
+ const confirmation=(req.nextUrl.searchParams.get("confirmation")||"").trim().toUpperCase();
+ if(!/^[A-Z0-9-]{3,25}$/.test(confirmation))return respond({error:"Invalid reservation"},400);
+ const headers={apikey:KEY,Authorization:"Bearer "+token};
+ async function read(view:string,params:URLSearchParams):Promise<Rec[]>{
+  const response=await fetch(BASE+"/rest/v1/"+view+"?"+params.toString(),{headers,cache:"no-store"});
+  if(!response.ok)throw new Error(view+" request failed: "+response.status);
+  return response.json();
  }
- return json({rows,certificates,documentsAvailable:Boolean(SECRET)});
+ try{
+  const reservations=await read("guest_readiness_history_search_v",new URLSearchParams({select:"*",confirmation_code:"eq."+confirmation,order:"visit_start_time.desc",limit:"10"}));
+  const rows=reservations.filter(r=>String(r.confirmation_code||"").toUpperCase()===confirmation);
+  if(!rows.length)return respond({rows:[],documents:[]});
+  const codes=[...new Set(rows.map(r=>String(r.confirmation_code)))];
+  const mpwr=[...new Set(rows.map(r=>String(r.mpwr_confirmation_number||"")).filter(Boolean))];
+  const visits=[...new Set(rows.map(r=>String(r.source_store_visit_id||"")).filter(Boolean))];
+  const exact=(values:string[])=>"in.("+values.map(v=>'"'+v.replace(/["\\]/g,"")+'"').join(",")+")";
+  const [storeDocs,epicDocs,mpwrDocs]=await Promise.all([
+   visits.length?read("epic_store_visit_document_evidence_v",new URLSearchParams({select:"store_visit_id,signer_name,signed_pdf_url,waiver_is_adult,signer_category",store_visit_id:exact(visits),limit:"100"})):Promise.resolve([]),
+   read("epic_waiver_signatures",new URLSearchParams({select:"id,confirmation_code,signer_full_name,signed_at",confirmation_code:exact(codes),archived_at:"is.null",limit:"100"})),
+   mpwr.length?read("scout_mpwr_waivers",new URLSearchParams({select:"mpwr_confirmation_number,rider_name,waiver_url,is_minor,is_passenger",mpwr_confirmation_number:exact(mpwr),limit:"100"})):Promise.resolve([])
+  ]);
+  const documents=rows.map(row=>{
+   const code=String(row.confirmation_code);
+   const epic=[
+    ...storeDocs.filter(d=>d.store_visit_id===row.source_store_visit_id).map(d=>({name:d.signer_name,url:d.signed_pdf_url,role:d.waiver_is_adult===false||d.signer_category==="minor"?"Minor / child":"Adult Signer"})),
+    ...epicDocs.filter(d=>d.confirmation_code===code).map(d=>({name:d.signer_full_name,url:"https://epic-tools-app.vercel.app/api/team/waivers/"+encodeURIComponent(String(d.id))+"/pdf",role:"Adult Signer"}))
+   ];
+   const polaris=mpwrDocs.filter(d=>d.mpwr_confirmation_number===row.mpwr_confirmation_number).map(d=>({name:d.rider_name,url:d.waiver_url,role:d.is_minor?"Minor":d.is_passenger?"Passenger":"Driver"}));
+   return {readinessId:row.readiness_id,confirmation:code,epicReceived:row.epic_document_received_count??epic.length,epicExpected:row.epic_document_expected_count??row.expected_guest_count??0,mpwrReceived:row.mpwr_document_received_count??polaris.length,mpwrExpected:row.mpwr_document_expected_count??0,epic,polaris};
+  });
+  return respond({rows,documents});
+ }catch(e){return respond({error:e instanceof Error?e.message:"Unable to load documents"},502);}
 }
