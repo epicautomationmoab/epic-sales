@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
-const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"").replace(/\/+$/,"");
+const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 const KEY=process.env.SUPABASE_SECRET_KEY||"";
 type Rec=Record<string,unknown>;
 const respond=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
