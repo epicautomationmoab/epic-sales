@@ -86,7 +86,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
   const selectedEvents=(selectedMetric==="outbound"?report.outbound_events||[]:report.agent_events||[]).filter((e:any)=>{
     if(String(e.extension||"")!==selectedExtension)return false;
     if(selectedMetric==="answered")return e.disposition==="ANSWERED"&&Number(e.billsec||0)>0;
-    if(selectedMetric==="no-answer")return e.disposition==="NO ANSWER"&&String(e.action_note||"")!=="answered elsewhere";
+    if(selectedMetric==="no-answer")return e.disposition==="NO ANSWER";
     if(selectedMetric==="outbound")return true;
     return false;
   });
@@ -117,14 +117,14 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
 
         <section style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:14,overflow:"hidden",marginBottom:16}}>
           <div style={{padding:16,borderBottom:"1px solid #e7ebef"}}><h2 style={{margin:0}}>Team Phone Activity</h2></div>
-          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Agent","Inbound Answered","No-answer Rings","Inbound Talk","Outbound Calls","Outbound Talk","Out of Queue"].map(h=><th key={h} style={{textAlign:"left",padding:12,fontSize:10,textTransform:"uppercase",color:"#7c8793",borderBottom:"1px solid #edf0f3"}}>{h}</th>)}</tr></thead><tbody>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Agent","Inbound Answered","Unanswered Rings","Inbound Talk","Outbound Calls","Outbound Talk","Out of Queue"].map(h=><th key={h} style={{textAlign:"left",padding:12,fontSize:10,textTransform:"uppercase",color:"#7c8793",borderBottom:"1px solid #edf0f3"}}>{h}</th>)}</tr></thead><tbody>
             {(report.agents||[]).map((a:any)=>{const p=pauseTotals.get(String(a.extension));return <tr key={String(a.extension)}><td style={{padding:12,borderBottom:"1px solid #edf0f3"}}><strong>{a.agent_name||"Ext. "+a.extension}</strong><div style={{fontSize:11,color:"#87919b"}}>{a.extension==="106"?"Main Street · ":""}Ext. {a.extension}</div></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=answered`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{a.inbound_answered_calls||0}</a></td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=no-answer`} style={{fontWeight:900,color:"#b9471f",textDecoration:"underline",textUnderlineOffset:3}}>{a.true_no_answer_rings||0}</a></td><td style={{padding:12}}>{duration(a.inbound_talk_seconds)}</td><td style={{padding:12}}><a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&extension=${encodeURIComponent(String(a.extension))}&metric=outbound`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{a.outbound_calls??a.outbound_answered_calls??0}</a></td><td style={{padding:12}}>{duration(a.outbound_talk_seconds)}</td><td style={{padding:12}}>{p?duration(p.seconds)+" · "+p.count+"x":"—"}</td></tr>})}
           </tbody></table></div>
         </section>
 
         {selectedExtension&&selectedMetric?<section style={{background:"#fff",border:"1px solid #dfe5eb",borderRadius:14,overflow:"hidden",marginBottom:16}}>
           <div style={{padding:16,borderBottom:"1px solid #e7ebef",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
-            <div><h2 style={{margin:0}}>{selectedMetric==="answered"?"Answered Calls":selectedMetric==="outbound"?"Outbound Calls":"No-Answer Rings"} · Ext. {selectedExtension}</h2><div style={{fontSize:12,color:"#788290",marginTop:4}}>{selectedEvents.length} event{selectedEvents.length===1?"":"s"} for the selected date.</div></div>
+            <div><h2 style={{margin:0}}>{selectedMetric==="answered"?"Answered Calls":selectedMetric==="outbound"?"Outbound Calls":"Unanswered Rings"} · Ext. {selectedExtension}</h2><div style={{fontSize:12,color:"#788290",marginTop:4}}>{selectedEvents.length} event{selectedEvents.length===1?"":"s"} for the selected date.</div></div>
             <a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}`} style={{fontWeight:800,color:"#56606d"}}>Close</a>
           </div>
           {selectedMetric==="answered"?<div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,padding:"14px 16px",background:"#f8fafb",borderBottom:"1px solid #e7ebef"}}>
@@ -161,7 +161,7 @@ export default async function PhoneReportPage({searchParams}:{searchParams:Promi
               </div>:<a href={`/phone-report?date=${encodeURIComponent(String(report.date||params.date||""))}&session=${encodeURIComponent(String(e.session||""))}`} style={{fontWeight:900,color:"#18202b",textDecoration:"underline",textUnderlineOffset:3}}>{phone(e.caller_phone)}</a>}
               <span style={{color:"#56606d"}}>{time(e.event_time)}{selectedMetric==="answered"||selectedMetric==="outbound"?<div style={{fontSize:11,color:"#87919b",marginTop:2}}>{duration(e.billsec)}</div>:null}</span>
               <span style={{fontWeight:900,color:selectedMetric==="no-answer"?"#b9471f":(e.call_outcome==="booked"||e.is_sale)?"#25693b":"#56606d"}}>
-                {selectedMetric==="outbound"?(e.is_sale?`💫 Sale ${money(e.sale_revenue_cents)}`:e.disposition==="ANSWERED"?outboundPurposeLabel(e):`Attempt · ${String(e.disposition||"No answer").toLowerCase()}`):selectedMetric==="answered"?outcomeLabel(e):"No answer · rang "+duration(e.duration_seconds)}
+                {selectedMetric==="outbound"?(e.is_sale?`💫 Sale ${money(e.sale_revenue_cents)}`:e.disposition==="ANSWERED"?outboundPurposeLabel(e):`Attempt · ${String(e.disposition||"No answer").toLowerCase()}`):selectedMetric==="answered"?outcomeLabel(e):"Unanswered ring · "+duration(e.duration_seconds)+(e.action_note==="answered elsewhere"?" · answered elsewhere":"")}
                 {selectedMetric==="answered"&&e.disposition==="ANSWERED"&&e.call_outcome!=="booked"&&(e.is_sales_opportunity||e.manual_override)?<PhoneLeadCorrection session={String(e.session||"")} extension={String(e.extension||"")} eventTime={String(e.event_time||"")} override={e.manual_override} eligible={!!e.is_sales_opportunity}/>:null}
                 {selectedMetric==="outbound"&&e.is_missed_call_recovery?<div style={{fontSize:10,fontWeight:700,color:"#788290",marginTop:3}}>Recovered in {duration(e.missed_call_recovery_seconds)}</div>:null}
               </span>
