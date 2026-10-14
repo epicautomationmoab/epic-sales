@@ -120,13 +120,13 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
   async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
     let note="";
     if(kind==="retire"){
-      const entered=window.prompt("Why are you closing this abandoned cart?");
+      const entered=window.prompt("Why are you closing this sales opportunity?");
       if(entered===null)return;
       note=entered.trim();
       if(!note){setError("Add a short reason before closing the cart.");return;}
     }
     if(kind==="mark_lost"){
-      const entered=window.prompt("Why was this abandoned cart lost?");
+      const entered=window.prompt("Why was this sales opportunity lost?");
       if(entered===null)return;
       note=entered.trim();
       if(!note){setError("Add a short reason before marking the cart lost.");return;}
@@ -140,15 +140,15 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
         note_text:note||undefined,
       })});
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload?.error||"Unable to update abandoned cart.");
+      if(!response.ok)throw new Error(payload?.error||"Unable to update sales opportunity.");
       window.location.reload();
-    }catch(e){setError(e instanceof Error?e.message:"Unable to update abandoned cart.");setBusyId(null);}
+    }catch(e){setError(e instanceof Error?e.message:"Unable to update sales opportunity.");setBusyId(null);}
   }
 
   return <>
-    <div className={styles.toolbar}><div><strong>Abandoned Carts {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
+    <div className={styles.toolbar}><div><strong>Sales Opportunities {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
     <div className={styles.ownerFilterRow}>
-      <select className={styles.ownerSelect} value={owner} onChange={e=>setOwner(e.target.value)} aria-label="Filter abandoned carts by owner">
+      <select className={styles.ownerSelect} value={owner} onChange={e=>setOwner(e.target.value)} aria-label="Filter sales opportunities by owner">
         <option value="All">All</option>
         <option value="Unclaimed">Unclaimed</option>
         <optgroup label="Claimed">
