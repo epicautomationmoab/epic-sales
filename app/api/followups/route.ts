@@ -14,6 +14,7 @@ export async function GET(req:NextRequest){
  try {
  const type=req.nextUrl.searchParams.get("scope")||"mine";
  if(type==="members")return NextResponse.json({members:await rpc(a.token,"epic_followup_members",{}),profile:a.user.id});
+ if(type==="history"){const id=req.nextUrl.searchParams.get("id");if(!id||!/^[0-9a-f-]{36}$/i.test(id))return NextResponse.json({error:"Invalid follow-up"},{status:400});return NextResponse.json({events:await rpc(a.token,"epic_followup_history",{p_id:id})});}
  const scope=type==="team"?"team":type==="customer"?"customer":"mine";
  const id=req.nextUrl.searchParams.get("opportunity_id");
  if(id&&!/^[0-9a-f-]{36}$/i.test(id))return NextResponse.json({error:"Invalid customer"},{status:400});
