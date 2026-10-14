@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Customer360Enhancer from "./customer-360/Customer360Enhancer";
 import IncomingCallPopup from "./IncomingCallPopup";
+import CancellationAutoPopup from "./customer-360/CancellationAutoPopup";
 
 const epicIcon = "https://myepicreservation.com/epic-logo.png?v=epicc360";
 
@@ -22,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="icon" href={epicIcon} type="image/png" />
         <link rel="shortcut icon" href={epicIcon} type="image/png" />
       </head>
-      <body><Customer360Enhancer />{children}<IncomingCallPopup /></body>
+      <body><Customer360Enhancer />{children}<IncomingCallPopup /><CancellationAutoPopup /></body>
     </html>
   );
 }
