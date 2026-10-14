@@ -38,6 +38,7 @@ type CancellationAgreementPanelProps = {
   autoOpen?: boolean;
   showLauncher?: boolean;
   onPopupClose?: () => void;
+  dismissWhenHandledElsewhere?: boolean;
 };
 
 const TEAM = ["Alex", "Cody", "Jenna", "Kim", "Lonnie", "Maggie", "Price", "Randy", "Taylin"];
@@ -66,6 +67,7 @@ export default function CancellationAgreementPanel({
   autoOpen = false,
   showLauncher = true,
   onPopupClose,
+  dismissWhenHandledElsewhere = false,
 }: CancellationAgreementPanelProps) {
   const [isOpen, setIsOpen] = useState(autoOpen);
   const [agreement, setAgreement] = useState<AgreementStatus | null>(null);
@@ -87,6 +89,7 @@ export default function CancellationAgreementPanel({
   const [podiumConfigured, setPodiumConfigured] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [error, setError] = useState("");
+  const [initiatedHere, setInitiatedHere] = useState(false);
 
   function closePopup() {
     setIsOpen(false);
@@ -106,6 +109,7 @@ export default function CancellationAgreementPanel({
         error?: string;
       };
       if (!response.ok) throw new Error(data.error || "Unable to load agreement status.");
+      if (dismissWhenHandledElsewhere && !initiatedHere && data.agreement && ["sent","opened","accepted"].includes(data.agreement.status)) { closePopup(); return; }
       setAgreement(data.agreement ?? null);
       setPolicyDecision(data.policyDecision ?? null);
       if (!data.agreement && data.policyDecision?.status && !overridePolicy) {
@@ -191,6 +195,7 @@ export default function CancellationAgreementPanel({
       });
       const data = (await response.json()) as { error?: string; agreementUrl?: string };
       if (!response.ok) throw new Error(data.error || "Unable to send agreement.");
+      setInitiatedHere(true);
       if (mode === "copy" && data.agreementUrl) {
         await navigator.clipboard.writeText(data.agreementUrl);
         setCopied(true);
