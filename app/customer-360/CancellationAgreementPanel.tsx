@@ -193,9 +193,9 @@ export default function CancellationAgreementPanel({
           email,
         }),
       });
-      const data = (await response.json()) as { error?: string; agreementUrl?: string };
+      const data = (await response.json()) as { error?: string; agreementUrl?: string; duplicatePrevented?: boolean; status?: string };
       if (!response.ok) throw new Error(data.error || "Unable to send agreement.");
-      setInitiatedHere(true);
+      if (mode !== "copy" && !data.duplicatePrevented) setInitiatedHere(true);
       if (mode === "copy" && data.agreementUrl) {
         await navigator.clipboard.writeText(data.agreementUrl);
         setCopied(true);
