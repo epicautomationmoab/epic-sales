@@ -31,29 +31,109 @@ create table if not exists public.sales_followup_events (
 create index if not exists sales_followup_events_history on public.sales_followup_events(followup_id,created_at);
 alter table public.sales_followups enable row level security;
 alter table public.sales_followup_events enable row level security;
--- Select for the owner, creator, or supervisors. Do not expose all employee records.
-create policy sales_followups_read on public.sales_followups for select to authenticated
- using (
- exists (select 1 from public.team_profiles p where p.user_id=(select auth.uid()) and p.active and p.role in ('admin','manager'))
- or exists (select 1 from public.team_profiles p where p.user_id=(select auth.uid()) and p.active and p.id in (assigned_to_profile_id,created_by_profile_id))
- );
-create policy sales_followups_insert on public.sales_followups for insert to authenticated
- with check (
- exists (select 1 from public.team_profiles p where p.user_id=(select auth.uid()) and p.active and p.role <> 'workstation' and p.id=created_by_profile_id)
- );
-create policy sales_followups_update on public.sales_followups for update to authenticated
- using (
- exists (select 1 from public.team_profiles p where p.user_id=(select auth.uid()) and p.active and (p.id=assigned_to_profile_id or p.role in ('admin','manager')))
- )
- with check (
- exists (select 1 from public.team_profiles p where p.user_id=(select auth.uid()) and p.active and (p.id=assigned_to_profile_id or p.role in ('admin','manager')))
- );
-create policy sales_followup_events_read on public.sales_followup_events for select to authenticated
- using (exists(select 1 from public.sales_followups f where f.id=followup_id));
-create policy sales_followup_events_insert on public.sales_followup_events for insert to authenticated
- with check (
- exists(select 1 from public.team_profiles p where p.id=actor_profile_id and p.user_id=(select auth.uid()) and p.active and p.role <> 'workstation')
- and exists(select 1 from public.sales_followups f where f.id=followup_id)
- );
-grant select,insert,update on public.sales_followups to authenticated;
-grant select,insert on public.sales_followup_events to authenticated;
+
+-- Follow-up data is deliberately not exposed through direct table grants.
+-- The following narrow RPC entrypoints perform explicit employee authorization.
+revoke all on public.sales_followups from anon, authenticated;
+revoke all on public.sales_followup_events from anon, authenticated;
+
+create or replace function public.epic_followup_list(p_scope text default 'mine',p_opportunity_id uuid default null)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare actor public.team_profiles%rowtype; result jsonb;
+begin
+ select * into actor from public.team_profiles where user_id=auth.uid() and active and role<>'workstation' limit 1;
+ if actor.id is null then raise exception 'Employee login required'; end if;
+ if p_scope='team' and actor.role not in ('admin','manager') then raise exception 'Manager access required'; end if;
+ select coalesce(jsonb_agg(x order by x.due_at asc), '[]'::jsonb) into result
+ from (
+ select f.id,f.opportunity_id,f.created_by_profile_id,f.assigned_to_profile_id,f.title,f.context_note,
+        f.due_at,f.status,f.outcome,f.completed_at,f.completed_by_profile_id,f.created_at,
+        o.customer_name,creator.display_name as created_by_name,assignee.display_name as assigned_to_name
+ from public.sales_followups f
+ join public.sales_opportunities o on o.id=f.opportunity_id
+ join public.team_profiles creator on creator.id=f.created_by_profile_id
+ join public.team_profiles assignee on assignee.id=f.assigned_to_profile_id
+ where (p_opportunity_id is null or f.opportunity_id=p_opportunity_id)
+ and (case when p_scope='team' then actor.role in ('admin','manager')
+           when p_scope='customer' then f.assigned_to_profile_id=actor.id or f.created_by_profile_id=actor.id or actor.role in ('admin','manager')
+           else f.assigned_to_profile_id=actor.id end)
+ order by f.due_at limit 400
+ ) x;
+ return result;
+end $$;
+
+create or replace function public.epic_followup_members()
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare aid uuid;
+begin
+ select id into aid from public.team_profiles where user_id=auth.uid() and active and role<>'workstation' limit 1;
+ if aid is null then raise exception 'Employee login required'; end if;
+ return (select coalesce(jsonb_agg(jsonb_build_object('id',id,'display_name',display_name) order by display_name),'[]'::jsonb)
+ from public.team_profiles where active and role<>'workstation');
+end $$;
+
+create or replace function public.epic_followup_create(
+ p_opportunity_id uuid,p_assignee uuid,p_title text,p_note text,p_due_at timestamptz,
+ p_source text default 'c360',p_workflow_id uuid default null)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare actor public.team_profiles%rowtype; f public.sales_followups%rowtype;
+begin
+ select * into actor from public.team_profiles where user_id=auth.uid() and active and role<>'workstation' limit 1;
+ if actor.id is null then raise exception 'Employee login required'; end if;
+ if p_title is null or length(btrim(p_title)) not between 1 and 240 or p_due_at is null then raise exception 'Task and date required'; end if;
+ if not exists(select 1 from public.sales_opportunities where id=p_opportunity_id) then raise exception 'Sales opportunity not found'; end if;
+ if not exists(select 1 from public.team_profiles where id=p_assignee and active and role<>'workstation') then raise exception 'Active employee required'; end if;
+ insert into public.sales_followups(opportunity_id,created_by_profile_id,assigned_to_profile_id,title,context_note,due_at,source,source_workflow_id)
+ values(p_opportunity_id,actor.id,p_assignee,btrim(p_title),left(coalesce(p_note,''),3000),p_due_at,left(coalesce(p_source,'c360'),80),p_workflow_id)
+ on conflict (source_workflow_id) do nothing returning * into f;
+ if f.id is null then select * into f from public.sales_followups where source_workflow_id=p_workflow_id; end if;
+ if f.id is null then raise exception 'Unable to create follow-up'; end if;
+ if not exists(select 1 from public.sales_followup_events where followup_id=f.id and event_type='created') then
+ insert into public.sales_followup_events(followup_id,actor_profile_id,event_type,next_due_at)
+ values(f.id,actor.id,'created',f.due_at); end if;
+ return to_jsonb(f);
+end $$;
+
+create or replace function public.epic_followup_action(
+ p_id uuid,p_action text,p_outcome text default null,p_note text default null,
+ p_due_at timestamptz default null,p_assignee uuid default null)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare actor public.team_profiles%rowtype; f public.sales_followups%rowtype; previous timestamptz;
+begin
+ select * into actor from public.team_profiles where user_id=auth.uid() and active and role<>'workstation' limit 1;
+ if actor.id is null then raise exception 'Employee login required'; end if;
+ select * into f from public.sales_followups where id=p_id for update;
+ if f.id is null then raise exception 'Follow-up not found'; end if;
+ if actor.role not in ('admin','manager') and actor.id<>f.assigned_to_profile_id then raise exception 'Not assigned to this follow-up'; end if;
+ previous:=f.due_at;
+ if f.status<>'pending' then raise exception 'Follow-up is already closed'; end if;
+ if p_action='complete' then
+   if p_outcome not in ('contacted','booked','no_longer_needed') or nullif(btrim(coalesce(p_note,'')),'') is null then
+     raise exception 'Completion requires an outcome and explanation'; end if;
+   update public.sales_followups set status='completed',outcome=p_outcome,completed_at=now(),completed_by_profile_id=actor.id,updated_at=now() where id=p_id;
+ elsif p_action='attempt' then
+   if p_outcome not in ('no_answer','voicemail') then raise exception 'Attempt outcome required'; end if;
+ elsif p_action='reschedule' then
+   if p_due_at is null then raise exception 'New date required'; end if;
+   update public.sales_followups set due_at=p_due_at,updated_at=now() where id=p_id;
+ elsif p_action='reassign' then
+   if not exists(select 1 from public.team_profiles where id=p_assignee and active and role<>'workstation') then raise exception 'Active employee required'; end if;
+   update public.sales_followups set assigned_to_profile_id=p_assignee,updated_at=now() where id=p_id;
+ else raise exception 'Invalid action'; end if;
+ insert into public.sales_followup_events(followup_id,actor_profile_id,event_type,note,previous_due_at,next_due_at)
+ values(p_id,actor.id,case when p_action='attempt' then 'attempted' else case when p_action='reassign' then 'reassigned' else case when p_action='complete' then 'completed' else 'rescheduled' end end,
+ left(concat_ws(': ',p_outcome,p_note),3000),previous,p_due_at);
+ return (select to_jsonb(z) from public.sales_followups z where z.id=p_id);
+end $$;
+revoke all on function public.epic_followup_list(text,uuid) from public,anon;
+revoke all on function public.epic_followup_members() from public,anon;
+revoke all on function public.epic_followup_create(uuid,uuid,text,text,timestamptz,text,uuid) from public,anon;
+revoke all on function public.epic_followup_action(uuid,text,text,text,timestamptz,uuid) from public,anon;
+grant execute on function public.epic_followup_list(text,uuid) to authenticated;
+grant execute on function public.epic_followup_members() to authenticated;
+grant execute on function public.epic_followup_create(uuid,uuid,text,text,timestamptz,text,uuid) to authenticated;
+grant execute on function public.epic_followup_action(uuid,text,text,text,timestamptz,uuid) to authenticated;
