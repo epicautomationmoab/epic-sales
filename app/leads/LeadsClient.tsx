@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
 import LeadWorkModal from "./LeadWorkModal";
+import LostReasonDialog from "../LostReasonDialog";
 import styles from "./Leads.module.css";
 
 export type SalesLead = {
@@ -117,6 +118,8 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
     finally{setBusyId(null);}
   }
 
+  const [lostLead,setLostLead]=useState<SalesLead|null>(null);
+  async function confirmLost(category:string,reason:string,note:string){if(!lostLead)return;const lead=lostLead;setBusyId(lead.id);setError("");try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"mark_lost",opportunity_id:lead.id,reason:`${category} | ${reason}`,note_text:note||null})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Could not mark lead lost.");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to mark lost.");setBusyId(null);}}
   async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
     let note="";
     if(kind==="retire"){
@@ -125,12 +128,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       note=entered.trim();
       if(!note){setError("Add a short reason before closing the cart.");return;}
     }
-    if(kind==="mark_lost"){
-      const entered=window.prompt("Why was this sales opportunity lost?");
-      if(entered===null)return;
-      note=entered.trim();
-      if(!note){setError("Add a short reason before marking the cart lost.");return;}
-    }
+    if(kind==="mark_lost"){setLostLead(lead);return;}
     setBusyId(lead.id);setError("");
     try{
       const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
@@ -214,6 +212,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       onOpenCustomer360={()=>{const lead=workLead;setWorkLead(null);if(lead)setSelected(lead);}}
       onLeadUpdated={()=>window.location.reload()}
     />:null}
+    {lostLead?<LostReasonDialog busy={busyId===lostLead.id} onCancel={()=>setLostLead(null)} onConfirm={confirmLost}/>:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
