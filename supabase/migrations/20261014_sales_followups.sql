@@ -137,3 +137,18 @@ grant execute on function public.epic_followup_list(text,uuid) to authenticated;
 grant execute on function public.epic_followup_members() to authenticated;
 grant execute on function public.epic_followup_create(uuid,uuid,text,text,timestamptz,text,uuid) to authenticated;
 grant execute on function public.epic_followup_action(uuid,text,text,text,timestamptz,uuid) to authenticated;
+
+create or replace function public.epic_followup_history(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare actor public.team_profiles%rowtype; f public.sales_followups%rowtype;
+begin
+ select * into actor from public.team_profiles where user_id=auth.uid() and active and role<>'workstation' limit 1;
+ if actor.id is null then raise exception 'Employee login required'; end if;
+ select * into f from public.sales_followups where id=p_id;
+ if f.id is null or (actor.role not in ('admin','manager') and actor.id not in (f.assigned_to_profile_id,f.created_by_profile_id)) then raise exception 'Follow-up not accessible'; end if;
+ return (select coalesce(jsonb_agg(jsonb_build_object('type',e.event_type,'note',e.note,'actor',p.display_name,'at',e.created_at,'previous_due_at',e.previous_due_at,'next_due_at',e.next_due_at) order by e.created_at asc),'[]'::jsonb)
+ from public.sales_followup_events e join public.team_profiles p on p.id=e.actor_profile_id where e.followup_id=p_id);
+end $$;
+revoke all on function public.epic_followup_history(uuid) from public,anon;
+grant execute on function public.epic_followup_history(uuid) to authenticated;
