@@ -18,9 +18,9 @@ export default function CancellationAutoPopup(){
     const data=await r.json() as {candidates?:Candidate[]};
     for(const c of data.candidates||[]){
      if(seen.current.has(c.readiness_id))continue;
-     seen.current.add(c.readiness_id);
      const status=await fetch("/api/cancellation-acknowledgement?readinessId="+encodeURIComponent(c.readiness_id),{cache:"no-store"});
      if(!status.ok)continue;
+     seen.current.add(c.readiness_id);
      const st=await status.json();
      if(st.agreement&&["sent","opened","accepted"].includes(st.agreement.status))continue;
      if(!dead)setActive(current=>current||c);
@@ -28,8 +28,23 @@ export default function CancellationAutoPopup(){
    }catch{}finally{working=false}
   }
   void check();const timer=window.setInterval(()=>void check(),3000);
+  const rawUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  let socket:WebSocket|null=null;
+  if(rawUrl&&key){
+   try{
+    const url=new URL(rawUrl);
+    url.protocol=url.protocol==="https:"?"wss:":"ws:";
+    url.pathname="/realtime/v1/websocket";
+    url.searchParams.set("apikey",key);
+    url.searchParams.set("vsn","1.0.0");
+    socket=new WebSocket(url);
+    socket.addEventListener("open",()=>socket?.send(JSON.stringify({topic:"realtime:epic-readiness-signal",event:"phx_join",payload:{config:{broadcast:{ack:false,self:false},presence:{key:""},postgres_changes:[{event:"*",schema:"public",table:"readiness_realtime_signal"}]},access_token:key},ref:"1"})));
+    socket.addEventListener("message",event=>{try{const message=JSON.parse(String(event.data));if(message.event==="postgres_changes"&&message.payload?.data?.table==="readiness_realtime_signal")void check()}catch{}});
+   }catch{}
+  }
   document.addEventListener("visibilitychange",check);
-  return()=>{dead=true;window.clearInterval(timer);document.removeEventListener("visibilitychange",check)}
+  return()=>{dead=true;socket?.close();window.clearInterval(timer);document.removeEventListener("visibilitychange",check)}
  },[]);
  return active?<CancellationAgreementPanel key={active.readiness_id} row={active} autoOpen showLauncher={false} dismissWhenHandledElsewhere onPopupClose={()=>setActive(null)}/>:null;
 }
