@@ -756,7 +756,7 @@ export default function QuoteBuilder() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Unable to send quote email.");
       setDetailsOpen(false);
-      setSaveMessage(`Quote emailed to ${email.trim()}. Would you like to schedule a follow-up?`);
+      setSaveMessage(result.opportunity_id?`Quote emailed to ${email.trim()}. Would you like to schedule a follow-up?`:`Quote emailed to ${email.trim()}. Open C360 to create a follow-up after the customer record is linked.`);
       setEmailedOpportunityId(result.opportunity_id||null);
       getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
     } catch (err) {
