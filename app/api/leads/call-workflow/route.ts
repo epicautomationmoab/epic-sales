@@ -79,18 +79,16 @@ export async function POST(request:NextRequest){
         followupError="A valid follow-up date is required.";
       }else{
         try{
-          await rest(accessToken,"sales_followups?on_conflict=source_workflow_id",{
+          await rest(accessToken,"rpc/epic_followup_create",{
             method:"POST",
-            headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
             body:JSON.stringify({
-              opportunity_id:opportunityId,
-              created_by_profile_id:profile.id,
-              assigned_to_profile_id:profile.id,
-              title:(body.next_action||"Follow up with guest").trim().slice(0,240),
-              context_note:[body.objection_detail,body.resolution_note].filter(Boolean).join(" · ").slice(0,3000),
-              source:"sales_call",
-              source_workflow_id:row.id,
-              due_at:new Date(body.follow_up_at).toISOString()
+              p_opportunity_id:opportunityId,
+              p_assignee:profile.id,
+              p_title:(body.next_action||"Follow up with guest").trim().slice(0,240),
+              p_note:[body.objection_detail,body.resolution_note].filter(Boolean).join(" · ").slice(0,3000),
+              p_source:"sales_call",
+              p_workflow_id:row.id,
+              p_due_at:new Date(body.follow_up_at).toISOString()
             })
           });
           followupScheduled=true;
