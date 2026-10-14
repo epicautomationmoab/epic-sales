@@ -55,11 +55,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result || { ok: true });
     }
     if (body?.action === "mark_lost" || body?.action === "retire") {
+      // Preserve structured details for reporting while using current validated DB codes.
+      const rawReason = body.reason || "";
+      const parts = rawReason.split(" | ");
+      const structured = body.action === "mark_lost" && parts.length === 2;
+      const category = structured ? parts[0] : "";
+      const specificReason = structured ? parts[1] : "";
+      const categories: Record<string,string> = {
+        "Price & Value":"price",
+        "Availability & Scheduling":"availability",
+        "Policies & Restrictions":"policy_or_qualification",
+        "Product & Experience":"product_mismatch",
+        "Guest Circumstances":"plans_changed",
+        "Unable to Determine / Other":"other",
+      };
+      const code = structured ? categories[category] : rawReason;
+      if (structured && (!code || !specificReason)) return NextResponse.json({error:"Choose a valid lost reason."},{status:400});
+      const note = structured ? "Lost category: "+category+"\\nLost reason: "+specificReason+(body.note_text?"\\nDetails: "+body.note_text:"") : body.note_text || null;
       const result = await rpc(accessToken, "epic_sales_close_lead", {
         p_opportunity_id: opportunityId,
         p_status: body.action === "mark_lost" ? "lost" : "retired",
-        p_reason: body.reason || "",
-        p_note: body.note_text || null,
+        p_reason: code || "",
+        p_note: note,
       });
       return NextResponse.json(result || { ok: true });
     }
