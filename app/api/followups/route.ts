@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
-const ROOT=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/,"");
+const ROOT=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
 async function rest(token:string,path:string,init?:RequestInit){
  const r=await fetch(ROOT+"/rest/v1/"+path,{...init,headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",...(init?.headers||{})},cache:"no-store"});
