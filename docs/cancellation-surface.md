@@ -1,0 +1,1 @@
+C360 cancellation acknowledgement integration: use the existing Readiness UI and Supabase-backed workflow. Preview branch only.
