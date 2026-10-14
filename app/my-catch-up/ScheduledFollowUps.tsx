@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
-type Item={id:string;opportunity_id:string;title:string;context_note:string;due_at:string;status:string;assigned_to_profile_id:string;created_at:string;sales_opportunities?:{customer_name?:string}|null};
+type Item={id:string;opportunity_id:string;title:string;context_note:string;due_at:string;status:string;assigned_to_profile_id:string;created_at:string;customer_name?:string;created_by_name?:string;assigned_to_name?:string};
 export default function ScheduledFollowUps(){
  const [items,setItems]=useState<Item[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[open,setOpen]=useState<string|null>(null),[action,setAction]=useState<string|null>(null),[note,setNote]=useState(""),[due,setDue]=useState(""),[busy,setBusy]=useState(false);
  async function load(){try{const r=await fetch("/api/followups",{cache:"no-store"});const p=await r.json();if(!r.ok)throw Error(p.error||"Unable to load follow-ups");setItems(p.items||[]);setError("");}catch(e){setError(e instanceof Error?e.message:"Unable to load follow-ups")}finally{setLoading(false)}}
@@ -18,10 +18,10 @@ export default function ScheduledFollowUps(){
  {sections.map(section=><div key={section.name} style={{background:"white",border:"1px solid #e3e5eb",borderRadius:12,padding:15}}>
  <h3 style={{fontSize:16,margin:"0 0 10px"}}>{section.name} ({section.rows.length})</h3>
  {!section.rows.length?<p style={{fontSize:13,color:"#77808c"}}>None</p>:section.rows.map(item=><div key={item.id} style={{borderTop:"1px solid #edf0f2",padding:"13px 0",display:"grid",gap:8}}>
- <strong>{item.sales_opportunities?.customer_name||"Customer"}</strong>
+ <strong>{item.customer_name||"Customer"}</strong>
  <div style={{fontSize:14}}>{item.title}</div>
  {item.context_note?<div style={{fontSize:12,color:"#526073"}}>{item.context_note}</div>:null}
- <small>{new Date(item.due_at).toLocaleString("en-US",{timeZone:"America/Denver",dateStyle:"medium",timeStyle:"short"})} Mountain</small>
+ <small>Scheduled by {item.created_by_name||"Employee"} · Assigned to {item.assigned_to_name||"Employee"} · {new Date(item.due_at).toLocaleString("en-US",{timeZone:"America/Denver",dateStyle:"medium",timeStyle:"short"})} Mountain</small>
  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
  <button type="button" onClick={()=>setOpen(item.opportunity_id)}>Open C360</button>
  <button type="button" onClick={()=>{setAction(item.id+":complete");setNote("")}}>Record outcome</button>
