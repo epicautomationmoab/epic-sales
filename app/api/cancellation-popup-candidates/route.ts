@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthenticatedTeamProfile} from "../../../lib/team-auth";
 export const dynamic="force-dynamic";
-const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/,"");
+const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
 async function rpc(token:string,name:string,body:object){const r=await fetch(BASE+"/rest/v1/rpc/"+name,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});if(!r.ok)throw Error("Lookup failed");return r.json()}
 export async function GET(request:NextRequest){
