@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ScheduleFollowUp from "./customer-360/ScheduleFollowUp";
 import {
   getRecentSalesQuotes,
   getSalesExperienceFees,
@@ -242,6 +243,7 @@ export default function QuoteBuilder() {
   const [saving, setSaving] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [emailedOpportunityId,setEmailedOpportunityId]=useState<string|null>(null);
   const [availabilityDates, setAvailabilityDates] = useState<Record<string, string>>({});
   const [availabilityByActivity, setAvailabilityByActivity] = useState<Record<string, ActivityAvailabilityState>>({});
   const [pendingBooking, setPendingBooking] = useState<PendingBooking | null>(null);
@@ -691,7 +693,7 @@ export default function QuoteBuilder() {
     }
     if (!email.trim()) { setSaveMessage("Add a guest email before sending the quote."); return; }
     if (!hasAnyTicket) { setSaveMessage("Add at least one ticket before sending the quote."); return; }
-    setEmailing(true); setSaveMessage("");
+    setEmailing(true); setSaveMessage(""); setEmailedOpportunityId(null);
     try {
       const result = await saveSalesQuote({
         quoteId: editingQuoteId, customerName: name, customerEmail: email, customerPhone: phone,
@@ -754,7 +756,8 @@ export default function QuoteBuilder() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Unable to send quote email.");
       setDetailsOpen(false);
-      setSaveMessage(`Quote emailed to ${email.trim()}.`);
+      setSaveMessage(`Quote emailed to ${email.trim()}. Would you like to schedule a follow-up?`);
+      setEmailedOpportunityId(result.opportunity_id||null);
       getRecentSalesQuotes().then(setRecentQuotes).catch(() => undefined);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : "Unable to save and email quote.");
@@ -997,6 +1000,7 @@ export default function QuoteBuilder() {
               <button className="primary" type="button" onClick={() => setDetailsOpen(true)} disabled={dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId])) || seasonLoading}>{editingQuoteId ? "Update Quote" : "Save Quote"}</button>
               {editingQuoteId && email.trim() ? <button className="secondary modalSecondary" type="button" onClick={handleSaveAndEmail} disabled={saving || emailing || dateSeasonMismatch || (pricingYear === 2027 && !effectiveVisitStart.startsWith("2027-")) || activities.some(a => Boolean(pending2027[a.experienceId]))}>{emailing ? "Emailing..." : "Email Quote"}</button> : null}
               {saveMessage && <p className="ticketMeta" style={{ marginBottom: 0 }}>{saveMessage}</p>}
+              {emailedOpportunityId?<ScheduleFollowUp opportunityId={emailedOpportunityId}/>:null}
             </section>
           </div>
         )}
