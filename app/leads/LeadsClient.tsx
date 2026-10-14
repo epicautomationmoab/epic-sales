@@ -134,7 +134,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         action:kind,
         opportunity_id:lead.id,
-        reason:kind==="retire"?"other":kind==="mark_lost"?"other":undefined,
+        reason:kind==="retire"?"other":undefined,
         note_text:note||undefined,
       })});
       const payload=await response.json().catch(()=>({}));
