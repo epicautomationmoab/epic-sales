@@ -15,7 +15,7 @@ function datesFor(period:string,today:string){
   return Array.from({length:count},(_,i)=>daysBefore(today,count-1-i));
 }
 async function loadDay(token:string,date:string):Promise<Report>{
-  const r=await fetch(BASE+"/rest/v1/rpc/get_epic_phone_report_v4",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date}),cache:"no-store"});
+  const r=await fetch(BASE+"/rest/v1/rpc/get_epic_phone_report_v5",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_local_date:date}),cache:"no-store"});
   if(!r.ok)throw Error("Phone report "+date+": "+(await r.text()).slice(0,250));
   return r.json();
 }
@@ -50,7 +50,8 @@ export default async function PhoneRangeReport({period,token,from,to}:{period:st
     let answered=0,opportunities=0,booked=0,revenue=0;
     for(const e of events){
       const ext=String(e.extension||"");
-      const a=agents.get(ext)||{name:String((r.agents||[]).find(x=>String(x.extension)===ext)?.agent_name||"Ext. "+ext),calls:0,seconds:0,opportunities:new Map<string,any[]>(),revenue:0,booked:0};
+      const rep=String(e.employee_name||((r.agents||[]).find(x=>String(x.extension)===ext)?.agent_name)||"Ext. "+ext);
+      const a=agents.get(rep)||{name:rep,calls:0,seconds:0,opportunities:new Map<string,any[]>(),revenue:0,booked:0};
       a.calls++;a.seconds+=Number(e.billsec||0);
       if(e.is_sales_opportunity){
         const p=normalize(e.caller_phone);
@@ -63,7 +64,7 @@ export default async function PhoneRangeReport({period,token,from,to}:{period:st
         const group=a.opportunities.get(key)||[];
         group.push(e);a.opportunities.set(key,group);
       }
-      agents.set(ext,a);
+      agents.set(rep,a);
     }
     answered=events.length;
     return {date:dates[i],answered,missed:(r.missed||[]).length,events,report:r,opportunities,booked,revenue};
@@ -113,7 +114,7 @@ export default async function PhoneRangeReport({period,token,from,to}:{period:st
         <summary style={{fontWeight:800,cursor:"pointer"}}>{d.date} · {d.answered} answered calls <Link href={"/phone-report?date="+d.date} style={{marginLeft:10,fontSize:12}}>Full daily report</Link></summary>
         <div style={{marginTop:12}}>
           {d.events.map((e,i)=><div key={String(e.session)+i} style={{display:"grid",gridTemplateColumns:"minmax(160px,1.5fr) 100px minmax(140px,1fr)",gap:10,padding:"10px 0",borderBottom:"1px solid #edf0f3",fontSize:12,alignItems:"center"}}>
-            <div><strong>{e.customer_name||normalize(e.caller_phone)||"Unknown"}</strong><div style={{color:"#64748b"}}>{normalize(e.caller_phone)} · {e.extension} · {e.agent_name||""}</div><PhoneReportC360Link contactId={e.contact_id||null} reservationId={e.booking_reservation_id||e.existing_reservation_id||null} reservationConfirmation={e.booking_confirmation_code||e.existing_confirmation_code||null} phone={e.caller_phone||null}/></div>
+            <div><strong>{e.customer_name||normalize(e.caller_phone)||"Unknown"}</strong><div style={{color:"#64748b"}}>{normalize(e.caller_phone)} · {e.extension} · {e.employee_name||e.agent_name||""}</div><PhoneReportC360Link contactId={e.contact_id||null} reservationId={e.booking_reservation_id||e.existing_reservation_id||null} reservationConfirmation={e.booking_confirmation_code||e.existing_confirmation_code||null} phone={e.caller_phone||null}/></div>
             <div>{new Date(e.event_time).toLocaleTimeString("en-US",{timeZone:"America/Denver",hour:"numeric",minute:"2-digit"})}</div>
             <div style={{fontWeight:700}}>{e.call_outcome==="booked"?"Sale "+dollars(Number(e.booking_revenue_cents||0)):e.is_sales_opportunity?"Sales Lead":e.call_outcome==="existing_reservation_handled"?"Reservation Service":"Other"}</div>
           </div>)}{!d.events.length?<p>No answered calls.</p>:null}
