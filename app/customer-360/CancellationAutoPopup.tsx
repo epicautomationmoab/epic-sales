@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import CancellationAgreementPanel from "./CancellationAgreementPanel";
-type Candidate={readiness_id:string;confirmation_code:string};
+type Candidate={readiness_id:string;confirmation_code:string;customer_name:string;customer_phone:string|null;customer_email:string|null;product_display_name:string};
 type Row=Candidate&{customer_name:string;customer_phone:string|null;customer_email:string|null;product_display_name:string};
 export default function CancellationAutoPopup(){
  const started=useRef(new Date().toISOString());
@@ -23,10 +23,7 @@ export default function CancellationAutoPopup(){
      if(!status.ok)continue;
      const st=await status.json();
      if(st.agreement&&["sent","opened","accepted"].includes(st.agreement.status))continue;
-     const details=await fetch("/api/cancellation-popup-detail?confirmation="+encodeURIComponent(c.confirmation_code),{cache:"no-store"});
-     if(!details.ok)continue;
-     const row=await details.json() as Row;
-     if(!dead)setActive(current=>current||row);
+     if(!dead)setActive(current=>current||c);
     }
    }catch{}finally{working=false}
   }
