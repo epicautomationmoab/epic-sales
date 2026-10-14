@@ -159,10 +159,10 @@ export default function CancellationAgreementPanel({
   }, [row.readiness_id, row.customer_name, row.customer_phone, row.customer_email, autoOpen]);
 
   useEffect(() => {
-    if (!agreement || !["created", "sent", "opened"].includes(agreement.status)) return;
+    if (!isOpen) return;
     const timer = window.setInterval(() => void loadStatus(true), 2000);
     return () => window.clearInterval(timer);
-  }, [agreement?.status, row.readiness_id]);
+  }, [agreement?.status, row.readiness_id, isOpen, initiatedHere]);
 
   async function createAgreement(mode: "sms" | "email" | "both" | "copy") {
     if (!row.readiness_id) return;
