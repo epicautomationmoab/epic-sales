@@ -125,7 +125,7 @@ begin
    update public.sales_followups set assigned_to_profile_id=p_assignee,updated_at=now() where id=p_id;
  else raise exception 'Invalid action'; end if;
  insert into public.sales_followup_events(followup_id,actor_profile_id,event_type,note,previous_due_at,next_due_at)
- values(p_id,actor.id,case when p_action='attempt' then 'attempted' else case when p_action='reassign' then 'reassigned' else case when p_action='complete' then 'completed' else 'rescheduled' end end,
+ values(p_id,actor.id,case when p_action='attempt' then 'attempted' when p_action='reassign' then 'reassigned' when p_action='complete' then 'completed' else 'rescheduled' end,
  left(concat_ws(': ',p_outcome,p_note),3000),previous,p_due_at);
  return (select to_jsonb(z) from public.sales_followups z where z.id=p_id);
 end $$;
