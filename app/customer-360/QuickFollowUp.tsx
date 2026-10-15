@@ -8,11 +8,12 @@ const outcomes=[
   {id:"callback",title:"Callback Requested",icon:"◷",description:"Called guest — Callback Requested"}
 ] as const;
 
-export default function QuickFollowUp({onLog,disabled=false}:{onLog:(message:string)=>Promise<void>;disabled?:boolean}){
+export default function QuickFollowUp({onLog,onCallback,disabled=false}:{onLog:(message:string)=>Promise<void>;onCallback?:()=>void;disabled?:boolean}){
  const [saving,setSaving]=useState<string|null>(null);
  const [feedback,setFeedback]=useState("");
  async function log(id:string,description:string){
   if(disabled||saving)return;
+  if(id==="callback"&&onCallback){onCallback();return;}
   setSaving(id);setFeedback("");
   try{await onLog(description);setFeedback(description+" — saved.");}
   catch(e){setFeedback(e instanceof Error?e.message:"Could not save follow-up.");}
