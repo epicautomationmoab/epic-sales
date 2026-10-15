@@ -20,8 +20,8 @@ export async function GET(request:NextRequest){
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Catch-Up unavailable"},{status:500});}
 }
 export async function POST(request:NextRequest){
- const token=await auth(request);
- if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
+ const a=await auth(request);
+ if(!a)return NextResponse.json({error:"Employee login required"},{status:401});
  const body=await request.json().catch(()=>null);
  if(typeof body?.event_key!=="string"||body.event_key.length>160||typeof body?.dismissed!=="boolean")return NextResponse.json({error:"Invalid request"},{status:400});
  try {await call(a.token,"epic_catchup_set_dismissed",{p_event_key:body.event_key,p_dismissed:body.dismissed});return NextResponse.json({ok:true});}
