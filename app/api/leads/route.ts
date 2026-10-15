@@ -26,11 +26,12 @@ export async function POST(request: NextRequest) {
   if (!profile || !accessToken || profile.role === "workstation") return NextResponse.json({ error: "Employee login required." }, { status: 401 });
 
   const body = await request.json().catch(() => null) as {
-    action?: "claim" | "release" | "activate" | "note" | "edit_note" | "mark_lost" | "retire";
+    action?: "claim" | "release" | "release_with_note" | "activate" | "note" | "edit_note" | "mark_lost" | "retire";
     opportunity_id?: string;
     note_id?: string;
     note_text?: string;
     reason?: string;
+    note_text?: string;
   } | null;
   const opportunityId = body?.opportunity_id?.trim();
   if (!opportunityId) return NextResponse.json({ error: "Lead is required." }, { status: 400 });
@@ -48,6 +49,14 @@ export async function POST(request: NextRequest) {
     }
     if (body?.action === "activate") {
       const result = await rpc(accessToken, "epic_sales_activate_lead", { p_opportunity_id: opportunityId });
+      return NextResponse.json(result || { ok: true });
+    }
+    if (body?.action === "release_with_note") {
+      const result = await rpc(accessToken, "epic_sales_release_claim", {
+        p_opportunity_id: opportunityId,
+        p_reason: body.reason || "",
+        p_note: body.note_text || "",
+      });
       return NextResponse.json(result || { ok: true });
     }
     if (body?.action === "claim" || body?.action === "release") {
