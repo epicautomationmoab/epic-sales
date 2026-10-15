@@ -11,12 +11,12 @@ async function call(token:string,fn:string,body:object){
 async function auth(request:NextRequest){
  const token=request.cookies.get("epic_access_token")?.value;
  const profile=await getAuthenticatedTeamProfile(token);
- return token&&profile&&profile.role!=="workstation"?token:null;
+ return token&&profile&&profile.role!=="workstation"?{token,profile}:null;
 }
 export async function GET(request:NextRequest){
- const token=await auth(request);
- if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
- try {const [activity,shopping]=await Promise.all([call(token,"epic_catchup_attributed",{}),call(token,"epic_catchup_shopped_again",{})]);const items=[...(Array.isArray(activity)?activity:[]),...(Array.isArray(shopping)?shopping:[])].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));return NextResponse.json({items,lookbackDays:60});}
+ const a=await auth(request);
+ if(!a)return NextResponse.json({error:"Employee login required"},{status:401});
+ try {const employee=request.nextUrl.searchParams.get("employee");if(employee){if(!["manager","admin"].includes(a.profile.role))return NextResponse.json({error:"Manager access required"},{status:403});const items=await call(a.token,"epic_manager_catchup",{p_employee:employee});return NextResponse.json({items,readOnly:true});}const [activity,shopping]=await Promise.all([call(a.token,"epic_catchup_attributed",{}),call(a.token,"epic_catchup_shopped_again",{})]);const items=[...(Array.isArray(activity)?activity:[]),...(Array.isArray(shopping)?shopping:[])].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));return NextResponse.json({items,lookbackDays:60});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Catch-Up unavailable"},{status:500});}
 }
 export async function POST(request:NextRequest){
@@ -24,6 +24,6 @@ export async function POST(request:NextRequest){
  if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
  const body=await request.json().catch(()=>null);
  if(typeof body?.event_key!=="string"||body.event_key.length>160||typeof body?.dismissed!=="boolean")return NextResponse.json({error:"Invalid request"},{status:400});
- try {await call(token,"epic_catchup_set_dismissed",{p_event_key:body.event_key,p_dismissed:body.dismissed});return NextResponse.json({ok:true});}
+ try {await call(a.token,"epic_catchup_set_dismissed",{p_event_key:body.event_key,p_dismissed:body.dismissed});return NextResponse.json({ok:true});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to update Catch-Up"},{status:500});}
 }
