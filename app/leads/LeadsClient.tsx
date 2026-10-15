@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
 import LeadWorkModal from "./LeadWorkModal";
+import LostReasonDialog from "../LostReasonDialog";
 import styles from "./Leads.module.css";
 
 export type SalesLead = {
@@ -117,38 +118,35 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
     finally{setBusyId(null);}
   }
 
+  const [lostLead,setLostLead]=useState<SalesLead|null>(null);
+  async function confirmLost(category:string,reason:string,note:string){if(!lostLead)return;const lead=lostLead;setBusyId(lead.id);setError("");try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"mark_lost",opportunity_id:lead.id,reason:`${category} | ${reason}`,note_text:note||null})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Could not mark lead lost.");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to mark lost.");setBusyId(null);}}
   async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
     let note="";
     if(kind==="retire"){
-      const entered=window.prompt("Why are you closing this abandoned cart?");
+      const entered=window.prompt("Why are you closing this sales opportunity?");
       if(entered===null)return;
       note=entered.trim();
       if(!note){setError("Add a short reason before closing the cart.");return;}
     }
-    if(kind==="mark_lost"){
-      const entered=window.prompt("Why was this abandoned cart lost?");
-      if(entered===null)return;
-      note=entered.trim();
-      if(!note){setError("Add a short reason before marking the cart lost.");return;}
-    }
+    if(kind==="mark_lost"){setLostLead(lead);return;}
     setBusyId(lead.id);setError("");
     try{
       const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         action:kind,
         opportunity_id:lead.id,
-        reason:kind==="retire"?"other":kind==="mark_lost"?"other":undefined,
+        reason:kind==="retire"?"other":undefined,
         note_text:note||undefined,
       })});
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload?.error||"Unable to update abandoned cart.");
+      if(!response.ok)throw new Error(payload?.error||"Unable to update sales opportunity.");
       window.location.reload();
-    }catch(e){setError(e instanceof Error?e.message:"Unable to update abandoned cart.");setBusyId(null);}
+    }catch(e){setError(e instanceof Error?e.message:"Unable to update sales opportunity.");setBusyId(null);}
   }
 
   return <>
-    <div className={styles.toolbar}><div><strong>Abandoned Carts {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
+    <div className={styles.toolbar}><div><strong>Sales Opportunities {filtered.length}</strong></div><input className={styles.search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, phone, email, activity…"/></div>
     <div className={styles.ownerFilterRow}>
-      <select className={styles.ownerSelect} value={owner} onChange={e=>setOwner(e.target.value)} aria-label="Filter abandoned carts by owner">
+      <select className={styles.ownerSelect} value={owner} onChange={e=>setOwner(e.target.value)} aria-label="Filter sales opportunities by owner">
         <option value="All">All</option>
         <option value="Unclaimed">Unclaimed</option>
         <optgroup label="Claimed">
@@ -214,6 +212,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       onOpenCustomer360={()=>{const lead=workLead;setWorkLead(null);if(lead)setSelected(lead);}}
       onLeadUpdated={()=>window.location.reload()}
     />:null}
+    {lostLead?<LostReasonDialog busy={busyId===lostLead.id} onCancel={()=>setLostLead(null)} onConfirm={confirmLost}/>:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
 }
