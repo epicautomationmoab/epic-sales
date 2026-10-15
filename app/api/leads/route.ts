@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
     note_id?: string;
     note_text?: string;
     reason?: string;
-    note_text?: string;
   } | null;
   const opportunityId = body?.opportunity_id?.trim();
   if (!opportunityId) return NextResponse.json({ error: "Lead is required." }, { status: 400 });
