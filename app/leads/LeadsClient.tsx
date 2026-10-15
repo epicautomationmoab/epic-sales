@@ -120,8 +120,18 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
 
   const [lostLead,setLostLead]=useState<SalesLead|null>(null);
   async function confirmLost(category:string,reason:string,note:string){if(!lostLead)return;const lead=lostLead;setBusyId(lead.id);setError("");try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"mark_lost",opportunity_id:lead.id,reason:`${category} | ${reason}`,note_text:note||null})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Could not mark lead lost.");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to mark lost.");setBusyId(null);}}
-  async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"){
+  async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"|"release_with_note"){
     let note="";
+    if(kind==="release_with_note"){
+      const reason=window.prompt("Why are you releasing this sales opportunity? (e.g. unable to follow up, reassignment requested)");
+      if(reason===null)return;
+      if(reason.trim().length<3){setError("A release reason is required.");return;}
+      const explanation=window.prompt("What should the next employee know? A written explanation is required.");
+      if(explanation===null)return;
+      if(explanation.trim().length<10){setError("Please enter at least 10 characters explaining the release.");return;}
+      setBusyId(lead.id);setError("");
+      try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"release_with_note",opportunity_id:lead.id,reason:reason.trim(),note_text:explanation.trim()})});const result=await response.json();if(!response.ok)throw Error(result.error||"Unable to release");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to release claim");setBusyId(null);}return;
+    }
     if(kind==="retire"){
       const entered=window.prompt("Why are you closing this sales opportunity?");
       if(entered===null)return;
@@ -169,6 +179,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       <td><div className={styles.rowActions} onClick={e=>e.stopPropagation()}>
         {!leadOwner?<button disabled={busyId===l.id} onClick={()=>void action(l,"claim")}>Claim</button>:null}
         {canIntroduce?<><button disabled={busyId===l.id} onClick={()=>setWorkLead(l)}>Work Lead</button><button disabled={busyId===l.id||queuedIntroIds.has(l.id)} onClick={()=>openIntroduction(l)}>{queuedIntroIds.has(l.id)?"Introduction Queued":"Email Introduction"}</button></>:null}
+        {leadOwner===profileName?<button disabled={busyId===l.id} onClick={()=>void action(l,"release_with_note")}>Release Claim</button>:null}
         <button disabled={busyId===l.id} onClick={()=>void action(l,"retire")}>Close</button>
         <button className={styles.lostAction} disabled={busyId===l.id} onClick={()=>void action(l,"mark_lost")}>Lost</button>
       </div></td>
