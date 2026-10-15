@@ -1,8 +1,8 @@
 "use client";
 import {useEffect,useState} from "react";
 type Member={id:string;display_name?:string;name?:string};
-export default function ScheduleFollowUp({opportunityId}:{opportunityId:string}){
- const [open,setOpen]=useState(false),[people,setPeople]=useState<Member[]>([]),[assignee,setAssignee]=useState(""),[title,setTitle]=useState(""),[date,setDate]=useState(""),[note,setNote]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+export default function ScheduleFollowUp({opportunityId,initialOpen=false,initialTitle=""}:{opportunityId:string;initialOpen?:boolean;initialTitle?:string}){
+ const [open,setOpen]=useState(initialOpen),[people,setPeople]=useState<Member[]>([]),[assignee,setAssignee]=useState(""),[title,setTitle]=useState(initialTitle),[date,setDate]=useState(""),[note,setNote]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
  useEffect(()=>{if(!open)return;fetch("/api/followups?scope=members",{cache:"no-store"}).then(r=>r.json()).then(x=>{setPeople(x.members||[]);setAssignee(x.profile||"")}).catch(()=>{});},[open]);
  async function save(){setBusy(true);setMessage("");try{const r=await fetch("/api/followups",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opportunity_id:opportunityId,title,due_at:date?new Date(date).toISOString():null,assigned_to_profile_id:assignee,context_note:note,source:"c360"})});const p=await r.json();if(!r.ok)throw Error(p.error||"Could not schedule");setMessage("Follow-up scheduled in My Catch-Up.");setOpen(false);setTitle("");setDate("");setNote("");}catch(e){setMessage(e instanceof Error?e.message:"Unable to schedule")}finally{setBusy(false)}}
  return <section style={{border:"1px solid #dbe2ea",borderRadius:12,padding:12,marginTop:10,background:"#fff"}}>
