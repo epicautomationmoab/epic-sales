@@ -19,7 +19,7 @@ const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "ping", href: "/epic-ping", label: "Epic Ping" },
   { key: "catch-up", href: "/my-catch-up", label: "My Catch-Up" },
   { key: "missed-calls", href: "/missed-calls", label: "Missed Calls" },
-  { key: "leads", href: "/leads", label: "Abandoned Cart" },
+  { key: "leads", href: "/leads", label: "Sales Opportunities" },
   { key: "quote", href: "/quote", label: "Quote Builder" },
   { key: "customers", href: "/customers", label: "C360" },
   { key: "phone-report", href: "/phone-report", label: "Phone Report" },
