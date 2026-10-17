@@ -35,7 +35,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
     setReviewing(true);setReviewMessage("");
     try{
       const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision,...(decision==="confirmed"?{primary_phone:primaryPhone,primary_email:primaryEmail||null}:{})})});
-      if(!response.ok)throw new Error("Could not save review");
+      if(!response.ok){const details=await response.json().catch(()=>null);throw new Error(details?.error||"Could not save review ("+response.status+")");}
       const result=await response.json();
       setMatches(previous=>previous.filter(m=>m!==candidate));
       setSelectedCandidate(null);
