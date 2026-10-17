@@ -32,8 +32,8 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
   }
   async function review(candidate:Candidate, decision:"confirmed"|"rejected"){
     const target=candidate.source_records?.find(r=>r.source_key&&(r.source_type==="sales_opportunity"||r.source_type==="call")&&!(r.source_type===sourceType&&r.source_key===sourceKey));
-    const leftType=sourceType|| (resolvedCallSource?"call":null);
-    const leftKey=sourceKey||resolvedCallSource;
+    const leftType=(sourceType==="call"||sourceType==="sales_opportunity")&&sourceKey?sourceType:(resolvedCallSource?"call":null);
+    const leftKey=(sourceType==="call"||sourceType==="sales_opportunity")&&sourceKey?sourceKey:resolvedCallSource;
     if(!leftType||!leftKey||!target){setReviewMessage("A verified source record is required for this decision.");return;}
     setReviewing(true);setReviewMessage("");
     try{
