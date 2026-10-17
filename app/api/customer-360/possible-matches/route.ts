@@ -46,7 +46,8 @@ export async function POST(request:NextRequest){
   const types=["sales_opportunity","sales_draft","call","tripworks_customer"];
   if(!types.includes(b.left_type)||!types.includes(b.right_type)||!["confirmed","rejected"].includes(b.decision)||typeof b.left_key!=="string"||typeof b.right_key!=="string"||!b.left_key||!b.right_key||b.left_key.length>120||b.right_key.length>120)return NextResponse.json({error:"Invalid match review."},{status:400});
   if(b.decision==="confirmed"){
-    const linked=await rpc(token,"c360_confirm_phone_identity",{p_left_type:b.left_type,p_left_key:b.left_key,p_right_type:b.right_type,p_right_key:b.right_key});
+    if(typeof b.primary_phone!=="string"||b.primary_phone.replace(/[^0-9]/g,"").length<10)return NextResponse.json({error:"Choose a primary phone before linking."},{status:400});
+    const linked=await rpc(token,"c360_confirm_phone_identity_with_primary",{p_left_type:b.left_type,p_left_key:b.left_key,p_right_type:b.right_type,p_right_key:b.right_key,p_primary_phone:b.primary_phone,p_primary_email:b.primary_email||null});
     return NextResponse.json({ok:true,recorded:true,history_linked:linked?.linked===true},{headers:{"Cache-Control":"no-store"}});
   }
   await rpc(token,"c360_employee_record_identity_review",{p_left_type:b.left_type,p_left_key:b.left_key,p_right_type:b.right_type,p_right_key:b.right_key,p_decision:b.decision});
