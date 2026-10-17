@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
+import { getAuthenticatedTeamProfile } from "../../../../lib/team-auth";
 
 const supabaseUrl=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 
