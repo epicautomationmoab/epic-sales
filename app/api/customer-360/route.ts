@@ -138,6 +138,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    // A caller with no reservation/lead still deserves a named, discoverable C360.
+    // Only fall back to CallRail when the canonical customer identity has no name.
+    if (customer?.identity && !customer.identity.name && body.p_phone) {
+      const callerName = await rpcNamed(session.accessToken, "c360_inbound_caller_name", {p_phone:body.p_phone}).catch(()=>null);
+      if (typeof callerName==="string" && callerName.trim()) {
+        customer.identity.name = callerName.trim();
+      }
+    }
 
     let pbxCalls:any[] = [];
     let pbxInboundCalls:any[] = [];
