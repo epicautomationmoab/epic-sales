@@ -164,6 +164,16 @@ export async function GET(request: NextRequest) {
         customer.identity.linked_phones=[...new Set([...(customer.identity.linked_phones||[]),linkedPhone])];
       }
     }
+    // Show the caller's number, not the Epic tracking line, on CallRail timeline entries.
+    if(Array.isArray(customer?.calls)){
+      const callIds=customer.calls.map((c:any)=>String(c.id||"")).filter((id:string)=>id.startsWith("CAL"));
+      if(callIds.length){
+        const origins=await rpcNamed(session.accessToken,"c360_employee_call_origins",{p_call_ids:callIds}).catch(()=>({}));
+        for(const call of customer.calls){
+          if(origins?.[call.id])call.customer_phone_number=origins[call.id];
+        }
+      }
+    }
     // Primary choices are explicit; opening the secondary number cannot promote it.
     if(currentPhone.length===10 && customer?.identity){
       const primary=await rpcNamed(session.accessToken,"c360_linked_primary_contact",{p_phone:currentPhone}).catch(()=>null);
