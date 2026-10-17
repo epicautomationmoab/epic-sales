@@ -16,8 +16,9 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
     try{
       const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision})});
       if(!response.ok)throw new Error("Could not save review");
+      const result=await response.json();
       setMatches(previous=>previous.filter(m=>m!==candidate));
-      setReviewMessage(decision==="confirmed"?"Same-person decision recorded. Histories are not yet linked.":"Not-the-same-person decision recorded.");
+      setReviewMessage(decision==="confirmed"?(result.history_linked?"Confirmed. Both phone histories are now linked. Reopen C360 to see the combined timeline.":"Confirmation recorded; history link is not yet available."):"Not-the-same-person decision recorded.");
     }catch(e){setReviewMessage(e instanceof Error?e.message:"Unable to save decision.");}
     finally{setReviewing(false);}
   }
