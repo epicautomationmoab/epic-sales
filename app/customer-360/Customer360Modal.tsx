@@ -203,8 +203,9 @@ export default function Customer360Modal(props:Props){
             const outbound=t.direction==="outbound";
             return <div key={t.id} style={{display:"flex",justifyContent:outbound?"flex-end":"flex-start"}}>
               <div style={{maxWidth:"83%",padding:"11px 13px",borderRadius:12,background:outbound?"#dbecff":"#fff",border:"1px solid #dfe5eb",overflowWrap:"anywhere"}}>
-                <div style={{whiteSpace:"pre-wrap",fontSize:14}}>{t.body}</div>
-                <div style={{fontSize:11,color:"#677486",marginTop:7}}>{outbound?(t.agent_name||"Epic team"):(identity?.name||"Customer")} · {fmtDateTime(t.at)}{t.status?" · "+t.status:""}</div>
+                {t.body?<div style={{whiteSpace:"pre-wrap",fontSize:14}}>{t.body}</div>:null}
+                {t.provider==="podium"&&(mediaByEvent[t.id.slice(7)]||[]).map(media=><a key={media.id} href={"/api/message-media?id="+encodeURIComponent(media.id)} target="_blank" rel="noreferrer" style={{display:"inline-block",margin:"7px 7px 0 0"}}><img src={"/api/message-media?id="+encodeURIComponent(media.id)} alt="Guest photo" loading="lazy" style={{width:170,height:128,objectFit:"cover",borderRadius:8,border:"1px solid #ddd"}}/></a>)}
+                <div style={{fontSize:11,color:"#677486",marginTop:7}}>{outbound?(t.agent_name||"Epic team"):(identity?.name||"Customer")} · {fmtDateTime(t.at)}{t.provider==="podium"?(outbound?" · sent":" · received"):(t.status?" · "+t.status:"")}</div>
                 <div style={{fontSize:11,color:"#677486",marginTop:3}}>Epic SMS: {t.epic_number||"Number unavailable"}{t.provider==="podium"?" · Podium":""}</div>
               </div>
             </div>;
