@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
+import ReadinessContactReview from "./ReadinessContactReview";
 type Method={id:string|null;type:"phone"|"email";value:string;primary:boolean};
 const formatPhone=(v:string)=>{const digits=v.replace(/\D/g,"");return digits.length===11&&digits.startsWith("1")?`(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`:digits.length===10?`(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`:v;};
 const actionStyle={padding:"7px 11px",borderRadius:8,border:"1px solid #d7deea",background:"#fff",color:"#334155",fontSize:12,fontWeight:700,cursor:"pointer"} as const;
@@ -61,6 +62,7 @@ export default function ContactIdentityEditor({name,phone}:Props){
     </div>
    </div>:null}
    </div>)}
+   {linked&&phone?<ReadinessContactReview phone={phone}/>:null}
    {status?<p role="status" style={{fontSize:12}}>{status}</p>:null}
    <div style={{textAlign:"right",marginTop:12}}><button type="button" style={actionStyle} onClick={()=>setOpen(false)}>Close</button></div>
   </section>:null}
