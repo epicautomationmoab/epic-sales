@@ -23,6 +23,8 @@ export async function GET(request:NextRequest){
   const rows=await rpc(token,"c360_employee_match_suggestions",{p_name:name,p_phone:p.get("phone")||null,p_email:p.get("email")||null,p_source_type:p.get("source_type")||null,p_source_key:p.get("source_key")||null});
   const normalizePhone=(value:unknown)=>String(value||"").replace(/[^0-9]/g,"").slice(-10);
   const currentPhone=normalizePhone(p.get("phone"));
+  const linked= currentPhone.length===10 ? await rpc(token,"c360_linked_phones",{p_phone:currentPhone}).catch(()=>[]) : [];
+  const linkedNumbers=new Set((Array.isArray(linked)?linked:[]).map(normalizePhone));
   const currentEmail=String(p.get("email")||"").trim().toLowerCase();
   const currentType=p.get("source_type"),currentKey=p.get("source_key");
   const matches=(Array.isArray(rows)?rows:[]).map((row:any)=>{
@@ -31,7 +33,7 @@ export async function GET(request:NextRequest){
   }).filter((row:any)=>{
     const phone=normalizePhone(row.candidate_phone);
     const email=String(row.candidate_email||"").trim().toLowerCase();
-    if(currentPhone.length===10&&phone===currentPhone)return false;
+    if(currentPhone.length===10&&(phone===currentPhone||linkedNumbers.has(phone)))return false;
     if(currentEmail&&email&&currentEmail===email)return false;
     return row.source_records.length>0;
   });
