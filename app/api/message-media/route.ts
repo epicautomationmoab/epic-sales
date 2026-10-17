@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 
-const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/$/,"");
+const BASE=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/$/,"");
 const SERVICE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BUCKET="c360-message-media";
 type MediaRow={id:string;provider_event_id:string;storage_path:string|null;content_type:string|null;ingestion_status:string};
