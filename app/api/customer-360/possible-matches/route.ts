@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
+import { getAuthenticatedTeamProfile } from "../../../../lib/team-auth";
 
 const url=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 export async function GET(request:NextRequest){
