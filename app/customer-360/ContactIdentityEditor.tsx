@@ -1,39 +1,64 @@
 "use client";
-import {useState} from "react";
-
+import {useEffect,useState} from "react";
+type Method={id:string|null;type:"phone"|"email";value:string;primary:boolean};
 type Props={name:string|null|undefined;phone:string|null|undefined;email:string|null|undefined;contactId:string|null|undefined};
-export default function ContactIdentityEditor({name,phone,email,contactId}:Props){
+export default function ContactIdentityEditor({name,phone}:Props){
  const [open,setOpen]=useState(false);
- const [primaryPhone,setPrimaryPhone]=useState(phone||"");
- const [primaryEmail,setPrimaryEmail]=useState(email||"");
+ const [methods,setMethods]=useState<Method[]>([]);
+ const [linked,setLinked]=useState(false);
+ const [loading,setLoading]=useState(false);
  const [status,setStatus]=useState("");
- const [checking,setChecking]=useState(false);
- const [knownPhones,setKnownPhones]=useState<string[]>([]);
- const [knownEmail,setKnownEmail]=useState("");
- async function loadContacts(){if(!phone)return;try{const response=await fetch("/api/customer-360?phone="+encodeURIComponent(phone),{cache:"no-store"});const result=await response.json();if(response.ok){const phones=[...new Set([phone,...(result.customer?.identity?.linked_phones||[])].filter(Boolean))];setKnownPhones(phones);setKnownEmail(result.customer?.identity?.email||email||"");}}catch{}}
- async function check(){
-  setChecking(true);setStatus("");
+ const [type,setType]=useState<"phone"|"email">("phone");
+ const [value,setValue]=useState("");
+ const [editing,setEditing]=useState<Method|null>(null);
+ async function load(){if(!phone)return;setLoading(true);setStatus("");try{
+  const res=await fetch("/api/customer-360/contact-methods?phone="+encodeURIComponent(phone),{cache:"no-store"});
+  const result=await res.json();if(!res.ok)throw new Error(result.error||"Unable to load contacts");
+  setMethods(result.methods||[]);setLinked(Boolean(result.linked));
+ }catch(e){setStatus(e instanceof Error?e.message:"Unable to load contacts");}finally{setLoading(false);}}
+ useEffect(()=>{if(open)void load();},[open,phone]);
+ async function change(action:"add"|"remove"|"primary",methodType:"phone"|"email",methodValue:string,makePrimary=false){
+  setLoading(true);setStatus("");
   try{
-   const response=await fetch("/api/customer-360/contact-match-preflight",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:primaryPhone,email:primaryEmail,contact_id:contactId||null})});
-   const result=await response.json();
-   if(!response.ok)throw new Error(result.error||"Unable to check contact pair.");
-   setStatus(result.exact_matches?.length
-     ?`Exact contact pair already exists on ${result.exact_matches.length} other customer record(s). No changes saved.`
-     :"No exact-match collision found in registered contact records. No changes saved.");
-  }catch(error){setStatus(error instanceof Error?error.message:"Validation unavailable.");}
-  finally{setChecking(false);}
+   const res=await fetch("/api/customer-360/contact-methods",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,action,type:methodType,value:methodValue,make_primary:makePrimary})});
+   const result=await res.json();if(!res.ok)throw new Error(result.error||"Unable to save contact change");
+   setMethods(result.methods||[]);setStatus("Saved. Reopen C360 to refresh the header.");
+   setEditing(null);setValue("");
+  }catch(e){setStatus(e instanceof Error?e.message:"Unable to save");}finally{setLoading(false);}
  }
- async function save(){setChecking(true);setStatus("");try{const response=await fetch("/api/customer-360/primary-contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,primary_phone:primaryPhone,primary_email:primaryEmail})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Unable to save");setStatus("Primary contacts saved. Reopen C360 to refresh the header.");}catch(e){setStatus(e instanceof Error?e.message:"Save failed");}finally{setChecking(false);}}
- return <div style={{display:"inline-block",position:"relative"}}>
-  <button type="button" onClick={()=>{setPrimaryPhone(phone||"");setPrimaryEmail(email||"");setStatus("");setOpen(v=>!v);void loadContacts();}} aria-expanded={open} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",color:"#334155",fontSize:12,fontWeight:700,cursor:"pointer"}}>Edit contact details</button>
-  {open?<div role="region" aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(360px,80vw)",padding:15,display:"grid",gap:10,background:"#fff",border:"1px solid #cbd5e1",borderRadius:10,boxShadow:"0 12px 28px #0002",color:"#172033"}}>
-    <strong>{name||"Customer"} — contact details</strong>
-    {knownPhones.length>1?<div style={{fontSize:12}}>Known numbers: {knownPhones.join(" · ")}. Other numbers stay available as secondary contacts.</div>:null}
-    <label style={{fontSize:12}}>Primary phone<input aria-label="Primary phone" type="tel" value={primaryPhone} onChange={e=>setPrimaryPhone(e.target.value)} style={{display:"block",width:"100%",padding:8,boxSizing:"border-box"}}/></label>
-    <label style={{fontSize:12}}>Primary email<input aria-label="Primary email" type="email" value={primaryEmail} onChange={e=>setPrimaryEmail(e.target.value)} style={{display:"block",width:"100%",padding:8,boxSizing:"border-box"}}/></label>
-    <p style={{fontSize:12,color:"#64748b",margin:0}}>Only existing confirmed linked phone numbers and known emails can be selected. Reservation contact information in Readiness is not changed.</p>
-    {status?<div role="status" style={{fontSize:12}}>{status}</div>:null}
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><button type="button" onClick={()=>setOpen(false)}>Close</button><button type="button" disabled={checking} onClick={()=>void check()}>{checking?"Checking…":"Check exact match"}</button><button type="button" disabled={checking||knownPhones.length<2} onClick={()=>void save()}>Save primary</button></div>
-  </div>:null}
+ return <div style={{position:"relative",display:"inline-block"}}>
+  <button type="button" onClick={()=>setOpen(v=>!v)} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",fontWeight:700,fontSize:12}}>Edit contact details</button>
+  {open?<section aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(420px,85vw)",maxHeight:"75vh",overflowY:"auto",padding:16,background:"white",border:"1px solid #cbd5e1",borderRadius:12,boxShadow:"0 12px 28px #0002",color:"#172033"}}>
+   <strong>{name||"Customer"} — contact details</strong>
+   <p style={{fontSize:12,color:"#64748b"}}Edit preferred contact information or add another way to reach this customer.</p>
+   {loading?<p style={{fontSize:12}}>Saving or loading…</p>:null}
+   {!linked?<p style={{fontSize:12}}>Contact editing is available for confirmed linked customers.</p>:null}
+   {(["phone","email"] as const).map(t=><div key={t} style={{margin:"12px 0"}}>
+    <strong>{t==="phone"?"Phone numbers":"Email addresses"}</strong>
+    {methods.filter(m=>m.type===t).map(m=><div key={m.id||m.value} style={{padding:"9px 0",borderBottom:"1px solid #e2e8f0"}}>
+     <div style={{overflowWrap:"anywhere",fontSize:12}}>{m.value} {m.primary?<strong style={{color:"#6d28d9"}}>· Primary</strong>:<span style={{color:"#64748b"}}>· Additional</span>}</div>
+     <div style={{display:"flex",gap:8,marginTop:5,flexWrap:"wrap"}}>
+      {!m.primary?<button type="button" disabled={loading} onClick={()=>void change("primary",m.type,m.value)}>Make primary</button>:null}
+      <button type="button" disabled={loading} onClick={()=>{setType(m.type);setEditing(m);setValue(m.value);}}>Edit</button>
+      {!m.primary&&m.id?<button type="button" disabled={loading} onClick={()=>void change("remove",m.type,m.value)}>Remove</button>:null}
+     </div>
+    </div>)}
+    {methods.filter(m=>m.type===t).length===0?<p style={{fontSize:12}}>No {t} on file.</p>:null}
+    <button type="button" disabled={!linked||loading} onClick={()=>{setType(t);setEditing(null);setValue("");}} style={{marginTop:8}}>+ Add {t}</button>
+   </div>)}
+   {linked?<div style={{border:"1px solid #c4b5fd",borderRadius:9,padding:10,background:"#faf9ff"}}>
+    <strong>{editing?"Edit "+editing.type:"Add "+type}</strong>
+    <input aria-label="Contact value" type={type==="email"?"email":"tel"} value={value} onChange={e=>setValue(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:8,margin:"8px 0"}} placeholder={type==="phone"?"Phone number":"Email address"}/>
+    <div style={{display:"flex",gap:8}}>
+     <button type="button" disabled={loading||!value.trim()} onClick={async()=>{
+      if(editing){await change("add",type,value,editing.primary);if(!editing.primary)await change("remove",editing.type,editing.value);}
+      else await change("add",type,value);
+     }}>Save contact</button>
+     <button type="button" onClick={()=>{setEditing(null);setValue("");}}>Cancel</button>
+    </div>
+   </div>:null}
+   {status?<p role="status" style={{fontSize:12}}>{status}</p>:null}
+   <div style={{textAlign:"right",marginTop:12}}><button type="button" onClick={()=>setOpen(false)}>Close</button></div>
+  </section>:null}
  </div>;
 }
