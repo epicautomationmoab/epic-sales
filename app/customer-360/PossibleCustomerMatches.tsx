@@ -12,6 +12,23 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
   const [selectedCandidate,setSelectedCandidate]=useState<Candidate|null>(null);
   const [primaryPhone,setPrimaryPhone]=useState("");
   const [primaryEmail,setPrimaryEmail]=useState("");
+  const [inspectCandidate,setInspectCandidate]=useState<Candidate|null>(null);
+  const [inspectData,setInspectData]=useState<any>(null);
+  const [inspectLoading,setInspectLoading]=useState(false);
+  const [inspectError,setInspectError]=useState("");
+  async function inspect(candidate:Candidate){
+    setInspectCandidate(candidate);setInspectData(null);setInspectError("");setInspectLoading(true);
+    try{
+      const q=new URLSearchParams();
+      if(candidate.candidate_phone)q.set("phone",candidate.candidate_phone);
+      if(candidate.candidate_email)q.set("email",candidate.candidate_email);
+      const res=await fetch("/api/customer-360?"+q.toString(),{cache:"no-store"});
+      const body=await res.json();
+      if(!res.ok)throw new Error(body.error||"Could not load the other customer.");
+      setInspectData(body.customer);
+    }catch(err){setInspectError(err instanceof Error?err.message:"Unable to load history.");}
+    finally{setInspectLoading(false);}
+  }
   async function review(candidate:Candidate, decision:"confirmed"|"rejected"){
     const target=candidate.source_records?.find(r=>r.source_key&&r.source_type&&!(r.source_type===sourceType&&r.source_key===sourceKey));
     if(!sourceType||!sourceKey||!target)return;
