@@ -26,7 +26,28 @@ export async function GET(request:NextRequest){
       digits(phone).length===10&&digits(String(r.candidate_phone||""))===digits(phone)&&
       email.length>0&&String(r.candidate_email||"").toLowerCase()===email.toLowerCase()
     ));
-    return NextResponse.json({matches},{headers:{"Cache-Control":"no-store"}});
+    const sourceType=request.nextUrl.searchParams.get("source_type")||"";
+    const sourceKey=request.nextUrl.searchParams.get("source_key")||"";
+    const types=["sales_opportunity","sales_draft","call","tripworks_customer"];
+    let visible=matches;
+    if(types.includes(sourceType)&&sourceKey.length>0&&sourceKey.length<=120){
+      const isSelf=(record:any)=>record?.source_type===sourceType&&record?.source_key===sourceKey;
+      const first=encodeURIComponent(sourceType);
+      const second=encodeURIComponent(sourceKey);
+      const filters=`or=(and(left_source_type.eq.${first},left_source_key.eq.${second}),and(right_source_type.eq.${first},right_source_key.eq.${second}))`;
+      const reviews=await fetch(url+"/rest/v1/c360_identity_review_decisions?select=left_source_type,left_source_key,right_source_type,right_source_key,decision&"+filters,{
+        cache:"no-store",headers:{"apikey":key,"Authorization":"Bearer "+key}
+      });
+      if(!reviews.ok)throw new Error("Review history unavailable ("+reviews.status+").");
+      const decisions=await reviews.json() as Array<{left_source_type:string;left_source_key:string;right_source_type:string;right_source_key:string;decision:string}>;
+      const reviewed=new Set(decisions.map(d=>d.left_source_type===sourceType&&d.left_source_key===sourceKey
+        ?d.right_source_type+":"+d.right_source_key:d.left_source_type+":"+d.left_source_key));
+      visible=matches.map((match:any)=>({
+        ...match,
+        source_records:(Array.isArray(match.source_records)?match.source_records:[]).filter((record:any)=>!isSelf(record)&&!reviewed.has(record.source_type+":"+record.source_key))
+      })).filter((match:any)=>match.source_records.length>0);
+    }
+    return NextResponse.json({matches:visible},{headers:{"Cache-Control":"no-store"}});
   }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Match lookup unavailable."},{status:502});}
 }
 
