@@ -72,6 +72,17 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
         <button type="button" onClick={()=>void inspect(m)} style={{display:"block",padding:"6px 0",border:0,background:"transparent",color:"#6d28d9",textDecoration:"underline",fontWeight:700,cursor:"pointer"}}>View C360 →</button>
         {sourceType&&sourceKey&&m.source_records?.length?<div style={{display:"flex",gap:7,marginTop:8}}><button type="button" disabled={reviewing} onClick={()=>{setSelectedCandidate(m);setPrimaryPhone(m.candidate_phone||phone||"");setPrimaryEmail(m.candidate_email||email||"");}} style={{flex:1,padding:"9px 12px",border:"none",borderRadius:9,background:"linear-gradient(110deg,#7c3aed 0%,#ce3b91 45%,#f97316 100%)",boxShadow:"0 3px 10px rgba(190,50,125,.2)",color:"#fff",fontSize:12,fontWeight:800,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>✓ Same person</button><button type="button" disabled={reviewing} onClick={()=>void review(m,"rejected")} style={{flex:1,padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:9,background:"linear-gradient(120deg,#f8fafc 0%,#e2e8f0 100%)",color:"#334155",fontSize:12,fontWeight:750,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>Not same person</button></div>:null}
       </div>)}
+      {inspectCandidate?<section aria-label="Suggested customer history" style={{marginTop:12,padding:12,border:"1px solid #c4b5fd",borderRadius:10,background:"#f8fafc"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong>Other C360 · Read only</strong><button type="button" onClick={()=>setInspectCandidate(null)}>Return to match review</button></div>
+        <div style={{marginTop:6,fontSize:12}}>{inspectCandidate.candidate_name} · {inspectCandidate.candidate_phone||inspectCandidate.candidate_email}</div>
+        {inspectLoading?<p>Loading history…</p>:inspectError?<p role="alert">{inspectError}</p>:inspectData?<div style={{marginTop:10,fontSize:12}}>
+          {(["calls","texts","emails","reservations","opportunities","drafts","quotes","team_thread_notes"] as const).map(key=>{
+            const items=Array.isArray(inspectData[key])?inspectData[key]:[];
+            return <div key={key} style={{borderTop:"1px solid #e2e8f0",padding:"6px 0"}}><strong>{key.replace(/_/g," ")} · {items.length}</strong>{items.slice(0,3).map((item:any,i:number)=><p key={String(item.id||i)} style={{margin:"4px 0",color:"#475569"}}>{String(item.at||item.created_at||item.start_time||"").slice(0,16)} {String(item.summary||item.subject||item.experience_name||item.body||item.customer_name||"").slice(0,180)}</p>)}</div>;
+          })}
+          <p style={{color:"#64748b"}}Inspection only. No records changed.</p>
+        </div>:null}
+      </section>:null}
       {selectedCandidate?<div role="dialog" aria-modal="true" aria-label="Confirm customer identity and primary contacts" style={{position:"relative",padding:14,marginTop:12,border:"1px solid #c4b5fd",borderRadius:12,background:"#faf9ff"}}>
         <strong>Confirm customer match</strong><p style={{fontSize:12,color:"#475569"}}>Choose one primary phone and email before linking. Both phone histories will be preserved.</p>
         <div style={{fontWeight:700,marginBottom:5}}>Primary phone</div>
