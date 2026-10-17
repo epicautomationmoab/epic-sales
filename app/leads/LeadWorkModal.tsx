@@ -123,6 +123,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
 
   async function save(){
     if(!objection||!outcome){setStatus("Choose the main objection and the call outcome first.");return;}
+    if(outcome==="follow_up"&&!followUp){setStatus("Choose a follow-up date so the commitment appears in My Catch-Up.");return;}
     if(outcome==="do_not_contact"){setStatus("Do Not Contact requires a verified contact-suppression step before closing. Please use the existing suppression workflow.");return;}
     setSaving(true);setStatus("");
     try{
@@ -147,7 +148,7 @@ export default function LeadWorkModal({lead,profileName,onClose,onOpenIntroducti
         const closeBody=await close.json().catch(()=>({}));
         if(!close.ok)throw new Error(closeBody?.error||"Call saved, but lead could not be closed.");
       }
-      setStatus(outcome==="lost"?"Call saved; lead closed as lost.":"Call saved to the lead.");
+      setStatus(outcome==="lost"?"Call saved; lead closed as lost.":outcome==="follow_up"?(p.followupScheduled?"Call saved and follow-up scheduled in My Catch-Up.":"Call saved, but follow-up was NOT scheduled: "+(p.followupError||"Please try again.")):"Call saved to the lead.");
       if(outcome==="lost")onLeadUpdated();
     }catch(e){setStatus(e instanceof Error?e.message:"Unable to save call.");}
     finally{setSaving(false);}
