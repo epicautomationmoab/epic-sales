@@ -108,6 +108,7 @@ function mergeCallRailWithPbxInbound(callrailCalls:any[],pbxInboundCalls:any[]) 
       lead_score:call.lead_score??null,
       lead_explanation:call.lead_explanation||null,
       source_name:call.source_name||"Grandstream PBX",
+      customer_phone_number:call.customer_phone_number||null,
       campaign:call.campaign||null,
       matched_reservation_id:call.matched_reservation_id||null,
       matched_opportunity_id:call.matched_opportunity_id||null,
