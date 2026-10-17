@@ -137,7 +137,32 @@ export async function GET(request: NextRequest) {
   if (!Object.values(body).some(Boolean)) return NextResponse.json({ error: "Customer identity is required." }, { status: 400 });
 
   try {
-    const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    let customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    // Add source histories only after an employee has explicitly confirmed the phone relationship.
+    const currentPhone=String(customer?.identity?.phone||body.p_phone||"").replace(/[^0-9]/g,"").slice(-10);
+    if(currentPhone.length===10){
+      const linkedPhones=await rpcNamed(session.accessToken,"c360_linked_phones",{p_phone:currentPhone}).catch(()=>[]);
+      for(const linkedPhone of Array.isArray(linkedPhones)?linkedPhones.slice(0,8):[]){
+        if(String(linkedPhone)===currentPhone)continue;
+        const other=normalizeCustomerReservationTimes(await rpcNamed(session.accessToken,"get_epic_customer_360",{
+          p_contact_id:null,p_opportunity_id:null,p_reservation_id:null,p_phone:linkedPhone,p_email:null
+        }));
+        if(!other)continue;
+        for(const key of ["calls","texts","emails","reservations","opportunities","drafts","quotes","notes"]){
+          const left=Array.isArray(customer?.[key])?customer[key]:[];
+          const right=Array.isArray(other?.[key])?other[key]:[];
+          const dedup=new Map<string,any>();
+          for(const item of [...left,...right]){
+            const id=String(item?.id||item?.confirmation_code||JSON.stringify(item));
+            if(!dedup.has(id))dedup.set(id,item);
+          }
+          customer[key]=[...dedup.values()];
+        }
+        if(!customer?.identity?.email && other?.identity?.email)customer.identity.email=other.identity.email;
+        if(!customer?.identity?.name && other?.identity?.name)customer.identity.name=other.identity.name;
+        customer.identity.linked_phones=[...new Set([...(customer.identity.linked_phones||[]),linkedPhone])];
+      }
+    }
     // A caller with no reservation/lead still deserves a named, discoverable C360.
     // Only fall back to CallRail when the canonical customer identity has no name.
     if (customer?.identity && !customer.identity.name && body.p_phone) {
