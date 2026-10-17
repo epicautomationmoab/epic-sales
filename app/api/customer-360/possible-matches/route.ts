@@ -35,7 +35,8 @@ export async function GET(request:NextRequest){
     if(currentEmail&&email&&currentEmail===email)return false;
     return row.source_records.length>0;
   });
-  return NextResponse.json({matches},{headers:{"Cache-Control":"no-store"}});
+  const currentCallSource=await rpc(token,"c360_employee_call_source_for_phone",{p_phone:p.get("phone")||null}).catch(()=>null);
+  return NextResponse.json({matches,current_call_source:currentCallSource},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Match lookup unavailable."},{status:502});}
 }
 export async function POST(request:NextRequest){
