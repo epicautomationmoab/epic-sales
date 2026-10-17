@@ -27,6 +27,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
     const q=new URLSearchParams({name});
     if(phone)q.set("phone",phone);
     if(email)q.set("email",email);
+    if(sourceType&&sourceKey){q.set("source_type",sourceType);q.set("source_key",sourceKey);}
     setLoading(true);setError("");
     fetch("/api/customer-360/possible-matches?"+q,{signal:controller.signal,cache:"no-store"})
       .then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||"Unable to search.");return data;})
@@ -34,7 +35,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
       .catch(e=>{if(e.name!=="AbortError")setError(e.message||"Lookup failed.");})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
-  },[open,name,phone,email]);
+  },[open,name,phone,email,sourceType,sourceKey]);
   if(!name||name.trim().length<3)return null;
   return <div style={{position:"relative",display:"inline-block"}}>
     <button type="button" aria-expanded={open} onClick={()=>setOpen(v=>!v)} style={{border:"1px solid #cbd5e1",borderRadius:7,padding:"7px 10px",background:"#fff",color:"#334155",cursor:"pointer",fontSize:12,fontWeight:700}}>Possible matches ▾</button>
