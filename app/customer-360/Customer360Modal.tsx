@@ -38,10 +38,13 @@ const outcomeLabels:Record<string,string>={booked:"Booked on the call",quote:"Se
 
 export default function Customer360Modal(props:Props){
   const{open,onClose,contactId,opportunityId,reservationId,reservationConfirmation,phone,email}=props;
-  const[data,setData]=useState<Customer360|null>(null);const[leadSheets,setLeadSheets]=useState<Array<{id:string;fields:Record<string,any>;updated_at:string}>>([]);const[editSheet,setEditSheet]=useState<string|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");const[textTransport,setTextTransport]=useState<"callrail"|"podium">("callrail");
+  const[data,setData]=useState<Customer360|null>(null);const[leadSheets,setLeadSheets]=useState<Array<{id:string;fields:Record<string,any>;updated_at:string}>>([]);const[editSheet,setEditSheet]=useState<string|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");const[textTransport,setTextTransport]=useState<string>("callrail");
   useEffect(()=>{
     const mostRecent=[...(data?.texts||[])].sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())[0];
-    setTextTransport(mostRecent?.provider==="podium"?"podium":"callrail");
+    if(mostRecent?.provider==="telnyx")setTextTransport("telnyx");
+    else if(mostRecent?.provider==="podium"&&mostRecent.conversation_uid)setTextTransport("podium:"+mostRecent.conversation_uid);
+    else if(mostRecent?.provider==="callrail"&&mostRecent.epic_number)setTextTransport("callrail:"+mostRecent.epic_number);
+    else setTextTransport("callrail");
   },[data?.texts]);
 
   useEffect(()=>{if(!open)return;const id=setInterval(()=>{if(document.visibilityState==="visible"&&!sending){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(phone)q.set("phone",phone);if(email)q.set("email",email);fetch("/api/customer-360?"+q,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(p=>{if(p?.customer)setData(p.customer);}).catch(()=>{});}},12000);return()=>clearInterval(id);},[open,sending,contactId,phone,email]);
@@ -97,6 +100,22 @@ export default function Customer360Modal(props:Props){
 
   const visibleTimeline=useMemo(()=>timeline.filter(item=>filter==="all"?true:filter==="reservation"?(item.kind==="reservation"||item.kind==="agreement"):filter==="call"?(item.kind==="call"||item.kind==="sales_call"):item.kind===filter),[timeline,filter]);
 
+  const replyRoutes=useMemo(()=>{
+    const routes:Array<{value:string;label:string}>=[];
+    for(const t of [...(data?.texts||[])].sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())){
+      if(t.provider==="telnyx"&&t.direction==="inbound"){
+        if(!routes.some(r=>r.value==="telnyx"))routes.push({value:"telnyx",label:"Telnyx — 7775"});
+      }else if(t.provider==="podium"&&t.conversation_uid){
+        const value="podium:"+t.conversation_uid;
+        if(!routes.some(r=>r.value===value))routes.push({value,label:"Podium — 2700"});
+      }else if(t.provider==="callrail"&&t.epic_number){
+        const value="callrail:"+t.epic_number;
+        if(!routes.some(r=>r.value===value))routes.push({value,label:"CallRail — "+t.epic_number});
+      }
+    }
+    if(!routes.some(r=>r.value.startsWith("callrail")))routes.push({value:"callrail",label:"CallRail (existing texting)"});
+    return routes;
+  },[data?.texts]);
   async function sendTextInline(){await sendCommunication("text");}
 
   async function sendCommunication(channelOverride?:"text"|"email"){
@@ -105,11 +124,14 @@ export default function Customer360Modal(props:Props){
     try{
       const reservation=(data.reservations||[]).find(r=>!r.is_cancelled)||(data.reservations||[])[0]||null;
       const opportunity=(data.opportunities||[]).find(o=>o.status==="open")||(data.opportunities||[])[0]||null;
-      const podiumConversation=[...(data.texts||[])].filter(t=>t.provider==="podium"&&t.conversation_uid).sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())[0]?.conversation_uid;
-      if(channel==="text"&&textTransport==="podium"&&!podiumConversation)throw new Error("No verified Podium conversation to reply to.");
-      const target=channel==="text"&&textTransport==="podium"?"/api/podium-text":"/api/customer-communications";
+      const viaPodium=channel==="text"&&textTransport.startsWith("podium:");
+      const viaTelnyx=channel==="text"&&textTransport==="telnyx";
+      const podiumConversation=viaPodium?textTransport.slice("podium:".length):null;
+      if(viaPodium&&!podiumConversation)throw new Error("No verified Podium conversation to reply to.");
+      const target=viaPodium?"/api/podium-text":viaTelnyx?"/api/telnyx-text":"/api/customer-communications";
       const r=await fetch(target,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        ...(channel==="text"&&textTransport==="podium"?{conversation_uid:podiumConversation}:{}),
+        ...(viaPodium?{conversation_uid:podiumConversation}:{}),
+        ...(channel==="text"&&textTransport.startsWith("callrail:")?{tracking_number:textTransport.slice("callrail:".length)}:{}),
         channel,
         confirmation:reservation?.confirmation_code||reservationConfirmation||null,
         opportunity_id:opportunity?.id||opportunityId||null,
@@ -122,7 +144,7 @@ export default function Customer360Modal(props:Props){
       })});
       const p=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(typeof p?.error === "string" ? p.error : "Unable to send message. No confirmation was received.");
-      if(channel==="text"&&textTransport==="podium"){
+      if(viaPodium){
         const outgoing=composeBody.trim();
         setPendingPodium(current=>[...current,{
           id:"podium-local:"+String(p.message_uid||Date.now()),
@@ -132,7 +154,7 @@ export default function Customer360Modal(props:Props){
           customer_number:data.identity.phone,provider:"podium",conversation_uid:podiumConversation
         }]);
       }
-      const wasText=channel==="text";setComposeBody("");setSendStatus(wasText?(textTransport==="podium"?"Text sent via Podium 2700.":"Text sent via CallRail."):"Email sent.");setComposeChannel(null);
+      const wasText=channel==="text";setComposeBody("");setSendStatus(wasText?(viaPodium?"Text sent via Podium 2700.":viaTelnyx?"Text sent via Telnyx 7775.":"Text sent via CallRail."):"Email sent.");setComposeChannel(null);
       if(wasText){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(opportunityId)q.set("opportunity",opportunityId);if(reservationId)q.set("reservation",reservationId);if(reservationConfirmation)q.set("confirmation",reservationConfirmation);if(phone)q.set("phone",phone);if(email)q.set("email",email);const refreshed=await fetch(`/api/customer-360?${q}`,{cache:"no-store"});if(refreshed.ok){const body=await refreshed.json();if(body.customer)setData(body.customer);}}
     }catch(e){setError(e instanceof Error?e.message:"Unable to send message.");}
     finally{setSending(false);}
@@ -212,8 +234,8 @@ export default function Customer360Modal(props:Props){
           })}
         </div>
         <div style={{display:"grid",gap:8}}>
-          <label style={{fontSize:12,fontWeight:750}}>Send reply using <select aria-label="Text reply provider" value={textTransport} onChange={e=>setTextTransport(e.target.value as "callrail"|"podium")} style={{marginLeft:8,padding:7,borderRadius:7}}><option value="callrail">CallRail (existing texting)</option>{(data.texts||[]).some(t=>t.provider==="podium"&&t.conversation_uid)?<option value="podium">Podium — 2700</option>:null}</select></label>
-          <div style={{fontSize:12,color:"#5d6776"}}>Reply to {identity?.phone||"customer"} using {textTransport==="podium"?"Podium 2700":"the existing CallRail texting service"}. Select Podium when replying to a 2700 conversation.</div>
+          <label style={{fontSize:12,fontWeight:750}}>Send reply using <select aria-label="Text reply provider" value={textTransport} onChange={e=>setTextTransport(e.target.value)} style={{marginLeft:8,padding:7,borderRadius:7}}>{replyRoutes.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
+          <div style={{fontSize:12,color:"#5d6776"}}>Reply to {identity?.phone||"customer"} using {textTransport==="telnyx"?"Telnyx 7775":textTransport.startsWith("podium:")?"Podium 2700":textTransport.startsWith("callrail:")?"CallRail "+textTransport.slice("callrail:".length):"CallRail existing texting"}. Messages stay in one customer timeline.</div>
           <textarea aria-label="Reply to customer by text" rows={3} maxLength={1600} value={composeBody} onChange={e=>setComposeBody(e.target.value)} placeholder="Reply in this conversation…" style={{width:"100%",boxSizing:"border-box",padding:12,borderRadius:10,border:"1px solid #cbd5df",resize:"vertical"}}/>
           <div style={{display:"flex",justifyContent:"flex-end"}}><button type="button" className={styles.buttonPrimary} disabled={sending||!composeBody.trim()||!identity?.phone} onClick={()=>void sendTextInline()}>{sending?"Sending…":"Send Text"}</button></div>
         </div>
