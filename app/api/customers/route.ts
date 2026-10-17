@@ -45,7 +45,42 @@ export async function GET(request: NextRequest) {
       keys.add(String(c.identity_key));
       return true;
     });
-    return NextResponse.json({ok:true,customers:[...existing,...additions].sort((a,b)=>new Date(b.last_seen_at||0).getTime()-new Date(a.last_seen_at||0).getTime()).slice(0,50)});
+    const all=[...existing,...additions].sort((a,b)=>new Date(b.last_seen_at||0).getTime()-new Date(a.last_seen_at||0).getTime());
+    const numbers=[...new Set(all.map(c=>canonicalPhone(c.phone)).filter(Boolean))];
+    let links:Array<{phone_a:string;phone_b:string;primary_phone:string|null;primary_email:string|null}>=[];
+    if(numbers.length){
+      const response=await fetch(SUPABASE_URL+"/rest/v1/rpc/c360_employee_search_phone_links",{
+        method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+accessToken,"Content-Type":"application/json"},
+        body:JSON.stringify({p_phones:numbers}),cache:"no-store"
+      });
+      if(!response.ok)throw new Error("Confirmed identity lookup failed ("+response.status+")");
+      links=await response.json();
+    }
+    const parent=new Map<string,string>();
+    function root(v:string):string{const p=parent.get(v);if(!p||p===v)return v;const r=root(p);parent.set(v,r);return r;}
+    for(const n of numbers)parent.set(n,n);
+    for(const link of links){if(!parent.has(link.phone_a))parent.set(link.phone_a,link.phone_a);if(!parent.has(link.phone_b))parent.set(link.phone_b,link.phone_b);parent.set(root(link.phone_b),root(link.phone_a));}
+    const primaryByGroup=new Map<string,string>();
+    for(const link of links)if(link.primary_phone)primaryByGroup.set(root(link.phone_a),link.primary_phone);
+    const groups=new Map<string,Record<string,any>>();
+    const result:Record<string,any>[]=[];
+    for(const record of all){
+      const phone=canonicalPhone(record.phone);
+      const group=phone&&parent.has(phone)?root(phone):null;
+      if(!group){result.push(record);continue;}
+      const primary=primaryByGroup.get(group);
+      const previous=groups.get(group);
+      if(!previous){const chosen={...record};groups.set(group,chosen);result.push(chosen);continue;}
+      const isCurrentPrimary=phone===primary;
+      const previousIsPrimary=canonicalPhone(previous.phone)===primary;
+      if(isCurrentPrimary&&!previousIsPrimary){
+        const idx=result.indexOf(previous);
+        const merged={...record,last_seen_at:new Date(record.last_seen_at||0)>new Date(previous.last_seen_at||0)?record.last_seen_at:previous.last_seen_at};
+        if(idx>=0)result[idx]=merged;
+        groups.set(group,merged);
+      }
+    }
+    return NextResponse.json({ok:true,customers:result.slice(0,50)});
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to search customers." }, { status: 500 });
   }
