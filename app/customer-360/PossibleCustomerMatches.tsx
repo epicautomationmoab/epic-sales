@@ -82,7 +82,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
             const items=Array.isArray(inspectData[key])?inspectData[key]:[];
             return <div key={key} style={{borderTop:"1px solid #e2e8f0",padding:"6px 0"}}><strong>{key.replace(/_/g," ")} · {items.length}</strong>{items.slice(0,3).map((item:any,i:number)=><p key={String(item.id||i)} style={{margin:"4px 0",color:"#475569"}}>{String(item.at||item.created_at||item.start_time||"").slice(0,16)} {String(item.summary||item.subject||item.experience_name||item.body||item.customer_name||"").slice(0,180)}</p>)}</div>;
           })}
-          <p style={{color:"#64748b"}}Inspection only. No records changed.</p>
+          <p style={{color:"#64748b"}}>Inspection only. No records changed.</p>
         </div>:null}
       </section>:null}
       {selectedCandidate?<div role="dialog" aria-modal="true" aria-label="Confirm customer identity and primary contacts" style={{position:"relative",padding:14,marginTop:12,border:"1px solid #c4b5fd",borderRadius:12,background:"#faf9ff"}}>
