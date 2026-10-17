@@ -39,13 +39,21 @@ const outcomeLabels:Record<string,string>={booked:"Booked on the call",quote:"Se
 export default function Customer360Modal(props:Props){
   const{open,onClose,contactId,opportunityId,reservationId,reservationConfirmation,phone,email}=props;
   const[data,setData]=useState<Customer360|null>(null);const[leadSheets,setLeadSheets]=useState<Array<{id:string;fields:Record<string,any>;updated_at:string}>>([]);const[editSheet,setEditSheet]=useState<string|null>(null);const[loading,setLoading]=useState(false);const[error,setError]=useState("");const[filter,setFilter]=useState<LifecycleFilter>("all");const[composeChannel,setComposeChannel]=useState<"email"|"text"|null>(null);const[composeSubject,setComposeSubject]=useState("Your Epic 4X4 Adventure");const[composeBody,setComposeBody]=useState("");const[sending,setSending]=useState(false);const[sendStatus,setSendStatus]=useState("");const[textTransport,setTextTransport]=useState<string>("callrail");
-  useEffect(()=>{
-    const mostRecent=[...(data?.texts||[])].sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime())[0];
-    if(mostRecent?.provider==="telnyx")setTextTransport("telnyx");
-    else if(mostRecent?.provider==="podium"&&mostRecent.conversation_uid)setTextTransport("podium:"+mostRecent.conversation_uid);
-    else if(mostRecent?.provider==="callrail"&&mostRecent.epic_number)setTextTransport("callrail:"+mostRecent.epic_number);
-    else setTextTransport("callrail");
+  const[replyRouteOverride,setReplyRouteOverride]=useState<string|null>(null);
+  const[showReplyChoices,setShowReplyChoices]=useState(false);
+  const lastInboundRoute=useMemo(()=>{
+    const latest=[...(data?.texts||[])].filter(t=>t.direction==="inbound").sort((a,b)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime());
+    for(const t of latest){
+      if(t.provider==="telnyx"&&t.epic_number)return "telnyx";
+      if(t.provider==="podium"&&t.conversation_uid)return "podium:"+t.conversation_uid;
+      if(t.provider==="callrail"&&t.epic_number)return "callrail:"+t.epic_number;
+    }
+    return null;
   },[data?.texts]);
+  useEffect(()=>{
+    setTextTransport(replyRouteOverride||lastInboundRoute||"callrail");
+  },[replyRouteOverride,lastInboundRoute]);
+  useEffect(()=>{if(!open){setReplyRouteOverride(null);setShowReplyChoices(false);}},[open]);
 
   useEffect(()=>{if(!open)return;const id=setInterval(()=>{if(document.visibilityState==="visible"&&!sending){const q=new URLSearchParams();if(contactId)q.set("contact",contactId);if(phone)q.set("phone",phone);if(email)q.set("email",email);fetch("/api/customer-360?"+q,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(p=>{if(p?.customer)setData(p.customer);}).catch(()=>{});}},12000);return()=>clearInterval(id);},[open,sending,contactId,phone,email]);
   useEffect(()=>{if(!open||(!data?.identity?.contact_id&&!data?.identity?.phone))return;let active=true;fetch("/api/lead-sheets?"+(data.identity.contact_id?"contact="+encodeURIComponent(data.identity.contact_id):"phone="+encodeURIComponent(data.identity.phone||"")),{cache:"no-store"}).then(r=>r.json()).then(p=>{if(active)setLeadSheets(p.rows||[])}).catch(()=>{});return()=>{active=false}},[open,data?.identity?.phone]);
@@ -113,9 +121,10 @@ export default function Customer360Modal(props:Props){
         if(!routes.some(r=>r.value===value))routes.push({value,label:"CallRail — "+t.epic_number});
       }
     }
-    if(!routes.some(r=>r.value.startsWith("callrail")))routes.push({value:"callrail",label:"CallRail (existing texting)"});
+    if(!routes.length)routes.push({value:"callrail",label:"CallRail (existing texting)"});
+    if(lastInboundRoute&&!routes.some(r=>r.value===lastInboundRoute))routes.unshift({value:lastInboundRoute,label:lastInboundRoute==="telnyx"?"Telnyx — 7775":lastInboundRoute.startsWith("podium:")?"Podium — 2700":"CallRail — "+lastInboundRoute.slice(9)});
     return routes;
-  },[data?.texts]);
+  },[data?.texts,lastInboundRoute]);
   async function sendTextInline(){await sendCommunication("text");}
 
   async function sendCommunication(channelOverride?:"text"|"email"){
@@ -234,7 +243,12 @@ export default function Customer360Modal(props:Props){
           })}
         </div>
         <div style={{display:"grid",gap:8}}>
-          <label style={{fontSize:12,fontWeight:750}}>Send reply using <select aria-label="Text reply provider" value={textTransport} onChange={e=>setTextTransport(e.target.value)} style={{marginLeft:8,padding:7,borderRadius:7}}>{replyRoutes.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",fontSize:13}}>
+            <strong>Replying from: {replyRoutes.find(r=>r.value===textTransport)?.label||"CallRail (existing texting)"}</strong>
+            <button type="button" onClick={()=>setShowReplyChoices(v=>!v)} style={{border:0,background:"transparent",color:"#145db0",cursor:"pointer",fontWeight:700}}>Change</button>
+            {!replyRouteOverride&&lastInboundRoute?<span style={{fontSize:11,color:"#65758a"}}>Automatically selected from latest incoming text</span>:null}
+          </div>
+          {showReplyChoices?<label style={{fontSize:12}}>Send from <select aria-label="Text reply provider" value={textTransport} onChange={e=>{setReplyRouteOverride(e.target.value);setTextTransport(e.target.value);setShowReplyChoices(false);}} style={{marginLeft:8,padding:7,borderRadius:7}}>{replyRoutes.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select><button type="button" onClick={()=>{setReplyRouteOverride(null);setTextTransport(lastInboundRoute||"callrail");setShowReplyChoices(false);}} style={{marginLeft:10}}>Use automatic</button></label>:null}
           <div style={{fontSize:12,color:"#5d6776"}}>Reply to {identity?.phone||"customer"} using {textTransport==="telnyx"?"Telnyx 7775":textTransport.startsWith("podium:")?"Podium 2700":textTransport.startsWith("callrail:")?"CallRail "+textTransport.slice("callrail:".length):"CallRail existing texting"}. Messages stay in one customer timeline.</div>
           <textarea aria-label="Reply to customer by text" rows={3} maxLength={1600} value={composeBody} onChange={e=>setComposeBody(e.target.value)} placeholder="Reply in this conversation…" style={{width:"100%",boxSizing:"border-box",padding:12,borderRadius:10,border:"1px solid #cbd5df",resize:"vertical"}}/>
           <div style={{display:"flex",justifyContent:"flex-end"}}><button type="button" className={styles.buttonPrimary} disabled={sending||!composeBody.trim()||!identity?.phone} onClick={()=>void sendTextInline()}>{sending?"Sending…":"Send Text"}</button></div>
