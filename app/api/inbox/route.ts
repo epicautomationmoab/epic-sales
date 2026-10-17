@@ -168,6 +168,11 @@ export async function POST(request: NextRequest) {
     if (body.action === "c360_note") {
       const entryType=(body as typeof body & { entry_type?: string })?.entry_type;
       if(entryType!=="customer_note"&&entryType!=="reservation_note")return NextResponse.json({error:"Invalid note type."},{status:400});
+      if(typeof body.thread_key!=="string"||!body.thread_key||typeof body.note_text!=="string"||!body.note_text.trim())return NextResponse.json({error:"A valid customer and note are required."},{status:400});
+      if(body.thread_key.startsWith("opp:")){
+        const valid=await rpc(session.accessToken,"epic_c360_verify_note_target",{p_thread_key:body.thread_key,p_contact_id:body.expected_contact_id||null,p_phone:body.expected_phone||null,p_email:body.expected_email||null,p_customer_name:body.expected_customer_name||null});
+        if(valid!==true)return NextResponse.json({error:"Customer changed or note destination does not match. Reopen this customer and try again."},{status:409});
+      }
       const result=await rpc(session.accessToken,"epic_sales_add_c360_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||"",p_entry_type:entryType});
       return NextResponse.json(result||{ok:true});
     }
