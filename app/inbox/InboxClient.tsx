@@ -54,12 +54,6 @@ function renderMentions(note:InboxNote){
     }
   }
   return <>
-    {openedMedia?<div role="presentation" onClick={()=>setOpenedMedia(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(12,19,30,.9)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-      <div role="dialog" aria-modal="true" aria-label="Full-size customer photo" onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"95vw",maxHeight:"95vh"}}>
-        <button type="button" aria-label="Close photo" onClick={()=>setOpenedMedia(null)} style={{position:"absolute",top:-17,right:-17,zIndex:1,border:0,borderRadius:22,background:"#fff",color:"#17212e",width:36,height:36,fontSize:22,cursor:"pointer"}}>×</button>
-        <img src={"/api/message-media?id="+encodeURIComponent(openedMedia)} alt="Customer photo enlarged" style={{display:"block",maxWidth:"90vw",maxHeight:"88vh",width:"auto",height:"auto",objectFit:"contain",borderRadius:8}}/>
-      </div>
-    </div>:null}
 {parts.map(([text,tagged],i)=>tagged?<span key={i} style={{display:"inline-block",padding:"1px 5px",borderRadius:6,background:"#eaf2ff",color:"#1b5fbf",fontWeight:800}}>{text}</span>:<span key={i}>{text}</span>)}</>;
 }
 
@@ -167,6 +161,12 @@ export default function InboxClient(){
     await load();}catch(e){setError(e instanceof Error?e.message:"Unable to claim lead.");}finally{setBusy(false);}}
   const counts=useMemo(()=>({open:threads.filter(t=>t.is_open).length,sales:threads.filter(t=>t.is_open&&t.lane==="sales").length,service:threads.filter(t=>t.is_open&&t.lane==="service").length}),[threads]);
   return <>
+    {openedMedia?<div role="presentation" onClick={()=>setOpenedMedia(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(12,19,30,.9)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div role="dialog" aria-modal="true" aria-label="Full-size customer photo" onClick={e=>e.stopPropagation()} style={{position:"relative",maxWidth:"95vw",maxHeight:"95vh"}}>
+        <button type="button" aria-label="Close photo" onClick={()=>setOpenedMedia(null)} style={{position:"absolute",top:-17,right:-17,zIndex:1,border:0,borderRadius:22,background:"#fff",color:"#17212e",width:36,height:36,fontSize:22,cursor:"pointer"}}>×</button>
+        <img src={"/api/message-media?id="+encodeURIComponent(openedMedia)} alt="Customer photo enlarged" style={{display:"block",maxWidth:"90vw",maxHeight:"88vh",width:"auto",height:"auto",objectFit:"contain",borderRadius:8}}/>
+      </div>
+    </div>:null}
     <section className={styles.phoneKpis}>
       <div><span>Total Calls</span><strong>{phoneSummary.inbound_queue_calls??0}</strong></div>
       <div><span>Median Answer</span><strong>{phoneSummary.median_answer_wait_seconds==null?"—":`${Math.round(phoneSummary.median_answer_wait_seconds)}s`}</strong></div>
