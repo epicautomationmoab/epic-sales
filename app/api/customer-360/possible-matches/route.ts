@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedTeamProfile } from "../../../lib/team-auth";
 
-const url=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\\/+$/,"");
+const url=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
 export async function GET(request:NextRequest){
   const token=request.cookies.get("epic_access_token")?.value;
   const profile=await getAuthenticatedTeamProfile(token);
@@ -20,7 +20,7 @@ export async function GET(request:NextRequest){
     });
     if(!result.ok)throw new Error("Match lookup unavailable ("+result.status+").");
     const rows=await result.json();
-    const digits=(s:string)=>s.replace(/\\D/g,"").slice(-10);
+    const digits=(s:string)=>s.replace(/\D/g,"").slice(-10);
     // Hide groups known by the exact contact pair; they are handled by automatic matching.
     const matches=(Array.isArray(rows)?rows:[]).filter((r:any)=>!(
       digits(phone).length===10&&digits(String(r.candidate_phone||""))===digits(phone)&&
