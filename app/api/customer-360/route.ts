@@ -295,7 +295,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
-      texts:[...(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.message_id||t.id).replace(/^callrail:/,""))||{epic_number:null,customer_number:null})})),...podiumTexts,...telnyxTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
+      texts:[...(customer.texts||[]).map((t:any)=>({...t,provider:"callrail",...(smsNumberById.get(String(t.message_id||t.id).replace(/^callrail:/,""))||{epic_number:null,customer_number:null})})),...podiumTexts,...telnyxTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
