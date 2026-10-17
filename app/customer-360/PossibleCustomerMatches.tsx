@@ -30,8 +30,8 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
     finally{setInspectLoading(false);}
   }
   async function review(candidate:Candidate, decision:"confirmed"|"rejected"){
-    const target=candidate.source_records?.find(r=>r.source_key&&r.source_type&&!(r.source_type===sourceType&&r.source_key===sourceKey));
-    if(!sourceType||!sourceKey||!target)return;
+    const target=candidate.source_records?.find(r=>r.source_key&&(r.source_type==="sales_opportunity"||r.source_type==="call")&&!(r.source_type===sourceType&&r.source_key===sourceKey));
+    if(!sourceType||!sourceKey||!target){setReviewMessage("This candidate has no supported record for linking yet.");return;}
     setReviewing(true);setReviewMessage("");
     try{
       const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision,...(decision==="confirmed"?{primary_phone:primaryPhone,primary_email:primaryEmail||null}:{})})});
