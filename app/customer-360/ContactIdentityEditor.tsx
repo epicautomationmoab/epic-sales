@@ -31,7 +31,7 @@ export default function ContactIdentityEditor({name,phone}:Props){
   }catch(e){setStatus(e instanceof Error?e.message:"Unable to save");}finally{setLoading(false);}
  }
  return <div style={{position:"relative",display:"inline-block"}}>
-  <button type="button" onClick={()=>setOpen(v=>!v);setFormOpen(false);setEditing(null);setValue("");} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",fontWeight:700,fontSize:12}}>Edit contact details</button>
+  <button type="button" onClick={()=>{setOpen(v=>!v);setFormOpen(false);setEditing(null);setValue("");}} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",fontWeight:700,fontSize:12}}>Edit contact details</button>
   {open?<section aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(450px,88vw)",maxHeight:"75vh",overflowY:"auto",padding:20,background:"white",border:"1px solid #cbd5e1",borderRadius:16,boxShadow:"0 18px 50px #0f172a2e",color:"#172033"}}>
    <div style={{fontSize:17,fontWeight:850,letterSpacing:"-.02em"}}>{name||"Customer"}</div><div style={{fontSize:12,color:"#f05a28",fontWeight:800,letterSpacing:".08em",marginTop:3}}>CONTACT DETAILS</div>
    <p style={{fontSize:12,color:"#64748b",lineHeight:1.5,margin:"10px 0 16px"}}>Edit preferred contact information or add another way to reach this customer.</p>
