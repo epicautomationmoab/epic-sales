@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
     // Include notes filed under the actual inbound phone thread, even when no opportunity exists.
     const noteThreadKeys=[...new Set([
       ...opportunityIds.map((id:string)=>`opp:${id}`),
-      ...(identityPhone.length===10?[`phone:+1${identityPhone}`]:[]),
+      ...[identityPhone,...(Array.isArray(customer?.identity?.linked_phones)?customer.identity.linked_phones:[])].filter((phone:any)=>String(phone).length===10).map((phone:any)=>`phone:+1${phone}`),
       ...(customer?.identity?.contact_id?[ `contact:${customer.identity.contact_id}` ]:[]),
       ...(!identityPhone.length&&customer?.identity?.email?[ `email:${String(customer.identity.email).trim().toLowerCase()}` ]:[]),
       ...(!identityPhone.length&&!customer?.identity?.contact_id&&!customer?.identity?.email&&customer?.reservations?.[0]?.id?[ `reservation:${customer.reservations[0].id}` ]:[]),
