@@ -1,6 +1,9 @@
 "use client";
 import {useEffect,useState} from "react";
 type Method={id:string|null;type:"phone"|"email";value:string;primary:boolean};
+const formatPhone=(v:string)=>{const digits=v.replace(/\D/g,"");return digits.length===11&&digits.startsWith("1")?`(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`:digits.length===10?`(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`:v;};
+const actionStyle={padding:"7px 11px",borderRadius:8,border:"1px solid #d7deea",background:"#fff",color:"#334155",fontSize:12,fontWeight:700,cursor:"pointer"} as const;
+const gradientStyle={...actionStyle,border:"none",color:"#fff",background:"linear-gradient(110deg,#7c3aed,#c339a0,#f97316)"} as const;
 type Props={name:string|null|undefined;phone:string|null|undefined;email:string|null|undefined;contactId:string|null|undefined};
 export default function ContactIdentityEditor({name,phone}:Props){
  const [open,setOpen]=useState(false);
@@ -28,37 +31,37 @@ export default function ContactIdentityEditor({name,phone}:Props){
  }
  return <div style={{position:"relative",display:"inline-block"}}>
   <button type="button" onClick={()=>setOpen(v=>!v)} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",fontWeight:700,fontSize:12}}>Edit contact details</button>
-  {open?<section aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(420px,85vw)",maxHeight:"75vh",overflowY:"auto",padding:16,background:"white",border:"1px solid #cbd5e1",borderRadius:12,boxShadow:"0 12px 28px #0002",color:"#172033"}}>
-   <strong>{name||"Customer"} — contact details</strong>
-   <p style={{fontSize:12,color:"#64748b"}}>Edit preferred contact information or add another way to reach this customer.</p>
+  {open?<section aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(450px,88vw)",maxHeight:"75vh",overflowY:"auto",padding:20,background:"white",border:"1px solid #cbd5e1",borderRadius:16,boxShadow:"0 18px 50px #0f172a2e",color:"#172033"}}>
+   <div style={{fontSize:17,fontWeight:850,letterSpacing:"-.02em"}}>{name||"Customer"}</div><div style={{fontSize:12,color:"#f05a28",fontWeight:800,letterSpacing:".08em",marginTop:3}}>CONTACT DETAILS</div>
+   <p style={{fontSize:12,color:"#64748b",lineHeight:1.5,margin:"10px 0 16px"}}>Edit preferred contact information or add another way to reach this customer.</p>
    {loading?<p style={{fontSize:12}}>Saving or loading…</p>:null}
    {!linked?<p style={{fontSize:12}}>Contact editing is available for confirmed linked customers.</p>:null}
-   {(["phone","email"] as const).map(t=><div key={t} style={{margin:"12px 0"}}>
-    <strong>{t==="phone"?"Phone numbers":"Email addresses"}</strong>
-    {methods.filter(m=>m.type===t).map(m=><div key={m.id||m.value} style={{padding:"9px 0",borderBottom:"1px solid #e2e8f0"}}>
-     <div style={{overflowWrap:"anywhere",fontSize:12}}>{m.value} {m.primary?<strong style={{color:"#6d28d9"}}>· Primary</strong>:<span style={{color:"#64748b"}}>· Additional</span>}</div>
-     <div style={{display:"flex",gap:8,marginTop:5,flexWrap:"wrap"}}>
-      {!m.primary?<button type="button" disabled={loading} onClick={()=>void change("primary",m.type,m.value)}>Make primary</button>:null}
-      <button type="button" disabled={loading} onClick={()=>{setType(m.type);setEditing(m);setValue(m.value);}}>Edit</button>
-      {!m.primary&&m.id?<button type="button" disabled={loading} onClick={()=>void change("remove",m.type,m.value)}>Remove</button>:null}
+   {(["phone","email"] as const).map(t=><div key={t} style={{margin:"15px 0 19px"}}>
+    <div style={{fontSize:13,fontWeight:850,marginBottom:10}}>{t==="phone"?"Phone numbers":"Email addresses"}</div>
+    {methods.filter(m=>m.type===t).map(m=><div key={m.id||m.value} style={{padding:"12px",marginBottom:8,border:"1px solid #e2e8f0",borderRadius:11,background:m.primary?"#faf9ff":"#f8fafc"}}>
+     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:9,flexWrap:"wrap"}}><span style={{overflowWrap:"anywhere",fontSize:13,fontWeight:700}}>{m.type==="phone"?formatPhone(m.value):m.value}</span><span style={{fontSize:10,fontWeight:800,padding:"4px 8px",borderRadius:20,color:m.primary?"#6d28d9":"#64748b",background:m.primary?"#ede9fe":"#e2e8f0"}}>{m.primary?"PRIMARY":"ADDITIONAL"}</span></div>
+     <div style={{display:"flex",gap:7,marginTop:10,flexWrap:"wrap"}}>
+      {!m.primary?<button type="button" disabled={loading} style={gradientStyle} onClick={()=>void change("primary",m.type,m.value)}>Make primary</button>:null}
+      <button type="button" disabled={loading} style={actionStyle} onClick={()=>{setType(m.type);setEditing(m);setValue(m.value);}}>Edit</button>
+      {!m.primary&&m.id?<button type="button" disabled={loading} style={actionStyle} onClick={()=>void change("remove",m.type,m.value)}>Remove</button>:null}
      </div>
     </div>)}
     {methods.filter(m=>m.type===t).length===0?<p style={{fontSize:12}}>No {t} on file.</p>:null}
-    <button type="button" disabled={!linked||loading} onClick={()=>{setType(t);setEditing(null);setValue("");}} style={{marginTop:8}}>+ Add {t}</button>
+    <button type="button" disabled={!linked||loading} onClick={()=>{setType(t);setEditing(null);setValue("");}} style={{...actionStyle,marginTop:4,borderStyle:"dashed",color:"#6d28d9"}}>+ Add {t}</button>
    </div>)}
-   {linked?<div style={{border:"1px solid #c4b5fd",borderRadius:9,padding:10,background:"#faf9ff"}}>
+   {linked?<div style={{border:"1px solid #c4b5fd",borderRadius:12,padding:14,background:"#faf9ff"}}>
     <strong>{editing?"Edit "+editing.type:"Add "+type}</strong>
-    <input aria-label="Contact value" type={type==="email"?"email":"tel"} value={value} onChange={e=>setValue(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:8,margin:"8px 0"}} placeholder={type==="phone"?"Phone number":"Email address"}/>
+    <input aria-label="Contact value" type={type==="email"?"email":"tel"} value={value} onChange={e=>setValue(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:"10px 12px",margin:"10px 0",border:"1px solid #cbd5e1",borderRadius:9,fontSize:13}} placeholder={type==="phone"?"Phone number":"Email address"}/>
     <div style={{display:"flex",gap:8}}>
-     <button type="button" disabled={loading||!value.trim()} onClick={async()=>{
+     <button type="button" style={gradientStyle} disabled={loading||!value.trim()} onClick={async()=>{
       if(editing){await change("add",type,value,editing.primary);if(!editing.primary)await change("remove",editing.type,editing.value);}
       else await change("add",type,value);
      }}>Save contact</button>
-     <button type="button" onClick={()=>{setEditing(null);setValue("");}}>Cancel</button>
+     <button type="button" style={actionStyle} onClick={()=>{setEditing(null);setValue("");}}>Cancel</button>
     </div>
    </div>:null}
    {status?<p role="status" style={{fontSize:12}}>{status}</p>:null}
-   <div style={{textAlign:"right",marginTop:12}}><button type="button" onClick={()=>setOpen(false)}>Close</button></div>
+   <div style={{textAlign:"right",marginTop:12}}><button type="button" style={actionStyle} onClick={()=>setOpen(false)}>Close</button></div>
   </section>:null}
  </div>;
 }
