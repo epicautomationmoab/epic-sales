@@ -255,6 +255,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Telnyx inbound SMS/MMS history stays in C360, separate from inbox tasks.
+    let telnyxTexts:any[]=[];
+    if(identityPhone.length===10){
+      try{
+        const response=await fetch(`${SUPABASE_URL}/rest/v1/rpc/c360_telnyx_sms`,{
+          method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:`Bearer ${session.accessToken}`,"Content-Type":"application/json"},
+          body:JSON.stringify({p_phone:"+1"+identityPhone}),cache:"no-store"
+        });
+        if(response.ok){
+          const rows=await response.json();
+          telnyxTexts=(Array.isArray(rows)?rows:[]).map((m:any)=>({
+            id:"telnyx:"+m.message_id,at:m.at,direction:m.direction,body:m.body,agent_name:null,
+            status:m.direction==="inbound"?"received":"sent",provider:"telnyx",
+            epic_number:m.epic_number,customer_number:m.customer_phone
+          }));
+        }
+      }catch(error){console.warn("Telnyx C360 enrichment unavailable",error);}
+    }
+
     let linkedSocial:any[]=[];
     const verifiedContactId=customer?.identity?.contact_id;
     if(verifiedContactId && /^[0-9a-f-]{36}$/i.test(String(verifiedContactId))){
@@ -279,7 +298,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       calls:[...mergeCallRailWithPbxInbound(customer.calls||[],pbxInboundCalls),...pbxCalls].sort((a:any,b:any)=>new Date(b.at||0).getTime()-new Date(a.at||0).getTime()),
-      texts:[...(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),...podiumTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
+      texts:[...(customer.texts||[]).map((t:any)=>({...t,...(smsNumberById.get(String(t.id))||{epic_number:null,customer_number:null})})),...podiumTexts,...telnyxTexts].sort((a:any,b:any)=>new Date(a.at||0).getTime()-new Date(b.at||0).getTime()),
       cancellation_agreements:cancellationEvents,
       sales_call_workflows:salesCallWorkflows,
       team_thread_notes:teamThreadNotes,
