@@ -4,6 +4,7 @@ import {getAuthenticatedTeamProfile} from "../../lib/team-auth";
 import EpicC360Sidebar from "../EpicC360Sidebar";
 import styles from "../leads/Leads.module.css";
 import CatchUpFeed from "./CatchUpFeed";
+import ScheduledFollowUps from "./ScheduledFollowUps";
 export default async function CatchUpPage(){
  const token=(await cookies()).get("epic_access_token")?.value;
  const profile=await getAuthenticatedTeamProfile(token);
@@ -16,6 +17,6 @@ export default async function CatchUpPage(){
  <div><div style={{fontSize:11,letterSpacing:2,color:"#875ab6",fontWeight:800}}>EPIC C360 · MY CATCH-UP <span style={{display:"inline-block",marginLeft:9,padding:"3px 8px",border:"1px solid #C89924",borderRadius:6,background:"#FFF5D8",color:"#916100",fontSize:10,fontWeight:900,letterSpacing:1}}>BETA</span></div><h1 style={{fontSize:29,margin:"11px 0 5px"}}>Welcome back, {first}!</h1><p style={{color:"#697081",margin:0}}>What happened with your claimed people while you were away?</p></div>
  <a href="/inbox" style={{background:"white",padding:"10px 13px",borderRadius:8,border:"1px solid #e0e1e7",textDecoration:"none",color:"#565b66"}}>← Inbox</a>
  </header>
- <CatchUpFeed profileId={profile.id} profileName={profile.display_name}/>
+ <ScheduledFollowUps/><CatchUpFeed profileId={profile.id} profileName={profile.display_name}/>
  </section></main>
 }

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   if (!profile || !accessToken || profile.role === "workstation") return NextResponse.json({ error: "Employee login required." }, { status: 401 });
 
   const body = await request.json().catch(() => null) as {
-    action?: "claim" | "release" | "activate" | "note" | "edit_note" | "mark_lost" | "retire";
+    action?: "claim" | "release" | "release_with_note" | "activate" | "note" | "edit_note" | "mark_lost" | "retire";
     opportunity_id?: string;
     note_id?: string;
     note_text?: string;
@@ -50,16 +50,41 @@ export async function POST(request: NextRequest) {
       const result = await rpc(accessToken, "epic_sales_activate_lead", { p_opportunity_id: opportunityId });
       return NextResponse.json(result || { ok: true });
     }
+    if (body?.action === "release_with_note") {
+      const result = await rpc(accessToken, "epic_sales_release_claim", {
+        p_opportunity_id: opportunityId,
+        p_reason: body.reason || "",
+        p_note: body.note_text || "",
+      });
+      return NextResponse.json(result || { ok: true });
+    }
     if (body?.action === "claim" || body?.action === "release") {
       const result = await rpc(accessToken, "epic_sales_claim_lead", { p_opportunity_id: opportunityId, p_release: body.action === "release" });
       return NextResponse.json(result || { ok: true });
     }
     if (body?.action === "mark_lost" || body?.action === "retire") {
+      // Preserve structured details for reporting while using current validated DB codes.
+      const rawReason = body.reason || "";
+      const parts = rawReason.split(" | ");
+      const structured = body.action === "mark_lost" && parts.length === 2;
+      const category = structured ? parts[0] : "";
+      const specificReason = structured ? parts[1] : "";
+      const categories: Record<string,string> = {
+        "Price & Value":"price",
+        "Availability & Scheduling":"availability",
+        "Policies & Restrictions":"policy_or_qualification",
+        "Product & Experience":"product_mismatch",
+        "Guest Circumstances":"plans_changed",
+        "Unable to Determine / Other":"other",
+      };
+      const code = structured ? categories[category] : rawReason;
+      if (structured && (!code || !specificReason)) return NextResponse.json({error:"Choose a valid lost reason."},{status:400});
+      const note = structured ? "Lost category: "+category+"\\nLost reason: "+specificReason+(body.note_text?"\\nDetails: "+body.note_text:"") : body.note_text || null;
       const result = await rpc(accessToken, "epic_sales_close_lead", {
         p_opportunity_id: opportunityId,
         p_status: body.action === "mark_lost" ? "lost" : "retired",
-        p_reason: body.reason || "",
-        p_note: body.note_text || null,
+        p_reason: code || "",
+        p_note: note,
       });
       return NextResponse.json(result || { ok: true });
     }
