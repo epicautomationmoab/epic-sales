@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       search("search_epic_customers"),
       search("search_epic_inbound_only_customers"),
     ]);
-    const canonicalPhone=(value:unknown)=>String(value||"").replace(/\\D/g,"").slice(-10);
+    const canonicalPhone=(value:unknown)=>String(value||"").replace(/\D/g,"").slice(-10);
     const existingPhones=new Set(existing.map(c=>canonicalPhone(c.phone)).filter(Boolean));
     const existingEmails=new Set(existing.map(c=>String(c.email||"").trim().toLowerCase()).filter(Boolean));
     const keys=new Set(existing.map(c=>String(c.identity_key)));
