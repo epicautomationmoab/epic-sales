@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
-  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
+  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string; entry_type?: string; expected_contact_id?: string | null; expected_phone?: string | null; expected_email?: string | null; expected_customer_name?: string | null } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
     if(body.thread_key.startsWith("meta:facebook:")&&(body.action==="link"||body.action==="unlink")){
