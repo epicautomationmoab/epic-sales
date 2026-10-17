@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         const valid=await rpc(session.accessToken,"epic_c360_verify_note_target",{p_thread_key:body.thread_key,p_contact_id:body.expected_contact_id||null,p_phone:body.expected_phone||null,p_email:body.expected_email||null,p_customer_name:body.expected_customer_name||null});
         if(valid!==true)return NextResponse.json({error:"Customer changed or note destination does not match. Reopen this customer and try again."},{status:409});
       }
-      const result=await rpc(session.accessToken,"epic_sales_add_c360_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||"",p_entry_type:entryType});
+      const result=await rpc(session.accessToken,"epic_sales_add_inbox_thread_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||""});
       return NextResponse.json(result||{ok:true});
     }
     if (body.action === "note") {
