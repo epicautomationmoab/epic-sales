@@ -9,15 +9,19 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
   const [matches,setMatches]=useState<Candidate[]>([]);
   const [reviewing,setReviewing]=useState(false);
   const [reviewMessage,setReviewMessage]=useState("");
+  const [selectedCandidate,setSelectedCandidate]=useState<Candidate|null>(null);
+  const [primaryPhone,setPrimaryPhone]=useState("");
+  const [primaryEmail,setPrimaryEmail]=useState("");
   async function review(candidate:Candidate, decision:"confirmed"|"rejected"){
     const target=candidate.source_records?.find(r=>r.source_key&&r.source_type&&!(r.source_type===sourceType&&r.source_key===sourceKey));
     if(!sourceType||!sourceKey||!target)return;
     setReviewing(true);setReviewMessage("");
     try{
-      const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision})});
+      const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision,...(decision==="confirmed"?{primary_phone:primaryPhone,primary_email:primaryEmail||null}:{})})});
       if(!response.ok)throw new Error("Could not save review");
       const result=await response.json();
       setMatches(previous=>previous.filter(m=>m!==candidate));
+      setSelectedCandidate(null);
       setReviewMessage(decision==="confirmed"?(result.history_linked?"Confirmed. Both phone histories are now linked. Reopen C360 to see the combined timeline.":"Confirmation recorded; history link is not yet available."):"Not-the-same-person decision recorded.");
     }catch(e){setReviewMessage(e instanceof Error?e.message:"Unable to save decision.");}
     finally{setReviewing(false);}
@@ -48,8 +52,21 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
         <strong>{m.candidate_name||"Unnamed customer"}</strong>
         <div style={{fontSize:12,color:"#475569"}}>{[m.candidate_phone,m.candidate_email].filter(Boolean).join(" · ")||"No contact method"}</div>
         <div style={{marginTop:4,fontSize:11,color:"#64748b"}}>{[m.evidence?.exact_name?"Same name":null,m.evidence?.nickname_variant?"Name variation":null,m.evidence?.same_area_code?"Same area code":null,m.evidence?.within_two_hours?"Recent activity":null].filter(Boolean).join(" · ")}{m.source_count>1?` · ${m.source_count} records`:""}</div>
-        {sourceType&&sourceKey&&m.source_records?.length?<div style={{display:"flex",gap:7,marginTop:8}}><button type="button" disabled={reviewing} onClick={()=>void review(m,"confirmed")} style={{flex:1,padding:"9px 12px",border:"none",borderRadius:9,background:"linear-gradient(110deg,#7c3aed 0%,#ce3b91 45%,#f97316 100%)",boxShadow:"0 3px 10px rgba(190,50,125,.2)",color:"#fff",fontSize:12,fontWeight:800,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>✓ Same person</button><button type="button" disabled={reviewing} onClick={()=>void review(m,"rejected")} style={{flex:1,padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:9,background:"linear-gradient(120deg,#f8fafc 0%,#e2e8f0 100%)",color:"#334155",fontSize:12,fontWeight:750,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>Not same person</button></div>:null}
+        {sourceType&&sourceKey&&m.source_records?.length?<div style={{display:"flex",gap:7,marginTop:8}}><button type="button" disabled={reviewing} onClick={()=>{setSelectedCandidate(m);setPrimaryPhone(m.candidate_phone||phone||"");setPrimaryEmail(m.candidate_email||email||"");}} style={{flex:1,padding:"9px 12px",border:"none",borderRadius:9,background:"linear-gradient(110deg,#7c3aed 0%,#ce3b91 45%,#f97316 100%)",boxShadow:"0 3px 10px rgba(190,50,125,.2)",color:"#fff",fontSize:12,fontWeight:800,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>✓ Same person</button><button type="button" disabled={reviewing} onClick={()=>void review(m,"rejected")} style={{flex:1,padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:9,background:"linear-gradient(120deg,#f8fafc 0%,#e2e8f0 100%)",color:"#334155",fontSize:12,fontWeight:750,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>Not same person</button></div>:null}
       </div>)}
+      {selectedCandidate?<div role="dialog" aria-modal="true" aria-label="Confirm customer identity and primary contacts" style={{position:"relative",padding:14,marginTop:12,border:"2px solid #db2777",borderRadius:12,background:"#fff7fb"}}>
+        <strong>Confirm customer match</strong><p style={{fontSize:12,color:"#475569"}}>Choose one primary phone and email before linking. Both phone histories will be preserved.</p>
+        <div style={{fontWeight:700,marginBottom:5}}>Primary phone</div>
+        {[...new Set([phone,selectedCandidate.candidate_phone].filter((v):v is string=>Boolean(v)))].map(v=><label key={v} style={{display:"block",marginBottom:6}}><input type="radio" checked={primaryPhone===v} onChange={()=>setPrimaryPhone(v)}/> {v}</label>)}
+        <div style={{fontWeight:700,margin:"12px 0 5px"}}>Primary email</div>
+        {[...new Set([email,selectedCandidate.candidate_email].filter((v):v is string=>Boolean(v)))].length?
+          [...new Set([email,selectedCandidate.candidate_email].filter((v):v is string=>Boolean(v)))].map(v=><label key={v} style={{display:"block",marginBottom:6}}><input type="radio" checked={primaryEmail===v} onChange={()=>setPrimaryEmail(v)}/> {v}</label>):
+          <p style={{fontSize:12,color:"#64748b"}}>Neither record has an email address.</p>}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button type="button" disabled={reviewing||!primaryPhone} onClick={()=>void review(selectedCandidate,"confirmed")} style={{padding:"9px 12px",border:0,borderRadius:8,background:"linear-gradient(110deg,#7c3aed,#ce3b91,#f97316)",color:"white",fontWeight:800}}>Confirm & link</button>
+          <button type="button" disabled={reviewing} onClick={()=>setSelectedCandidate(null)} style={{padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:8,background:"white"}}>Cancel</button>
+        </div>
+      </div>:null}
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}><button type="button" onClick={()=>setOpen(false)} style={{background:"#fff",border:"1px solid #cbd5e1",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>Close</button></div>
     </div>:null}
   </div>;
