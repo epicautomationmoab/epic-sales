@@ -163,6 +163,12 @@ export async function GET(request: NextRequest) {
         customer.identity.linked_phones=[...new Set([...(customer.identity.linked_phones||[]),linkedPhone])];
       }
     }
+    // Primary choices are explicit; opening the secondary number cannot promote it.
+    if(currentPhone.length===10 && customer?.identity){
+      const primary=await rpcNamed(session.accessToken,"c360_linked_primary_contact",{p_phone:currentPhone}).catch(()=>null);
+      if(primary?.phone)customer.identity.phone="+1"+primary.phone;
+      if(primary?.email)customer.identity.email=primary.email;
+    }
     // A caller with no reservation/lead still deserves a named, discoverable C360.
     // Only fall back to CallRail when the canonical customer identity has no name.
     if (customer?.identity && !customer.identity.name && body.p_phone) {
