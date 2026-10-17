@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth(request);
   if (!session) return NextResponse.json({ error: "Employee login required." }, { status: 401 });
-  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string } | null;
+  const body = await request.json().catch(() => null) as { action?: string; thread_key?: string; note_text?: string; destination?: string; entry_type?: string; expected_contact_id?: string | null; expected_phone?: string | null; expected_email?: string | null; expected_customer_name?: string | null } | null;
   if (!body?.thread_key) return NextResponse.json({ error: "Thread is required." }, { status: 400 });
   try {
     if(body.thread_key.startsWith("meta:facebook:")&&(body.action==="link"||body.action==="unlink")){
@@ -168,7 +168,12 @@ export async function POST(request: NextRequest) {
     if (body.action === "c360_note") {
       const entryType=(body as typeof body & { entry_type?: string })?.entry_type;
       if(entryType!=="customer_note"&&entryType!=="reservation_note")return NextResponse.json({error:"Invalid note type."},{status:400});
-      const result=await rpc(session.accessToken,"epic_sales_add_c360_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||"",p_entry_type:entryType});
+      if(typeof body.thread_key!=="string"||!body.thread_key||typeof body.note_text!=="string"||!body.note_text.trim())return NextResponse.json({error:"A valid customer and note are required."},{status:400});
+      if(body.thread_key.startsWith("opp:")){
+        const valid=await rpc(session.accessToken,"epic_c360_verify_note_target",{p_thread_key:body.thread_key,p_contact_id:body.expected_contact_id||null,p_phone:body.expected_phone||null,p_email:body.expected_email||null,p_customer_name:body.expected_customer_name||null});
+        if(valid!==true)return NextResponse.json({error:"Customer changed or note destination does not match. Reopen this customer and try again."},{status:409});
+      }
+      const result=await rpc(session.accessToken,"epic_sales_add_inbox_thread_note",{p_thread_key:body.thread_key,p_note_text:body.note_text||""});
       return NextResponse.json(result||{ok:true});
     }
     if (body.action === "note") {
