@@ -7,6 +7,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [matches,setMatches]=useState<Candidate[]>([]);
+  const [resolvedCallSource,setResolvedCallSource]=useState("");
   const [reviewing,setReviewing]=useState(false);
   const [reviewMessage,setReviewMessage]=useState("");
   const [selectedCandidate,setSelectedCandidate]=useState<Candidate|null>(null);
@@ -31,10 +32,12 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
   }
   async function review(candidate:Candidate, decision:"confirmed"|"rejected"){
     const target=candidate.source_records?.find(r=>r.source_key&&(r.source_type==="sales_opportunity"||r.source_type==="call")&&!(r.source_type===sourceType&&r.source_key===sourceKey));
-    if(!sourceType||!sourceKey||!target){setReviewMessage("This candidate has no supported record for linking yet.");return;}
+    const leftType=sourceType|| (resolvedCallSource?"call":null);
+    const leftKey=sourceKey||resolvedCallSource;
+    if(!leftType||!leftKey||!target){setReviewMessage("A verified source record is required for this decision.");return;}
     setReviewing(true);setReviewMessage("");
     try{
-      const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:sourceType,left_key:sourceKey,right_type:target.source_type,right_key:target.source_key,decision,...(decision==="confirmed"?{primary_phone:primaryPhone,primary_email:primaryEmail||null}:{})})});
+      const response=await fetch("/api/customer-360/possible-matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({left_type:leftType,left_key:leftKey,right_type:target.source_type,right_key:target.source_key,decision,...(decision==="confirmed"?{primary_phone:primaryPhone,primary_email:primaryEmail||null}:{})})});
       if(!response.ok){const details=await response.json().catch(()=>null);throw new Error(details?.error||"Could not save review ("+response.status+")");}
       const result=await response.json();
       setMatches(previous=>previous.filter(m=>m!==candidate));
@@ -53,7 +56,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
     setLoading(true);setError("");
     fetch("/api/customer-360/possible-matches?"+q,{signal:controller.signal,cache:"no-store"})
       .then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||"Unable to search.");return data;})
-      .then(data=>setMatches(data.matches||[]))
+      .then(data=>{setMatches(data.matches||[]);setResolvedCallSource(data.current_call_source||"");})
       .catch(e=>{if(e.name!=="AbortError")setError(e.message||"Lookup failed.");})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
@@ -71,7 +74,7 @@ export default function PossibleCustomerMatches({name,phone,email,sourceType,sou
         <div style={{fontSize:12,color:"#475569"}}>{[m.candidate_phone,m.candidate_email].filter(Boolean).join(" · ")||"No contact method"}</div>
         <div style={{marginTop:4,fontSize:11,color:"#64748b"}}>{[m.evidence?.exact_name?"Same name":null,m.evidence?.nickname_variant?"Name variation":null,m.evidence?.same_area_code?"Same area code":null,m.evidence?.within_two_hours?"Recent activity":null].filter(Boolean).join(" · ")}{m.source_count>1?` · ${m.source_count} records`:""}</div>
         <button type="button" onClick={()=>void inspect(m)} style={{display:"block",padding:"6px 0",border:0,background:"transparent",color:"#6d28d9",textDecoration:"underline",fontWeight:700,cursor:"pointer"}}>View C360 →</button>
-        {sourceType&&sourceKey&&m.source_records?.length?<div style={{display:"flex",gap:7,marginTop:8}}><button type="button" disabled={reviewing} onClick={()=>{setSelectedCandidate(m);setPrimaryPhone(m.candidate_phone||phone||"");setPrimaryEmail(m.candidate_email||email||"");}} style={{flex:1,padding:"9px 12px",border:"none",borderRadius:9,background:"linear-gradient(110deg,#7c3aed 0%,#ce3b91 45%,#f97316 100%)",boxShadow:"0 3px 10px rgba(190,50,125,.2)",color:"#fff",fontSize:12,fontWeight:800,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>✓ Same person</button><button type="button" disabled={reviewing} onClick={()=>void review(m,"rejected")} style={{flex:1,padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:9,background:"linear-gradient(120deg,#f8fafc 0%,#e2e8f0 100%)",color:"#334155",fontSize:12,fontWeight:750,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>Not same person</button></div>:null}
+        {(sourceType&&sourceKey||resolvedCallSource)&&m.source_records?.length?<div style={{display:"flex",gap:7,marginTop:8}}><button type="button" disabled={reviewing} onClick={()=>{setSelectedCandidate(m);setPrimaryPhone(m.candidate_phone||phone||"");setPrimaryEmail(m.candidate_email||email||"");}} style={{flex:1,padding:"9px 12px",border:"none",borderRadius:9,background:"linear-gradient(110deg,#7c3aed 0%,#ce3b91 45%,#f97316 100%)",boxShadow:"0 3px 10px rgba(190,50,125,.2)",color:"#fff",fontSize:12,fontWeight:800,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>✓ Same person</button><button type="button" disabled={reviewing} onClick={()=>void review(m,"rejected")} style={{flex:1,padding:"9px 12px",border:"1px solid #cbd5e1",borderRadius:9,background:"linear-gradient(120deg,#f8fafc 0%,#e2e8f0 100%)",color:"#334155",fontSize:12,fontWeight:750,cursor:reviewing?"wait":"pointer",opacity:reviewing?.6:1}}>Not same person</button></div>:null}
       </div>)}
       </>:null}
       {inspectCandidate?<section aria-label="Suggested customer history" style={{marginTop:12,padding:12,border:"1px solid #c4b5fd",borderRadius:10,background:"#f8fafc"}}>
