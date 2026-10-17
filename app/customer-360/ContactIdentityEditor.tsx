@@ -30,7 +30,7 @@ export default function ContactIdentityEditor({name,phone}:Props){
   <button type="button" onClick={()=>setOpen(v=>!v)} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #cbd5e1",background:"#fff",fontWeight:700,fontSize:12}}>Edit contact details</button>
   {open?<section aria-label="Customer contact details" style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:45,width:"min(420px,85vw)",maxHeight:"75vh",overflowY:"auto",padding:16,background:"white",border:"1px solid #cbd5e1",borderRadius:12,boxShadow:"0 12px 28px #0002",color:"#172033"}}>
    <strong>{name||"Customer"} — contact details</strong>
-   <p style={{fontSize:12,color:"#64748b"}}Edit preferred contact information or add another way to reach this customer.</p>
+   <p style={{fontSize:12,color:"#64748b"}}>Edit preferred contact information or add another way to reach this customer.</p>
    {loading?<p style={{fontSize:12}}>Saving or loading…</p>:null}
    {!linked?<p style={{fontSize:12}}>Contact editing is available for confirmed linked customers.</p>:null}
    {(["phone","email"] as const).map(t=><div key={t} style={{margin:"12px 0"}}>
