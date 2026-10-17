@@ -67,10 +67,11 @@ export async function GET(request: NextRequest) {
       rpc(session.accessToken, "get_epic_inbox_mentions", {}),
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
+    const telnyxThreads = await rpc(session.accessToken, "get_c360_telnyx_inbox", {});
     const socialThreads: any[] = []; // Podium social disabled; direct Meta is authoritative.
     const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
-    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
+    const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(telnyxThreads) ? telnyxThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
       if (thread.kind !== "email") return true;
       const domain = emailDomain(thread.email);
       return !domain || !domainBlocked(domain, blocked);
@@ -143,6 +144,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result||{ok:true});
     }
     if (body.thread_key.startsWith("podium:") && (body.action === "close" || body.action === "clean")) { const ok = await rpc(session.accessToken, "close_c360_podium_inbox", { p_conversation_uid: body.thread_key.slice(7) }); return NextResponse.json({ok}); }
+    if(body.thread_key.startsWith("telnyx:")&&["close","clean","route"].includes(body.action||"")){
+      const result=await rpc(session.accessToken,"c360_telnyx_inbox_action",{
+        p_phone:body.thread_key.slice("telnyx:".length),p_action:body.action==="route"?"route":"close",
+        p_lane:body.action==="route"?body.destination:null
+      });
+      if(body.action==="route"&&body.note_text?.trim())await rpc(session.accessToken,"epic_sales_add_inbox_thread_note",{p_thread_key:body.thread_key,p_note_text:body.note_text.trim()});
+      return NextResponse.json(result||{ok:true});
+    }
     if (body.action === "close" || body.action === "clean") {
       const result = await rpc(session.accessToken, "epic_sales_clean_inbox_thread", { p_thread_key: body.thread_key });
       return NextResponse.json(result || { ok: true });
