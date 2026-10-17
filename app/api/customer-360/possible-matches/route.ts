@@ -65,7 +65,7 @@ export async function POST(request:NextRequest){
   const response=await fetch(url+"/rest/v1/rpc/c360_record_identity_review",{
    method:"POST",cache:"no-store",
    headers:{"apikey":key,"Authorization":"Bearer "+key,"Content-Type":"application/json"},
-   body:JSON.stringify({p_left_type:left_type,p_left_key:left_key,p_right_type:right_type,p_right_key:right_key,p_decision:decision,p_reviewer:String(profile.name||profile.id||"Epic employee"),p_evidence:{review_origin:"epic_sales_ui"}})
+   body:JSON.stringify({p_left_type:left_type,p_left_key:left_key,p_right_type:right_type,p_right_key:right_key,p_decision:decision,p_reviewer:String(profile.display_name||profile.id||"Epic employee"),p_evidence:{review_origin:"epic_sales_ui"}})
   });
   if(!response.ok)return NextResponse.json({error:"Unable to record review."},{status:502});
   return NextResponse.json({ok:true,recorded:true,history_linked:false},{headers:{"Cache-Control":"no-store"}});
