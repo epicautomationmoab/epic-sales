@@ -21,7 +21,21 @@ export async function GET(request:NextRequest){
  if(name.length<3||name.length>120)return NextResponse.json({matches:[]});
  try{
   const rows=await rpc(token,"c360_employee_match_suggestions",{p_name:name,p_phone:p.get("phone")||null,p_email:p.get("email")||null,p_source_type:p.get("source_type")||null,p_source_key:p.get("source_key")||null});
-  return NextResponse.json({matches:Array.isArray(rows)?rows:[]},{headers:{"Cache-Control":"no-store"}});
+  const normalizePhone=(value:unknown)=>String(value||"").replace(/[^0-9]/g,"").slice(-10);
+  const currentPhone=normalizePhone(p.get("phone"));
+  const currentEmail=String(p.get("email")||"").trim().toLowerCase();
+  const currentType=p.get("source_type"),currentKey=p.get("source_key");
+  const matches=(Array.isArray(rows)?rows:[]).map((row:any)=>{
+    const sources=(Array.isArray(row.source_records)?row.source_records:[]).filter((source:any)=>!(source.source_type===currentType&&source.source_key===currentKey));
+    return {...row,source_records:sources,source_count:sources.length};
+  }).filter((row:any)=>{
+    const phone=normalizePhone(row.candidate_phone);
+    const email=String(row.candidate_email||"").trim().toLowerCase();
+    if(currentPhone.length===10&&phone===currentPhone)return false;
+    if(currentEmail&&email&&currentEmail===email)return false;
+    return row.source_records.length>0;
+  });
+  return NextResponse.json({matches},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Match lookup unavailable."},{status:502});}
 }
 export async function POST(request:NextRequest){
