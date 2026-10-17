@@ -31,7 +31,7 @@ export default function ReadinessContactReview({phone}:{phone:string}){
  return <div style={{marginTop:14,borderTop:"1px solid #e2e8f0",paddingTop:12,fontSize:12}}>
   <button type="button" onClick={()=>{setOpen(v=>!v);if(!open)void refresh();}} style={{border:"1px solid #c4b5fd",borderRadius:8,padding:"8px 10px",background:"#faf9ff",color:"#6d28d9",fontWeight:800}}>Review Readiness updates</button>
   {open?<div style={{marginTop:10}}>
-   <p style={{color:"#64748b"}}Select reservations that should use this customer's primary contacts. Existing reservation-specific corrections are shown below. Nothing changes until you apply.</p>
+   <p style={{color:"#64748b"}}>Select reservations that should use this customer's primary contacts. Existing reservation-specific corrections are shown below. Nothing changes until you apply.</p>
    {rows.map(row=><label key={row.confirmation} style={{display:"block",padding:10,margin:"7px 0",border:"1px solid #e2e8f0",borderRadius:9}}>
     <input type="checkbox" checked={selected.includes(row.confirmation)} onChange={e=>setSelected(p=>e.target.checked?[...p,row.confirmation]:p.filter(c=>c!==row.confirmation))}/>
     <strong> {row.confirmation} · {row.name}</strong>
