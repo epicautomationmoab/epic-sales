@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PingBadge from "./PingBadge";
 type ActiveSection = "inbox" | "missed-calls" | "phone-report" | "leads" | "customers" | "quote" | "call-recordings" | "ping" | "catch-up";
 
@@ -36,6 +36,8 @@ export default function EpicC360Sidebar({
   canManage = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mentionCount, setMentionCount] = useState(0);
+  useEffect(() => { let mounted=true; const refresh=async()=>{try{const r=await fetch("/api/my-catch-up",{cache:"no-store"});if(!r.ok)return;const data=await r.json();if(mounted)setMentionCount(Number(data.mentions?.unread_count||0));}catch{}};void refresh();const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void refresh()},15000);return()=>{mounted=false;window.clearInterval(timer)};},[]);
   const [loggingOut, setLoggingOut] = useState(false);
   async function logout() {
     setLoggingOut(true);
@@ -61,7 +63,7 @@ export default function EpicC360Sidebar({
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>{item.label}</a>
         </>) : (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
-            {item.label}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
+            {item.label}{item.key==="catch-up"&&mentionCount>0?<span aria-label={`${mentionCount} unread mentions`} style={{marginLeft:8,padding:"2px 7px",background:"#d84a27",borderRadius:12,color:"#fff",fontSize:11,fontWeight:800}}>{mentionCount}</span>:null}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
           </a>
         ))}
         {canManage ? <a href="/inbox/blocked-domains">Blocked Email Domains</a> : null}
