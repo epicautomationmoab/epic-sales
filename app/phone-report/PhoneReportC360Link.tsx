@@ -23,13 +23,13 @@ export default function PhoneReportC360Link({
     >
       Open EpicC360 →
     </button>
-    <Customer360Modal
-      open={open}
+    {open?<Customer360Modal
+      open={true}
       onClose={()=>setOpen(false)}
       contactId={contactId||null}
       reservationId={reservationId||null}
       reservationConfirmation={reservationConfirmation||null}
       phone={phone||null}
-    />
+    />:null}
   </>;
 }
