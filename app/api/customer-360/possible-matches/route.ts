@@ -10,7 +10,7 @@ async function authorized(request:NextRequest){
 }
 async function rpc(token:string,fn:string,body:unknown){
  const response=await fetch(url+"/rest/v1/rpc/"+fn,{method:"POST",cache:"no-store",headers:{"apikey":anonKey,"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
- if(!response.ok)throw new Error("Identity review service unavailable ("+response.status+").");
+ if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(String(body?.message||body?.error||"Identity review service unavailable")+" ("+response.status+").");}
  return response.json();
 }
 export async function GET(request:NextRequest){
