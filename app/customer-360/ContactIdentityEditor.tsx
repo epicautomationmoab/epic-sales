@@ -51,11 +51,11 @@ export default function ContactIdentityEditor({name,phone,email}:Props){
     {methods.filter(m=>m.type===t).length===0?<p style={{fontSize:12}}>No {t} on file.</p>:null}
     <button type="button" disabled={!linked||loading} onClick={()=>{setType(t);setEditing(null);setValue("");setFormOpen(true);}} style={{...actionStyle,marginTop:4,borderStyle:"dashed",color:"#6d28d9"}}>+ Add {t}</button>
     {linked&&formOpen&&type===t?<div style={{border:"1px solid #c4b5fd",borderRadius:12,padding:14,background:"#faf9ff"}}>
-    <strong>{editing?"Edit "+editing.type:"Add "+type}</strong>
+    <strong>{editing?"Replace preferred "+editing.type+" (preserve previous contact)":"Add "+type}</strong>
     <input aria-label="Contact value" type={type==="email"?"email":"tel"} value={value} onChange={e=>setValue(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:"10px 12px",margin:"10px 0",border:"1px solid #cbd5e1",borderRadius:9,fontSize:13}} placeholder={type==="phone"?"Phone number":"Email address"}/>
     <div style={{display:"flex",gap:8}}>
      <button type="button" style={gradientStyle} disabled={loading||!value.trim()} onClick={async()=>{
-      if(editing){await change("add",type,value,editing.primary);if(!editing.primary)await change("remove",editing.type,editing.value);}
+      if(editing){await change("add",type,value,editing.primary);}
       else await change("add",type,value);
      }}>Save contact</button>
      <button type="button" style={actionStyle} onClick={()=>{setEditing(null);setValue("");setFormOpen(false);}}>Cancel</button>
