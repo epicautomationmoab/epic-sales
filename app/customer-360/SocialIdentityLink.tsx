@@ -24,3 +24,5 @@ export default function SocialIdentityLink({contactId,onLinked}:{contactId:strin
    {error?<p className={styles.error} role="alert">{error}</p>:null}
   </section>:null}
  </div>;
+
+}
