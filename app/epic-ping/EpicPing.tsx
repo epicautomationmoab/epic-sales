@@ -11,7 +11,7 @@ async function act(payload:object){setBusy(true);setError("");try{const r=await 
 const unread=(data?.messages||[]).filter(p=>p.to_id===data?.profile.id&&!p.status).length;
 const incoming=(data?.messages||[]).filter(p=>p.to_id===data?.profile.id);
 const sent=(data?.messages||[]).filter(p=>p.from_id===data?.profile.id);
-const [view,setView]=[tab,setTab];
+const view=tab;
 const shown=view==="incoming"?incoming:view==="sent"?sent:(data?.messages||[]);
 const btn={border:"1px solid #d9e1eb",borderRadius:9,padding:"9px 13px",fontSize:12,fontWeight:800,cursor:"pointer",background:"#fff",color:"#334155"} as const;
 return <main style={{maxWidth:1060,margin:"0 auto",padding:"30px clamp(16px,3vw,44px)",display:"grid",gap:22,color:"#172033"}}>
