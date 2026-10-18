@@ -44,7 +44,7 @@ export default function ReservationReadiness({confirmation,customerName,customer
    <button type="button" onClick={()=>setExpanded(true)} style={{...button,color:"#fff",borderColor:"#1d4ed8",background:"#1d4ed8"}}>View Documents</button>
    {isRental&&documents[0]?.mpwrReservationUrl?view(documents[0].mpwrReservationUrl,"MPWR Reservation"):null}
    {view(destination,"Full Readiness")}
-   <a href={destination} target="_blank" rel="noreferrer" title="Open this reservation in Epic Tools Readiness to resend its original confirmation email" style={{...button,gridColumn:"1 / -1",textAlign:"center",textDecoration:"none",fontWeight:850,color:"#fff",background:"#15803d",borderColor:"#15803d"}}>Resend Confirmation Email</a>
+   <a href={destination} target="_blank" rel="noreferrer" title="Open this reservation in Epic Tools Readiness to resend its original confirmation email" style={{...button,gridColumn:"1 / -1",textAlign:"center",textDecoration:"none",fontWeight:850,color:"#fff",background:"#15803d",borderColor:"#15803d"}}>Resend Confirmation in Readiness</a>
   </div>
   {expanded?<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setExpanded(false)}} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(15,23,42,.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
    <div role="dialog" aria-modal="true" aria-label="Reservation documents" style={{background:"#fff",color:"#172033",borderRadius:16,padding:"20px 22px",width:"min(720px,100%)",maxHeight:"88vh",overflowY:"auto",boxShadow:"0 25px 70px #0f172a44"}}>
