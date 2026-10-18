@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     ]);
     const podiumThreads = await rpc(session.accessToken, "get_c360_podium_inbox", {});
     const telnyxThreads = await rpc(session.accessToken, "get_c360_telnyx_inbox", {});
-    const socialThreads: any[] = []; // Podium social disabled; direct Meta is authoritative.
+    const socialThreads = await rpc(session.accessToken, "get_c360_social_inbox", {}); // Keep received social messages visible while direct Meta delivery is incomplete.
     const metaThreads = await rpc(session.accessToken,"get_c360_meta_inbox",{});
     const blocked = (Array.isArray(blockedRows) ? blockedRows : []).map((row: { domain?: string }) => String(row.domain || "").toLowerCase()).filter(Boolean);
     const filteredThreads = [...(Array.isArray(threads) ? threads : []), ...(Array.isArray(podiumThreads) ? podiumThreads : []), ...(Array.isArray(telnyxThreads) ? telnyxThreads : []), ...(Array.isArray(socialThreads) ? socialThreads : []).filter((t:any)=>!((metaThreads||[]).some((m:any)=>m.platform===t.platform&&m.customer_name===t.customer_name&&m.preview===t.preview))), ...(Array.isArray(metaThreads) ? metaThreads : [])].filter((thread: { kind?: string; email?: string | null }) => {
