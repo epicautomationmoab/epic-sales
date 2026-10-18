@@ -18,7 +18,8 @@ export async function GET(request:NextRequest){
  if(!token)return NextResponse.json({error:"Employee login required"},{status:401});
  const phone=request.nextUrl.searchParams.get("phone")||"";
  if(!phone)return NextResponse.json({error:"Phone required"},{status:400});
- try{return NextResponse.json(await rpc(token,"c360_employee_linked_contact_methods",{p_phone:phone}),{headers:{"Cache-Control":"no-store"}});}
+ try{const linked=await rpc(token,"c360_employee_linked_contact_methods",{p_phone:phone});
+ return NextResponse.json(linked?.linked?linked:await rpc(token,"c360_employee_regular_contact",{p_phone:phone,p_email:request.nextUrl.searchParams.get("email")||null}),{headers:{"Cache-Control":"no-store"}});}
  catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Contact lookup failed"},{status:400});}
 }
 export async function POST(request:NextRequest){
@@ -27,7 +28,8 @@ export async function POST(request:NextRequest){
  try{
  const b=await request.json();
  if(typeof b.phone!=="string"||typeof b.value!=="string"||b.value.length>254||!["phone","email"].includes(b.type)||!["add","remove","primary"].includes(b.action))return NextResponse.json({error:"Invalid contact change"},{status:400});
- const result=await rpc(token,"c360_employee_manage_contact_method",{p_phone:b.phone,p_action:b.action,p_type:b.type,p_value:b.value,p_make_primary:b.make_primary===true});
+ const current=await rpc(token,"c360_employee_linked_contact_methods",{p_phone:b.phone});
+ const result=current?.linked?await rpc(token,"c360_employee_manage_contact_method",{p_phone:b.phone,p_action:b.action,p_type:b.type,p_value:b.value,p_make_primary:b.make_primary===true}):await rpc(token,"c360_employee_regular_contact",{p_phone:b.phone,p_email:b.email||null,p_action:b.action,p_type:b.type,p_value:b.value,p_make_primary:b.make_primary===true});
  return NextResponse.json(result,{headers:{"Cache-Control":"no-store"}});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Contact change failed"},{status:400});}
 }
