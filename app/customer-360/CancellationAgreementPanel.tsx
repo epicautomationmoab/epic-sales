@@ -37,6 +37,7 @@ type CancellationAgreementPanelProps = {
   row: ReadinessRow;
   autoOpen?: boolean;
   showLauncher?: boolean;
+  compactLauncher?: boolean;
   onPopupClose?: () => void;
   dismissWhenHandledElsewhere?: boolean;
 };
@@ -66,6 +67,7 @@ export default function CancellationAgreementPanel({
   row,
   autoOpen = false,
   showLauncher = true,
+  compactLauncher = false,
   onPopupClose,
   dismissWhenHandledElsewhere = false,
 }: CancellationAgreementPanelProps) {
@@ -241,7 +243,9 @@ export default function CancellationAgreementPanel({
 
   return (
     <>
-      {showLauncher ? (
+      {showLauncher ? compactLauncher ? (
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,border:"1px solid #e2e8f0",borderRadius:10,padding:11,marginTop:10}}><div><strong style={{fontSize:12}}>Cancellation acknowledgement</strong><div style={{fontSize:11,color:"#64748b",marginTop:3}}>{agreement?statusLabel(agreement.status):loading?"Checking status…":"Not sent"}</div></div><button type="button" onClick={()=>{setIsOpen(true);void loadStatus()}} style={{background:"#fff",color:"#334155",fontSize:12,fontWeight:750,border:"1px solid #d9e0ea",padding:"8px 10px",borderRadius:9,cursor:"pointer",whiteSpace:"nowrap"}}>{agreement?"View":"Send"}</button></div>
+      ) : (
         <section className={styles.panel}>
           <div className={styles.heading}>
             <div>
