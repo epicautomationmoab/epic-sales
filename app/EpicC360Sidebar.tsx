@@ -16,7 +16,6 @@ type Props = {
 
 const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "inbox", href: "/inbox", label: "Inbox" },
-  { key: "ping", href: "/epic-ping", label: "Epic Ping" },
   { key: "catch-up", href: "/my-catch-up", label: "My Catch-Up" },
   { key: "missed-calls", href: "/missed-calls", label: "Missed Calls" },
   { key: "leads", href: "/leads", label: "Sales Opportunities" },
@@ -24,6 +23,7 @@ const items: Array<{ key: ActiveSection; href: string; label: string }> = [
   { key: "customers", href: "/customers", label: "C360" },
   { key: "phone-report", href: "/phone-report", label: "Phone Report" },
   { key: "call-recordings", href: "/call-recordings", label: "Call Recordings" },
+  { key: "ping", href: "/epic-ping", label: "Epic Ping" },
 ];
 
 export default function EpicC360Sidebar({
@@ -58,9 +58,9 @@ export default function EpicC360Sidebar({
         <div className="epicC360Tagline">Every customer. One complete history.</div>
       </div>
       <nav className={navClassName}>
-        {items.map((item) => item.key === "customers" ? (<>
+        {items.map((item) => item.key === "catch-up" ? (<>
           <button key="new-lead-sheet" type="button" onClick={() => window.dispatchEvent(new Event("epicc360:new-lead-sheet"))} style={{display:"block",width:"calc(100% - 22px)",margin:"7px 11px 12px",padding:"11px 12px",border:"1px solid #e33732",borderRadius:24,background:"#c92320",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",textAlign:"center"}}>+ New Lead Sheet</button>
-          <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>{item.label}</a>
+          <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>{item.label}{mentionCount>0?<span style={{marginLeft:8,padding:"2px 7px",background:"#d84a27",borderRadius:12,color:"#fff",fontSize:11,fontWeight:800}}>{mentionCount}</span>:null}</a>
         </>) : (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
             {item.label}{item.key==="catch-up"&&mentionCount>0?<span aria-label={`${mentionCount} unread mentions`} style={{marginLeft:8,padding:"2px 7px",background:"#d84a27",borderRadius:12,color:"#fff",fontSize:11,fontWeight:800}}>{mentionCount}</span>:null}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
