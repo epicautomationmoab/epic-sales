@@ -108,6 +108,7 @@ function mergeCallRailWithPbxInbound(callrailCalls:any[],pbxInboundCalls:any[]) 
       lead_score:call.lead_score??null,
       lead_explanation:call.lead_explanation||null,
       source_name:call.source_name||"Grandstream PBX",
+      customer_phone_number:call.customer_phone_number||null,
       campaign:call.campaign||null,
       matched_reservation_id:call.matched_reservation_id||null,
       matched_opportunity_id:call.matched_opportunity_id||null,
@@ -137,7 +138,61 @@ export async function GET(request: NextRequest) {
   if (!Object.values(body).some(Boolean)) return NextResponse.json({ error: "Customer identity is required." }, { status: 400 });
 
   try {
-    const customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    let customer = normalizeCustomerReservationTimes(await rpcNamed(session.accessToken, "get_epic_customer_360", body));
+    // Add source histories only after an employee has explicitly confirmed the phone relationship.
+    const currentPhone=String(customer?.identity?.phone||body.p_phone||"").replace(/[^0-9]/g,"").slice(-10);
+    if(currentPhone.length===10){
+      const linkedPhones=await rpcNamed(session.accessToken,"c360_linked_phones",{p_phone:currentPhone}).catch(()=>[]);
+      for(const linkedPhone of Array.isArray(linkedPhones)?linkedPhones.slice(0,8):[]){
+        if(String(linkedPhone)===currentPhone)continue;
+        const other=normalizeCustomerReservationTimes(await rpcNamed(session.accessToken,"get_epic_customer_360",{
+          p_contact_id:null,p_opportunity_id:null,p_reservation_id:null,p_phone:linkedPhone,p_email:null
+        }));
+        if(!other)continue;
+        for(const key of ["calls","texts","emails","reservations","opportunities","drafts","quotes","notes"]){
+          const left=Array.isArray(customer?.[key])?customer[key]:[];
+          const right=Array.isArray(other?.[key])?other[key]:[];
+          const dedup=new Map<string,any>();
+          for(const item of [...left,...right]){
+            const id=String(item?.id||item?.confirmation_code||JSON.stringify(item));
+            if(!dedup.has(id))dedup.set(id,item);
+          }
+          customer[key]=[...dedup.values()];
+        }
+        if(!customer?.identity?.email && other?.identity?.email)customer.identity.email=other.identity.email;
+        if(!customer?.identity?.name && other?.identity?.name)customer.identity.name=other.identity.name;
+        customer.identity.linked_phones=[...new Set([...(customer.identity.linked_phones||[]),linkedPhone])];
+      }
+    }
+    // Show the caller's number, not the Epic tracking line, on CallRail timeline entries.
+    if(Array.isArray(customer?.calls)){
+      const callIds=customer.calls.map((c:any)=>String(c.id||"")).filter((id:string)=>id.startsWith("CAL"));
+      if(callIds.length){
+        const origins=await rpcNamed(session.accessToken,"c360_employee_call_origins",{p_call_ids:callIds}).catch(()=>({}));
+        for(const call of customer.calls){
+          if(origins?.[call.id])call.customer_phone_number=origins[call.id];
+        }
+      }
+    }
+    // Primary choices are explicit; opening the secondary number cannot promote it.
+    if(currentPhone.length===10 && customer?.identity){
+      const primary=await rpcNamed(session.accessToken,"c360_linked_primary_contact",{p_phone:currentPhone}).catch(()=>null);
+      if(primary?.phone)customer.identity.phone="+1"+primary.phone;
+      if(primary?.email)customer.identity.email=primary.email;
+      if(!primary?.phone){
+        const regular=await rpcNamed(session.accessToken,"c360_employee_regular_contact",{p_phone:currentPhone,p_email:customer.identity.email||null}).catch(()=>null);
+        if(regular?.primary_phone)customer.identity.phone="+1"+regular.primary_phone;
+        if(regular?.primary_email)customer.identity.email=regular.primary_email;
+      }
+    }
+    // A caller with no reservation/lead still deserves a named, discoverable C360.
+    // Only fall back to CallRail when the canonical customer identity has no name.
+    if (customer?.identity && !customer.identity.name && body.p_phone) {
+      const callerName = await rpcNamed(session.accessToken, "c360_inbound_caller_name", {p_phone:body.p_phone}).catch(()=>null);
+      if (typeof callerName==="string" && callerName.trim()) {
+        customer.identity.name = callerName.trim();
+      }
+    }
 
     let pbxCalls:any[] = [];
     let pbxInboundCalls:any[] = [];
@@ -191,7 +246,7 @@ export async function GET(request: NextRequest) {
     // Include notes filed under the actual inbound phone thread, even when no opportunity exists.
     const noteThreadKeys=[...new Set([
       ...opportunityIds.map((id:string)=>`opp:${id}`),
-      ...(identityPhone.length===10?[`phone:+1${identityPhone}`]:[]),
+      ...[identityPhone,...(Array.isArray(customer?.identity?.linked_phones)?customer.identity.linked_phones:[])].filter((phone:any)=>String(phone).length===10).map((phone:any)=>`phone:+1${phone}`),
       ...(customer?.identity?.contact_id?[ `contact:${customer.identity.contact_id}` ]:[]),
       ...(!identityPhone.length&&customer?.identity?.email?[ `email:${String(customer.identity.email).trim().toLowerCase()}` ]:[]),
       ...(!identityPhone.length&&!customer?.identity?.contact_id&&!customer?.identity?.email&&customer?.reservations?.[0]?.id?[ `reservation:${customer.reservations[0].id}` ]:[]),
