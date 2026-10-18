@@ -17,15 +17,15 @@ export default function ContactIdentityEditor({name,phone,email}:Props){
  const [editing,setEditing]=useState<Method|null>(null);
  const [formOpen,setFormOpen]=useState(false);
  async function load(){if(!phone)return;setLoading(true);setStatus("");try{
-  const res=await fetch("/api/customer-360/contact-methods?phone="+encodeURIComponent(phone),{cache:"no-store"});
+  const res=await fetch("/api/customer-360/contact-methods?phone="+encodeURIComponent(phone)+"&email="+encodeURIComponent(email||""),{cache:"no-store"});
   const result=await res.json();if(!res.ok)throw new Error(result.error||"Unable to load contacts");
-  setMethods(result.linked?(result.methods||[]):[{id:null,type:"phone",value:phone||"",primary:true},...(email?[{id:null,type:"email",value:email,primary:true}]:[])].filter(m=>m.value) as Method[]);setLinked(Boolean(result.linked));
+  setMethods(result.methods||[]);setLinked(Boolean(result.linked||result.editable));
  }catch(e){setStatus(e instanceof Error?e.message:"Unable to load contacts");}finally{setLoading(false);}}
  useEffect(()=>{if(open)void load();},[open,phone]);
  async function change(action:"add"|"remove"|"primary",methodType:"phone"|"email",methodValue:string,makePrimary=false){
   setLoading(true);setStatus("");
   try{
-   const res=await fetch("/api/customer-360/contact-methods",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,action,type:methodType,value:methodValue,make_primary:makePrimary})});
+   const res=await fetch("/api/customer-360/contact-methods",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone,email,action,type:methodType,value:methodValue,make_primary:makePrimary})});
    const result=await res.json();if(!res.ok)throw new Error(result.error||"Unable to save contact change");
    setMethods(result.methods||[]);setStatus("Saved. Reopen C360 to refresh the header.");
    setEditing(null);setValue("");setFormOpen(false);
@@ -37,7 +37,7 @@ export default function ContactIdentityEditor({name,phone,email}:Props){
    <div style={{fontSize:17,fontWeight:850,letterSpacing:"-.02em"}}>{name||"Customer"}</div><div style={{fontSize:12,color:"#f05a28",fontWeight:800,letterSpacing:".08em",marginTop:3}}>CONTACT DETAILS</div>
    <p style={{fontSize:12,color:"#64748b",lineHeight:1.5,margin:"10px 0 16px"}}>Edit preferred contact information or add another way to reach this customer.</p>
    {loading?<p style={{fontSize:12}}>Saving or loading…</p>:null}
-   {!linked?<p style={{fontSize:12}}>Contact editing is available for confirmed linked customers.</p>:null}
+   {!linked?<p style={{fontSize:12}}>Contact editing is unavailable for this record.</p>:null}
    {(["phone","email"] as const).map(t=><div key={t} style={{margin:"15px 0 19px"}}>
     <div style={{fontSize:13,fontWeight:850,marginBottom:10}}>{t==="phone"?"Phone numbers":"Email addresses"}</div>
     {methods.filter(m=>m.type===t).map(m=><div key={m.id||m.value} style={{padding:"12px",marginBottom:8,border:"1px solid #e2e8f0",borderRadius:11,background:m.primary?"#faf9ff":"#f8fafc"}}>
