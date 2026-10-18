@@ -63,7 +63,7 @@ export default function EpicC360Sidebar({
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>{item.label}{mentionCount>0?<span style={{marginLeft:8,padding:"2px 7px",background:"#d84a27",borderRadius:12,color:"#fff",fontSize:11,fontWeight:800}}>{mentionCount}</span>:null}</a>
         </>) : (
           <a key={item.key} className={active === item.key ? activeClassName : undefined} href={item.href}>
-            {item.label}{item.key==="catch-up"&&mentionCount>0?<span aria-label={`${mentionCount} unread mentions`} style={{marginLeft:8,padding:"2px 7px",background:"#d84a27",borderRadius:12,color:"#fff",fontSize:11,fontWeight:800}}>{mentionCount}</span>:null}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
+            {item.label}{item.key==="ping"?<PingBadge endpoint="/api/epic-ping" href="/epic-ping"/>:null}
           </a>
         ))}
         {canManage ? <a href="/inbox/blocked-domains">Blocked Email Domains</a> : null}
