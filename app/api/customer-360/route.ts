@@ -179,6 +179,11 @@ export async function GET(request: NextRequest) {
       const primary=await rpcNamed(session.accessToken,"c360_linked_primary_contact",{p_phone:currentPhone}).catch(()=>null);
       if(primary?.phone)customer.identity.phone="+1"+primary.phone;
       if(primary?.email)customer.identity.email=primary.email;
+      if(!primary?.phone){
+        const regular=await rpcNamed(session.accessToken,"c360_employee_regular_contact",{p_phone:currentPhone,p_email:customer.identity.email||null}).catch(()=>null);
+        if(regular?.primary_phone)customer.identity.phone="+1"+regular.primary_phone;
+        if(regular?.primary_email)customer.identity.email=regular.primary_email;
+      }
     }
     // A caller with no reservation/lead still deserves a named, discoverable C360.
     // Only fall back to CallRail when the canonical customer identity has no name.
