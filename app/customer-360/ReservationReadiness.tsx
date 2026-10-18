@@ -25,7 +25,7 @@ export default function ReservationReadiness({confirmation,customerName,customer
  useEffect(()=>{void refresh();},[confirmation]);
  const destination="https://epic-tools-app.vercel.app/team/readiness?confirmation="+encodeURIComponent(confirmation);
  const isRental=documents[0]?.businessLine?.toLowerCase()==="rental";
- const epicCoverage=(d:Docs)=>{const covered=d.epic.reduce((n,p)=>n+1+(p.minors?.length||0),0);return {received:Math.max(d.epicReceived,covered),expected:Math.max(d.epicExpected,covered)};};
+ const epicCoverage=(d:Docs)=>{const covered=d.epic.reduce((n,p)=>n+1+(p.minors?.length||0),0);return {received:Math.max(d.epicReceived,covered),expected:d.epicExpected};};
  const portalUrl=documents[0]?.guestPortalUrl?"https://epic-tools-app.vercel.app"+documents[0].guestPortalUrl:null;
  const ohv=(documents[0]?.ohv?.length??0)>0?"Received ("+documents[0]!.ohv!.length+")":"Not uploaded";
  return <div style={{marginTop:10,borderTop:"1px solid #e4e8ed",paddingTop:9,fontSize:12}}>
