@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Customer360Modal from "../customer-360/Customer360Modal";
 import LeadWorkModal from "./LeadWorkModal";
 import LostReasonDialog from "../LostReasonDialog";
+import CloseReasonDialog from "./CloseReasonDialog";
 import ReleaseClaimDialog from "./ReleaseClaimDialog";
 import styles from "./Leads.module.css";
 
@@ -120,6 +121,8 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
     finally{setBusyId(null);}
   }
 
+  const [closeLead,setCloseLead]=useState<SalesLead|null>(null);
+  async function confirmClose(reason:string,note:string){if(!closeLead)return;const lead=closeLead;setBusyId(lead.id);setError("");try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"retire",opportunity_id:lead.id,reason,note_text:note||null})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Unable to close opportunity.");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to close opportunity.");setBusyId(null);setCloseLead(null);}}
   const [lostLead,setLostLead]=useState<SalesLead|null>(null);
   async function confirmLost(category:string,reason:string,note:string){if(!lostLead)return;const lead=lostLead;setBusyId(lead.id);setError("");try{const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"mark_lost",opportunity_id:lead.id,reason:`${category} | ${reason}`,note_text:note||null})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Could not mark lead lost.");window.location.reload();}catch(e){setError(e instanceof Error?e.message:"Unable to mark lost.");setBusyId(null);}}
   async function confirmRelease(reason:string,note:string){
@@ -136,22 +139,15 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
     finally{setBusyId(null);}
   }
   async function action(lead:SalesLead, kind:"claim"|"retire"|"mark_lost"|"release_with_note"){
-    let note="";
     if(kind==="release_with_note"){setReleaseLead(lead);setError("");return;}
-    if(kind==="retire"){
-      const entered=window.prompt("Why are you closing this sales opportunity?");
-      if(entered===null)return;
-      note=entered.trim();
-      if(!note){setError("Add a short reason before closing the cart.");return;}
-    }
+    if(kind==="retire"){setCloseLead(lead);setError("");return;}
     if(kind==="mark_lost"){setLostLead(lead);return;}
     setBusyId(lead.id);setError("");
     try{
       const response=await fetch("/api/leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         action:kind,
         opportunity_id:lead.id,
-        reason:kind==="retire"?"other":undefined,
-        note_text:note||undefined,
+        
       })});
       const payload=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(payload?.error||"Unable to update sales opportunity.");
@@ -230,6 +226,7 @@ export default function LeadsClient({leads,profileName}:{leads:SalesLead[];profi
       onLeadUpdated={()=>window.location.reload()}
     />:null}
     {releaseLead?<ReleaseClaimDialog customerName={releaseLead.customer_name||"Customer"} busy={busyId===releaseLead.id} error={error} onCancel={()=>{setReleaseLead(null);setError("");}} onConfirm={confirmRelease}/>:null}
+    {closeLead?<CloseReasonDialog customerName={closeLead.customer_name||"Customer"} busy={busyId===closeLead.id} onCancel={()=>setCloseLead(null)} onConfirm={confirmClose}/>:null}
     {lostLead?<LostReasonDialog busy={busyId===lostLead.id} onCancel={()=>setLostLead(null)} onConfirm={confirmLost}/>:null}
     {selected?<Customer360Modal open={true} onClose={()=>setSelected(null)} opportunityId={selected.id} phone={selected.phone_e164} email={selected.email}/>:null}
   </>;
