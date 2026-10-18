@@ -19,7 +19,7 @@ return <main style={{maxWidth:1060,margin:"0 auto",padding:"30px clamp(16px,3vw,
   <div><div style={{fontSize:11,letterSpacing:2,fontWeight:900,color:"#fba07d"}}>EPIC TEAM COMMUNICATION</div><h1 style={{fontSize:29,margin:"7px 0 6px",letterSpacing:"-.04em"}}>Epic Ping</h1><p style={{fontSize:13,color:"#d8e1ed",margin:0}}>A quick message to a teammate, without involving a customer record.</p></div>
   <div style={{background:"rgba(255,255,255,.11)",border:"1px solid rgba(255,255,255,.2)",padding:"13px 18px",borderRadius:12,minWidth:120,textAlign:"center"}}><div style={{fontSize:27,fontWeight:900}}>{unread}</div><div style={{fontSize:11,color:"#d8e1ed"}}>Awaiting your response</div></div>
  </header>
- <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,340px),1fr))",gap:16,alignItems:"start"}}>
+ <section style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:16,alignItems:"start"}}>
   <div style={{background:"#fff",border:"1px solid #e0e7ef",borderRadius:15,padding:22,display:"grid",gap:14,boxShadow:"0 4px 16px #0f172a08"}}>
    <div><h2 style={{fontSize:19,margin:"0 0 4px"}}>Send a Ping</h2><p style={{fontSize:12,color:"#64748b",margin:0}}>Choose a colleague and send a quick internal note.</p></div>
    <label style={{fontSize:12,fontWeight:800,display:"grid",gap:6}}>To <select aria-label="Choose colleague" value={recipient} onChange={e=>setRecipient(e.target.value)} style={{width:"100%",border:"1px solid #cbd5e1",borderRadius:9,padding:"11px 12px",background:"#fff",color:"#172033",fontSize:13}}><option value="">Choose colleague…</option>{(data?.members||[]).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
