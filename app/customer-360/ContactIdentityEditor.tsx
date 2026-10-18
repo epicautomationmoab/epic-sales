@@ -6,7 +6,7 @@ const formatPhone=(v:string)=>{const digits=v.replace(/\D/g,"");return digits.le
 const actionStyle={padding:"7px 11px",borderRadius:8,border:"1px solid #d7deea",background:"#fff",color:"#334155",fontSize:12,fontWeight:700,cursor:"pointer"} as const;
 const gradientStyle={...actionStyle,border:"none",color:"#fff",background:"linear-gradient(110deg,#7c3aed,#c339a0,#f97316)"} as const;
 type Props={name:string|null|undefined;phone:string|null|undefined;email:string|null|undefined;contactId:string|null|undefined};
-export default function ContactIdentityEditor({name,phone}:Props){
+export default function ContactIdentityEditor({name,phone,email}:Props){
  const [open,setOpen]=useState(false);
  const [methods,setMethods]=useState<Method[]>([]);
  const [linked,setLinked]=useState(false);
@@ -19,7 +19,7 @@ export default function ContactIdentityEditor({name,phone}:Props){
  async function load(){if(!phone)return;setLoading(true);setStatus("");try{
   const res=await fetch("/api/customer-360/contact-methods?phone="+encodeURIComponent(phone),{cache:"no-store"});
   const result=await res.json();if(!res.ok)throw new Error(result.error||"Unable to load contacts");
-  setMethods(result.methods||[]);setLinked(Boolean(result.linked));
+  setMethods(result.linked?(result.methods||[]):[{id:null,type:"phone",value:phone||"",primary:true},...(email?[{id:null,type:"email",value:email,primary:true}]:[])].filter(m=>m.value) as Method[]);setLinked(Boolean(result.linked));
  }catch(e){setStatus(e instanceof Error?e.message:"Unable to load contacts");}finally{setLoading(false);}}
  useEffect(()=>{if(open)void load();},[open,phone]);
  async function change(action:"add"|"remove"|"primary",methodType:"phone"|"email",methodValue:string,makePrimary=false){
