@@ -79,11 +79,13 @@ export async function POST(request: NextRequest) {
       };
       const code = structured ? categories[category] : rawReason;
       if (structured && (!code || !specificReason)) return NextResponse.json({error:"Choose a valid lost reason."},{status:400});
-      const note = structured ? "Lost category: "+category+"\\nLost reason: "+specificReason+(body.note_text?"\\nDetails: "+body.note_text:"") : body.note_text || null;
+      const closeReasons = ["Already booked / converted","Duplicate opportunity","Existing customer / reservation inquiry","Test or internal record","Invalid contact / spam","Not a sales opportunity","Other — explanation required"];
+      if(body.action==="retire"&&(!closeReasons.includes(rawReason)||(rawReason==="Other — explanation required"&&!body.note_text?.trim())))return NextResponse.json({error:"Choose a valid close reason and add an explanation if required."},{status:400});
+      const note = structured ? "Lost category: "+category+"\nLost reason: "+specificReason+(body.note_text?"\nDetails: "+body.note_text:"") : body.action==="retire" ? "Close reason: "+rawReason+(body.note_text?"\nDetails: "+body.note_text:"") : body.note_text || null;
       const result = await rpc(accessToken, "epic_sales_close_lead", {
         p_opportunity_id: opportunityId,
         p_status: body.action === "mark_lost" ? "lost" : "retired",
-        p_reason: code || "",
+        p_reason: body.action==="retire" ? "other" : code || "",
         p_note: note,
       });
       return NextResponse.json(result || { ok: true });
