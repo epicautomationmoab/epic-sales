@@ -28,8 +28,8 @@ export default function CloseReasonDialog({customerName,busy,onCancel,onConfirm}
         <textarea rows={3} value={note} disabled={busy} onChange={e=>setNote(e.target.value)} maxLength={2000} placeholder="Add any context that should remain in C360…" style={{border:"1px solid #cbd5e1",borderRadius:9,padding:11,font:"inherit",resize:"vertical"}}/>
       </label>
       <div style={{display:"flex",justifyContent:"flex-end",gap:9,marginTop:19}}>
-        <button type="button" disabled={busy} onClick={onCancel}>Cancel</button>
-        <button type="button" disabled={busy||!reason||(requiresNote&&!note.trim())} onClick={()=>void onConfirm(reason,note.trim())} style={{background:"#f06429",border:0,color:"#fff",padding:"11px 17px",borderRadius:9,fontWeight:800,opacity:busy||!reason||(requiresNote&&!note.trim())?.5:1}}>{busy?"Closing…":"Confirm Close"}</button>
+        <button type="button" className="epic-btn" disabled={busy} onClick={onCancel}>Cancel</button>
+        <button type="button" className="epic-btn epic-btn--primary" disabled={busy||!reason||(requiresNote&&!note.trim())} onClick={()=>void onConfirm(reason,note.trim())}>{busy?"Closing…":"Confirm Close"}</button>
       </div>
     </section>
   </div>;
