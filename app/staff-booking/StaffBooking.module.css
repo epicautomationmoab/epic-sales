@@ -3,3 +3,9 @@
 .selectedProtection,.unselectedProtection{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;white-space:nowrap}
 .selectedProtection{color:#186c45}.unselectedProtection{color:#8a3b35}
 .grid .quantity{margin-top:6px;color:#455569;font-size:11px}
+
+.protectionBadge{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-top:9px;padding:10px 12px;border-radius:10px;border:1px solid #9fd7bc;background:#eaf8f0;color:#145a38}
+.protectionBadge .protectionLabel{width:100%;margin:0;color:#24714d;font-size:10px;font-weight:900;letter-spacing:.07em}
+.protectionBadge strong{font-size:14px;line-height:1.3;flex:1 1 180px}
+.protectionBadge b{font-size:13px;white-space:nowrap}
+.line .mutedAddon,.mutedAddon{display:block;margin-top:7px;color:#87919e;font-size:11px}
