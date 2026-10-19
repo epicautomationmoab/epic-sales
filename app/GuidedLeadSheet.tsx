@@ -27,6 +27,9 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
  const [savingFinal,setSavingFinal]=useState(false);
  const [finalMessage,setFinalMessage]=useState("");
  async function saveFinal(openCustomer:boolean){
+  const rawPhone=String(data.phone||"").trim();
+  const digits=rawPhone.replace(/\D/g,"");
+  if(rawPhone && !(digits.length===10 || (digits.length===11&&digits.startsWith("1")))){setFinalMessage("Phone number must contain 10 digits, or be left blank. Please check the customer name and phone fields.");return;}
   setSavingFinal(true);setFinalMessage("");
   try{
    const response=await fetch("/api/lead-sheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:serverId,fields:data,finalize:true})});
