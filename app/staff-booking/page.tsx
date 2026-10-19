@@ -13,8 +13,8 @@ function dateLabel(value:string|null){
 }
 
 function protectionDetails(addons:any[]){
-  const protection=addons.filter((a:any)=>/adventure\\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
-  const other=addons.filter((a:any)=>!/adventure\\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
+  const protection=addons.filter((a:any)=>/adventure\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
+  const other=addons.filter((a:any)=>!/adventure\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
   return <>
     {protection.map((a:any,i:number)=><div className={styles.protectionBadge} key={i}><span className={styles.protectionLabel}>PROTECTION SELECTED</span><strong>✓ {a?.name||a?.experience_addon?.title||"Adventure Assure"}</strong><b>{addonAmount(a)}</b></div>)}
     {other.map((a:any,i:number)=><span className={styles.mutedAddon} key={i}>{a?.name||a?.experience_addon?.title||"Add-on"}</span>)}
