@@ -7,16 +7,18 @@ type Event={type:string;note:string|null;actor:string;at:string;previous_due_at?
 type Member={id:string;display_name:string};
 const localDate=(d:string|Date)=>{const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Denver",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(d));const val=(x:string)=>parts.find(p=>p.type===x)?.value||"";return val("year")+"-"+val("month")+"-"+val("day")};
 export default function ScheduledFollowUps(){
+ const [dismissedIds,setDismissedIds]=useState<string[]>([]);
  const [items,setItems]=useState<Item[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[open,setOpen]=useState<string|null>(null),[action,setAction]=useState<string|null>(null),[note,setNote]=useState(""),[due,setDue]=useState(""),[outcome,setOutcome]=useState("contacted"),[assignee,setAssignee]=useState(""),[busy,setBusy]=useState(false),[manager,setManager]=useState(false),[teamView,setTeamView]=useState(false),[members,setMembers]=useState<Member[]>([]),[employee,setEmployee]=useState("all"),[history,setHistory]=useState<string|null>(null),[events,setEvents]=useState<Event[]>([]);
- async function load(team=teamView){try{const r=await fetch("/api/followups"+(team?"?scope=team":""),{cache:"no-store"});const p=await r.json();if(!r.ok)throw Error(p.error||"Unable to load follow-ups");setItems(p.items||[]);setManager(!!p.supervisor);setError("");}catch(e){setError(e instanceof Error?e.message:"Unable to load follow-ups")}finally{setLoading(false)}}
+ async function load(team=teamView){try{const r=await fetch("/api/followups"+(team?"?scope=team":""),{cache:"no-store"});const p=await r.json();if(!r.ok)throw Error(p.error||"Unable to load follow-ups");setItems(p.items||[]);if(!team)setDismissedIds(p.dismissedIds||[]);setManager(!!p.supervisor);setError("");}catch(e){setError(e instanceof Error?e.message:"Unable to load follow-ups")}finally{setLoading(false)}}
  useEffect(()=>{void load(false);fetch("/api/followups?scope=members").then(r=>r.json()).then(p=>setMembers(p.members||[])).catch(()=>{});},[]);
+ async function dismiss(id:string){setBusy(true);setError("");try{const r=await fetch("/api/followups",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action:"dismiss"})});const p=await r.json();if(!r.ok)throw Error(p.error||"Unable to dismiss follow-up");setDismissedIds(old=>[...new Set([...old,id])]);}catch(e){setError(e instanceof Error?e.message:"Unable to dismiss")}finally{setBusy(false)}}
  async function changeView(team:boolean){setTeamView(team);setLoading(true);await load(team)}
  async function loadHistory(id:string){if(history===id){setHistory(null);return}setHistory(id);setEvents([]);try{const r=await fetch("/api/followups?scope=history&id="+encodeURIComponent(id));const p=await r.json();if(!r.ok)throw Error(p.error||"History unavailable");setEvents(p.events||[])}catch(e){setError(e instanceof Error?e.message:"History unavailable")}}
  async function save(id:string,kind:string){setBusy(true);setError("");try{const body={id,action:kind,outcome:kind==="complete"?outcome:kind==="attempt"?outcome:null,note,due_at:kind==="reschedule"&&due?new Date(due).toISOString():null,assigned_to_profile_id:kind==="reassign"?assignee:null};const r=await fetch("/api/followups",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const p=await r.json();if(!r.ok)throw Error(p.error||"Unable to update");setAction(null);setNote("");setDue("");setHistory(null);await load()}catch(e){setError(e instanceof Error?e.message:"Unable to update")}finally{setBusy(false)}}
  const today=localDate(new Date());
  const filtered=items.filter(x=>employee==="all"||x.assigned_to_profile_id===employee);
  const pending=filtered.filter(x=>x.status==="pending");
- const sections=[{name:"Overdue",rows:pending.filter(x=>localDate(x.due_at)<today)},{name:"Due Today",rows:pending.filter(x=>localDate(x.due_at)===today)},{name:"Upcoming",rows:pending.filter(x=>localDate(x.due_at)>today)},{name:"Recently Completed",rows:filtered.filter(x=>x.status==="completed").slice(0,35)}];
+ const sections=[{name:"Overdue",rows:pending.filter(x=>localDate(x.due_at)<today)},{name:"Due Today",rows:pending.filter(x=>localDate(x.due_at)===today)},{name:"Upcoming",rows:pending.filter(x=>localDate(x.due_at)>today)},{name:"Recently Completed",rows:filtered.filter(x=>x.status==="completed"&&(teamView||!dismissedIds.includes(x.id))).slice(0,35)}];
  return <section className={ui.section} style={{marginTop:18}}>
  <h2 className={ui.sectionTitle}>Scheduled Follow-Ups</h2>
  <p className={ui.sectionDescription}>Your customer commitments, connected to their complete C360 conversations.</p>
@@ -37,6 +39,7 @@ export default function ScheduledFollowUps(){
  <div className={ui.actions}>
  <button type="button" className={ui.action} onClick={()=>setOpen(item.opportunity_id)}>Open C360</button>
  <button type="button" className={ui.action} onClick={()=>void loadHistory(item.id)}>{history===item.id?"Hide history":"View history"}</button>
+ {item.status==="completed"&&!teamView?<button type="button" className={ui.action} disabled={busy} onClick={()=>void dismiss(item.id)}>Dismiss</button>:null}
  {item.status==="pending"?<>
  <button type="button" className={ui.action} onClick={()=>{setAction(item.id+":complete");setOutcome("contacted");setNote("")}}>Record outcome</button>
  <button type="button" className={ui.action} onClick={()=>{setAction(item.id+":attempt");setOutcome("no_answer");setNote("")}}>Record attempt</button>
