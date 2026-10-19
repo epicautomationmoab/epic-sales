@@ -34,7 +34,7 @@ export default function GuidedLeadSheet({phone,name,onClose,draftId}:{phone:stri
    if(!response.ok||!payload.rows?.[0]?.id)throw Error(payload.error||"Couldn't save this Lead Sheet.");
    const id=payload.rows[0].id;setServerId(id);
    try{localStorage.setItem(key+":server-id",id);}catch{}
-   setSaveStatus(payload.contactId?"Saved to customer C360":"Lead Sheet saved — customer not yet linked");setFinalMessage(payload.contactId?"Saved and linked to customer C360.":"Lead Sheet saved. No customer linked yet; enter a phone number to create or match a C360 customer.");
+   setSaveStatus(payload.opportunityStatus==="claimed"?"Sales Opportunity claimed":payload.contactId?"Saved to customer C360":"Lead Sheet saved — customer not yet linked");setFinalMessage(payload.opportunityStatus==="claimed"?"Saved to C360 and claimed in Sales Opportunities.":payload.opportunityStatus==="already_claimed"?"Saved to C360. Existing Sales Opportunity remains claimed by its current representative.":payload.opportunityStatus==="needs_contact"?"Lead Sheet saved. Add a phone number or email to create a Sales Opportunity.":payload.contactId?"Saved and linked to customer C360.":"Lead Sheet saved.");
    if(openCustomer&&payload.contactId){window.location.href="/customers?q="+encodeURIComponent(String(data.phone||""))+"&open=1";}else if(!openCustomer){onClose();}
   }catch(e){setFinalMessage(e instanceof Error?e.message:"Unable to save.");}
   finally{setSavingFinal(false);}
