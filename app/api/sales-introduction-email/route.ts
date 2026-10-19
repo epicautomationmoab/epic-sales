@@ -21,3 +21,17 @@ export async function POST(request: NextRequest) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("epic_access_token")?.value || "";
+  const id = request.nextUrl.searchParams.get("opportunity_id") || "";
+  if (!token) return NextResponse.json({error:"Employee login required"}, {status:401});
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({error:"Invalid opportunity"}, {status:400});
+  const base=(process.env.NEXT_PUBLIC_SUPABASE_URL||"https://kbuxcvqzicnydqllyong.supabase.co").replace(/\/+$/,"");
+  const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"sb_publishable_Jw6uPe9tju4BGeUI6vkucQ_MI-EiRVZ";
+  const url=base+"/rest/v1/gmail_messages?matched_sales_opportunity_id=eq."+encodeURIComponent(id)+"&source_type=eq.sales_introduction&direction=eq.outbound&select=sent_at&order=sent_at.desc&limit=1";
+  const response=await fetch(url,{headers:{apikey:key,Authorization:"Bearer "+token},cache:"no-store"});
+  if(!response.ok)return NextResponse.json({error:"Unable to verify introduction history"},{status:response.status});
+  const rows=await response.json();
+  return NextResponse.json({sentAt:rows?.[0]?.sent_at||null},{headers:{"Cache-Control":"no-store"}});
+}
