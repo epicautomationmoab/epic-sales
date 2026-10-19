@@ -31,10 +31,10 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
   return NextResponse.json({ok:true,match:matches.length===1?{id:matches[0].contact_id,display_name:matches[0].display_name,tripworks_customer_id:null}:null,ambiguous:matches.length>1},{headers:{"Cache-Control":"no-store"}});
  }
  if(method==="POST"&&body.finalize===true){
-  const response=await fetch(URL+"/rest/v1/rpc/finalize_epicc360_lead_sheet",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_id:body.id||null,p_fields:body.fields,p_contact_id:body.contactId||null}),cache:"no-store"});
+  const response=await fetch(URL+"/rest/v1/rpc/finalize_and_claim_epicc360_lead_sheet",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_id:body.id||null,p_fields:body.fields,p_contact_id:body.contactId||null}),cache:"no-store"});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)return NextResponse.json({error:result.message||"Unable to finish saving this Lead Sheet"},{status:response.status});
-  return NextResponse.json({ok:true,rows:[result],linked:result.linked,contactId:result.contact_id});
+  return NextResponse.json({ok:true,rows:[result],linked:result.linked,contactId:result.contact_id,opportunityId:result.opportunity_id||null,opportunityStatus:result.opportunity_status||null});
  }
  const response=await fetch(`${URL}/rest/v1/${p}`,{method:method==="POST"?"POST":"GET",headers:{"apikey":KEY,"Authorization":`Bearer ${token}`,"Content-Type":"application/json",...(method==="POST"?{"Prefer":"resolution=merge-duplicates,return=representation"}:{})},body:payload?JSON.stringify(payload):undefined,cache:"no-store"});
  const result=await response.json().catch(()=>[]);
