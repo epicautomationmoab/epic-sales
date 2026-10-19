@@ -32,7 +32,7 @@ async function handler(request:NextRequest,method:"GET"|"POST"){
  }
  if(method==="POST"&&body.finalize===true){
   const rawPhone=String(body.fields.phone||"").trim();
-  const digits=rawPhone.replace(/\\D/g,"");
+  const digits=rawPhone.replace(/\D/g,"");
   if(rawPhone&&!(digits.length===10||(digits.length===11&&digits.startsWith("1"))))return NextResponse.json({error:"Enter a valid 10-digit phone number or leave the phone field blank."},{status:400});
   const response=await fetch(URL+"/rest/v1/rpc/finalize_and_claim_epicc360_lead_sheet",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({p_id:body.id||null,p_fields:body.fields,p_contact_id:body.contactId||null}),cache:"no-store"});
   const result=await response.json().catch(()=>({}));
