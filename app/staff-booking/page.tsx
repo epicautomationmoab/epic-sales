@@ -12,6 +12,15 @@ function dateLabel(value:string|null){
   return Number.isNaN(date.getTime())?value:date.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
 }
 
+function protectionDetails(addons:any[]){
+  const protection=addons.filter((a:any)=>/adventure\\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
+  const other=addons.filter((a:any)=>!/adventure\\s*assure/i.test(String(a?.name||a?.experience_addon?.title||"")));
+  return <>
+    {protection.map((a:any,i:number)=><div className={styles.protectionBadge} key={i}><span className={styles.protectionLabel}>PROTECTION SELECTED</span><strong>✓ {a?.name||a?.experience_addon?.title||"Adventure Assure"}</strong><b>{addonAmount(a)}</b></div>)}
+    {other.map((a:any,i:number)=><span className={styles.mutedAddon} key={i}>{a?.name||a?.experience_addon?.title||"Add-on"}</span>)}
+  </>;
+}
+
 export default async function StaffBookingPage({searchParams}:{searchParams:Promise<{draft?:string}>}){
   const params=await searchParams;
   const draftId=params.draft||"";
@@ -53,8 +62,8 @@ export default async function StaffBookingPage({searchParams}:{searchParams:Prom
       <div><span>Time</span><strong>{row.time_label||"—"}</strong></div>
       <div><span>Duration / Option</span><strong>{row.option_name||"—"}</strong></div>
     </div>
-    {bookings.length>1?<section className={styles.section}><h2>Vehicles / Bookings ({vehicleCount})</h2>{bookings.map((booking:any,index:number)=><div className={styles.line} key={index}><div><strong>Vehicle {index+1}: {booking.experience_name||row.experience_name||"Vehicle"}</strong><span>{booking.option_name||row.option_name||"—"}</span>{Array.isArray(booking.addons)&&booking.addons.length?<span>{booking.addons.map((a:any)=>a?.name||a?.experience_addon?.title||"Add-on").join(" · ")}</span>:null}</div></div>)}</section>:null}
-    {bookings.length>1?null:addons.length?<section className={styles.section}><h2>Add-ons / Protection</h2>{addons.map((addon:any,index:number)=><div className={styles.line} key={index}><div><strong>{addon?.name||addon?.experience_addon?.title||"Add-on"}</strong>{addon?.experience_addon?.title&&addon.experience_addon.title!==addon.name?<span>{addon.experience_addon.title}</span>:null}</div><em>{addonAmount(addon)}</em></div>)}</section>:null}
+    {bookings.length>1?<section className={styles.section}><h2>Vehicles / Bookings ({vehicleCount})</h2>{bookings.map((booking:any,index:number)=><div className={styles.line} key={index}><div><strong>Vehicle {index+1}: {booking.experience_name||row.experience_name||"Vehicle"}</strong><span>{booking.option_name||row.option_name||"—"}</span>{Array.isArray(booking.addons)&&booking.addons.length?protectionDetails(booking.addons):null}</div></div>)}</section>:null}
+    {bookings.length>1?null:addons.length?<section className={styles.section}><h2>Add-ons / Protection</h2>{protectionDetails(addons)}</section>:null}
     {bookings.length>1?null:products.length?<section className={styles.section}><h2>Products</h2>{products.map((product:any,index:number)=><div className={styles.line} key={index}><div><strong>{product?.name||product?.product?.name||"Product"}</strong>{product?.quantity?<span>Qty {product.quantity}</span>:null}</div><em>{typeof product?.price==="number"?money.format(product.price/100):""}</em></div>)}</section>:null}
     <div className={styles.total}><span>Draft Total</span><strong>{typeof row.value_cents==="number"?money.format(row.value_cents/100):"—"}</strong></div>
     <div className={styles.actions}>{customerUrl?<a className={styles.primary} href={customerUrl} target="_blank" rel="noreferrer">Open Customer in TripWorks</a>:null}</div>
