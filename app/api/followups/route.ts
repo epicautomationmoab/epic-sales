@@ -19,7 +19,8 @@ export async function GET(req:NextRequest){
  const id=req.nextUrl.searchParams.get("opportunity_id");
  if(id&&!/^[0-9a-f-]{36}$/i.test(id))return NextResponse.json({error:"Invalid customer"},{status:400});
  const items=await rpc(a.token,"epic_followup_list",{p_scope:scope,p_opportunity_id:id||null});
- return NextResponse.json({items,profile:a.user.id,supervisor:["manager","admin"].includes(a.user.role)});
+ const dismissedIds=scope==="mine"?await rpc(a.token,"epic_followup_dismissed_ids",{}):[];
+ return NextResponse.json({items,dismissedIds,profile:a.user.id,supervisor:["manager","admin"].includes(a.user.role)});
  }catch(e){return failure(e)}
 }
 export async function POST(req:NextRequest){
@@ -36,7 +37,7 @@ export async function PATCH(req:NextRequest){
  try {
  const b=await req.json();
  if(!/^[0-9a-f-]{36}$/i.test(String(b.id||"")))return NextResponse.json({error:"Invalid follow-up"},{status:400});
- const item=await rpc(a.token,"epic_followup_action",{p_id:b.id,p_action:b.action,p_outcome:b.outcome||null,p_note:String(b.note||"").slice(0,3000),p_due_at:b.due_at||null,p_assignee:b.assigned_to_profile_id||null});
+ const item=b.action==="dismiss"?await rpc(a.token,"epic_followup_dismiss",{p_id:b.id}):await rpc(a.token,"epic_followup_action",{p_id:b.id,p_action:b.action,p_outcome:b.outcome||null,p_note:String(b.note||"").slice(0,3000),p_due_at:b.due_at||null,p_assignee:b.assigned_to_profile_id||null});
  return NextResponse.json({ok:true,item});
  }catch(e){return failure(e)}
 }
