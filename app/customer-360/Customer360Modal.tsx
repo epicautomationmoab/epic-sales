@@ -179,6 +179,7 @@ export default function Customer360Modal(props:Props){
   const pastReservations=(data?.reservations||[]).filter(r=>!activeReservations.some(a=>a.id===r.id));
   const openLeads=(data?.opportunities||[]).filter(o=>o.status==="open");
   const futureDrafts=(data?.drafts||[]).filter(d=>d.is_current_draft!==false&&!d.converted_at);
+  const shoppingDrafts=[...(data?.drafts||[])].sort((a,b)=>new Date(b.last_seen_at||0).getTime()-new Date(a.last_seen_at||0).getTime());
   const quoteParams=new URLSearchParams();
   if(identity?.contact_id)quoteParams.set("contact",identity.contact_id);
   if(openLeads[0]?.id)quoteParams.set("opportunity",openLeads[0].id);
@@ -274,7 +275,13 @@ export default function Customer360Modal(props:Props){
         {openLeads.length?<div className={styles.sideSection}><h3>Active Lead</h3>{openLeads.map(o=><div key={o.id} className={styles.record}><div className={styles.recordTitle}>{o.interest_label||"Active sales opportunity"}</div><div className={styles.recordMeta}>{[o.lead_value_cents!=null?money.format(o.lead_value_cents/100):null,o.activity_window_start?fmtDate(o.activity_window_start):null,o.claimed_by_name||o.assigned_rep_name||"Unclaimed"].filter(Boolean).join(" · ")}</div><LeadWorkspaceAccess opportunityId={o.id}/><ScheduleFollowUp opportunityId={o.id}/><CustomerFollowUps opportunityId={o.id}/></div>)}</div>:null}
         {!openLeads.length&&data.opportunities?.[0]?.id?<div className={styles.sideSection}><h3>Customer Follow-Ups</h3><ScheduleFollowUp opportunityId={data.opportunities[0].id}/><CustomerFollowUps opportunityId={data.opportunities[0].id}/></div>:null}
         <div className={styles.summaryGrid}><div><span>Known Visits</span><strong>{data.reservations.length}</strong></div><div><span>Known Spend</span><strong>{money.format(lifetimeSpend/100)}</strong></div><div><span>Communications</span><strong>{communications}</strong></div><div><span>Open Sales Activity</span><strong>{openLeads.length}</strong></div></div>
-        {openLeads.length&&futureDrafts.length?<div className={styles.sideSection}><h3>Current Draft Activity</h3><div className={styles.compactRecord}><strong>{futureDrafts.length} TripWorks draft{futureDrafts.length===1?"":"s"}</strong><span>{money.format(futureDrafts.reduce((s,d)=>s+(d.value_cents||0),0)/100)} in current draft options</span></div></div>:null}
+        {shoppingDrafts.length?<div className={styles.sideSection}><h3>TripWorks Shopping History ({shoppingDrafts.length})</h3><div style={{fontSize:12,color:"#64748b",marginBottom:11}}>Most recently shopped first · individual draft details</div>{shoppingDrafts.map(d=><div key={d.id} className={styles.compactRecord} style={{display:"grid",gap:7,marginBottom:10,padding:"12px 13px",border:"1px solid #e2e8f0",borderRadius:11,background:"#fff"}}>
+ <strong style={{fontSize:14,color:"#17212e"}}>{d.experience_name||"Draft Reservation"}</strong>
+ {d.option_name?<span style={{fontSize:12,fontWeight:700,color:"#475569"}}>{d.option_name}</span>:null}
+ <span style={{fontSize:12,color:"#64748b"}}>Shopped {fmtDateTime(d.last_seen_at)}{d.activity_date?" · Visit "+fmtDate(d.activity_date):""}</span>
+ <span style={{fontSize:13,fontWeight:800,color:"#17212e"}}>{d.value_cents!=null?money.format(d.value_cents/100):"Total unavailable"} <span style={{fontSize:11,fontWeight:600,color:"#64748b"}}>· {d.converted_at?"Converted to booking":d.is_current_draft===false?"Closed draft":"Open draft"}</span></span>
+ {d.confirmation_code?<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><span style={{fontSize:11,color:"#64748b"}}>{d.confirmation_code}</span><a href={twReservationUrl(d.confirmation_code)||"#"} target="_blank" rel="noreferrer" style={{fontSize:12,fontWeight:750,color:"#c2410c"}}>Open in TripWorks ↗</a></div>:null}
+ </div>)}</div>:null}
         <div className={styles.sideSection}><h3>Customer Identity</h3><div className={styles.identityList}><div><span>Name</span><strong>{identity.name||"—"}</strong></div><div><span>Phone</span><strong>{identity.phone||"—"}</strong></div><div><span>Email</span><strong>{identity.email||"—"}</strong></div><div><span>TripWorks Customer</span><strong>{identity.tripworks_customer_code&&twCustomerUrl(identity.tripworks_customer_code)?<a href={twCustomerUrl(identity.tripworks_customer_code)!} target="_blank" rel="noreferrer">{identity.tripworks_customer_code}</a>:identity.tripworks_customer_id??"—"}</strong></div></div></div>
       </aside>
     </div>}
