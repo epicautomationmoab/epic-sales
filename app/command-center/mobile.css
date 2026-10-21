@@ -1,0 +1,2 @@
+.epic-command-center { min-width: 0; }
+@media (max-width: 800px) { .epic-command-center { display: block !important; } .epic-command-center > aside { width: auto; } .epic-command-center > main { padding: 16px; } }
