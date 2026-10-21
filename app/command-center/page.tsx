@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 import CustomersClient from "../customers/CustomersClient";
 import CommandCenterLiveActions from "./CommandCenterLiveActions";
+import OperationalLaunches from "./OperationalLaunches";
 
 // ISOLATED DESIGN BRANCH ONLY. This route reuses real C360 customer behavior.
 // Existing /customers, existing sidebars, APIs, auth and staff actions are untouched.
@@ -84,6 +85,7 @@ export default async function CommandCenterPreviewPage({
         <section style={{ background: "#fff", border: "1px solid #e2e7ef", borderRadius: 14, padding: "20px", marginTop: 21 }}>
           <CustomersClient initialQuery={params.q || ""} autoOpen={params.open === "1"} userId={profile.user_id || profile.id} />
         </section>
+        <OperationalLaunches />
       </main>
     </div>
   );
