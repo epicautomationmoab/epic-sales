@@ -20,6 +20,8 @@ const groups: { name: string; links: LinkDef[] }[] = [
   ]},
   { name: "READINESS & OPERATIONS", links: [
     { label: "Guest Readiness", href: "/team/readiness", owner: "tools" },
+    { label: "Arrival Board", href: "/team/arrival-board", owner: "tools" },
+    { label: "Kiosk", href: "/kiosk", owner: "tools" },
     { label: "Guest Lookup", href: "/team/previous-guests", owner: "tools" },
     { label: "Held-Over Rentals", href: "/team/active-rentals", owner: "tools" },
     { label: "Deposits On-Hold", href: "/team/deposits-on-hold", owner: "tools" },
