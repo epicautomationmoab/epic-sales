@@ -1,3 +1,4 @@
+import "./mobile.css";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
@@ -53,7 +54,7 @@ export default async function CommandCenterPreviewPage({
   if (!profile || !token || profile.role === "workstation") redirect("/employee-login");
   const canManage = profile.role === "admin" || profile.role === "manager";
   return (
-    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "minmax(230px,270px) minmax(0,1fr)", background: "#f5f7fa", color: "#17263b", fontFamily: "Arial,Helvetica,sans-serif" }}>
+    <div className="epic-command-center" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "minmax(230px,270px) minmax(0,1fr)", background: "#f5f7fa", color: "#17263b", fontFamily: "Arial,Helvetica,sans-serif" }}>
       <aside style={{ background: "#17263a", color: "#f4f7fc", padding: "24px 16px" }}>
         <div style={{ fontSize: 20, fontWeight: 850, letterSpacing: 1 }}>EPIC</div>
         <div style={{ fontSize: 12, color: "#b9cadb", marginBottom: 24 }}>COMMAND CENTER · INTEGRATION REVIEW</div>
