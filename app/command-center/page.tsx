@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthenticatedTeamProfile } from "../../lib/team-auth";
 import CustomersClient from "../customers/CustomersClient";
+import CommandCenterLiveActions from "./CommandCenterLiveActions";
 
 // ISOLATED DESIGN BRANCH ONLY. This route reuses real C360 customer behavior.
 // Existing /customers, existing sidebars, APIs, auth and staff actions are untouched.
@@ -77,6 +78,7 @@ export default async function CommandCenterPreviewPage({
           <a href="/inbox" style={{ border: "1px solid #c6d2df", padding: "10px 15px", borderRadius: 9, color: "#263d58", textDecoration: "none" }}>Open full Inbox ↗</a>
         </div>
         <p style={{ maxWidth: 800, color: "#516175", fontSize: 14 }}>This workspace uses Epic's existing customer search and original Customer360Modal. Opening a customer runs the existing real C360 workflows, including communications, Lead Sheet, notes, quotes, follow-ups, individual drafts and the existing Book It helper.</p>
+        <CommandCenterLiveActions />
         <section style={{ background: "#fff", border: "1px solid #e2e7ef", borderRadius: 14, padding: "20px", marginTop: 21 }}>
           <CustomersClient initialQuery={params.q || ""} autoOpen={params.open === "1"} userId={profile.user_id || profile.id} />
         </section>
