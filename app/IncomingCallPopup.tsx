@@ -9,6 +9,7 @@ const STORAGE="epicc360-pending-incoming-call";
 export default function IncomingCallPopup() {
   const [call,setCall]=useState<Call|null>(null);
   const [error,setError]=useState(false);
+  const [clearing,setClearing]=useState(false);
   const [sheet,setSheet]=useState<Call|null>(null);
   const [manual,setManual]=useState(false);
   const [manualId,setManualId]=useState("manual");
@@ -52,6 +53,17 @@ export default function IncomingCallPopup() {
     try{sessionStorage.removeItem(STORAGE);}catch{}
     try{await fetch("/api/live-calls",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({live_call_id:id})});}catch{}
   }
+  async function dismissAll(){
+    if(clearing)return;
+    setClearing(true);
+    try{
+      const response=await fetch("/api/live-calls",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"dismiss_all"})});
+      if(!response.ok)throw Error("Unable to dismiss pending calls");
+      setCall(null);
+      setError(false);
+      try{sessionStorage.removeItem(STORAGE);}catch{}
+    }catch{setError(true);}finally{setClearing(false);}
+  }
   const manualPanel=manual?<GuidedLeadSheet phone="" name="" draftId={manualId} onClose={()=>setManual(false)}/>:null;
   if(!call)return <>{manualPanel}{sheet?<GuidedLeadSheet phone={sheet.caller_phone||""} name={sheet.caller_name||""} onClose={()=>setSheet(null)}/>:null}</>;
   const known=Boolean(call.route_kind&&call.route_kind!=="new_lead");
@@ -70,6 +82,7 @@ export default function IncomingCallPopup() {
       <a href={url} onClick={e=>{if(!known){e.preventDefault();setSheet(call);}void dismiss();}} style={{flex:1,padding:"9px 10px",borderRadius:7,background:"#c92320",color:"#fff",textAlign:"center",textDecoration:"none",fontSize:12,fontWeight:800}}>{known?"Open C360":"Open Lead Sheet"}</a>
       <button type="button" onClick={()=>void dismiss()} style={{borderRadius:7,border:"1px solid #d6d6d6",background:"#fff",padding:"9px 10px",fontSize:12,cursor:"pointer"}}>Dismiss</button>
     </div>
+    <button type="button" disabled={clearing} onClick={()=>void dismissAll()} style={{marginTop:9,padding:"6px 4px",border:0,background:"transparent",color:"#586675",fontSize:12,fontWeight:700,cursor:clearing?"wait":"pointer",textDecoration:"underline"}}>{clearing?"Dismissing…":"Dismiss All Pending Calls"}</button>
     {error&&<div style={{fontSize:11,color:"#a33",marginTop:8}}>Call feed temporarily unavailable</div>}
   </aside>{sheet?<GuidedLeadSheet phone={sheet.caller_phone||""} name={sheet.caller_name||""} onClose={()=>setSheet(null)}/>:null}</>;
 }
